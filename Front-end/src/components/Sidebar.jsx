@@ -52,7 +52,7 @@ export default function Sidebar({ open, toggleDrawer, drawerWidth, glassStyle })
       <List component="nav">
         <ListItemButton component={Link} to="/Dashboard" sx={{ minHeight: 48, justifyContent: open ? 'initial' : 'center', px: 2.5 }}>
           <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 'auto', justifyContent: 'center' }}>
-            <DashboardIcon color="" />
+            <DashboardIcon />
           </ListItemIcon>
           <ListItemText primary="Dashboard" sx={{ opacity: open ? 1 : 0 }} />
         </ListItemButton>
@@ -80,7 +80,7 @@ export default function Sidebar({ open, toggleDrawer, drawerWidth, glassStyle })
         <ListItemButton component={Link} to="/" sx={{ minHeight: 48, justifyContent: open ? 'initial' : 'center', px: 2.5 }}>
           <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 'auto', justifyContent: 'center' }}>
            
-            <FitnessCenterIcon color="" />
+            <FitnessCenterIcon/>
           </ListItemIcon>
           <ListItemText primary="Máquinas" sx={{ opacity: open ? 1 : 0 }} />
         </ListItemButton>

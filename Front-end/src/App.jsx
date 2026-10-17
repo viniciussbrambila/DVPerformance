@@ -1,15 +1,16 @@
+import Login from './pages/Login';
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'; 
 import { styled, ThemeProvider } from '@mui/material/styles';
 import { 
   CssBaseline, Box, Toolbar, Typography, IconButton, Badge, Container, Grid, Switch
 } from '@mui/material';
+import Darktheme, { darkGlassStyle } from './themes/Dark.js';
+import Lighttheme, { lightGlassStyle } from './themes/Light';
 import MuiAppBar from '@mui/material/AppBar';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 
-import Darktheme from './themes/Dark';
-import Lighttheme from './themes/Light';
 import Sidebar from './components/Sidebar';
 import Home from './pages/Home';
 import Alunos from './pages/Alunos';
@@ -95,66 +96,95 @@ const MaterialUISwitch = styled(Switch)(({ theme }) => ({
 
 export default function App() {
   const [open, setOpen] = useState(true);
-  const toggleDrawer = () => setOpen(!open);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
 
-  // Começa como true para o Dark Mode ser o padrão
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+  const toggleDrawer = () => {
+    setOpen(!open);
+  };
+
+  const handleThemeChange = (event) => {
+    setIsDarkMode(event.target.checked);
+  };
+
+  const glassStyle = isDarkMode ? darkGlassStyle : lightGlassStyle;
 
   return (
-    <ThemeProvider theme={isDarkMode ? Darktheme : Lighttheme}>
-      <Router>
+    <Router>
+      <ThemeProvider theme={isDarkMode ? Darktheme : Lighttheme}>
         <CssBaseline />
-        <Box sx={{ display: 'flex' }}>
-          <AppBar position="absolute" open={open} elevation={0}>
-            <Toolbar sx={{ pr: '24px' }}>
-              <IconButton 
-                edge="start" 
-                color="inherit" 
-                onClick={toggleDrawer} 
-                sx={{ marginRight: '36px', ...(open && { display: 'none' }) }}
-              >
-                <MenuIcon />
-              </IconButton>
-              
-              <Typography component="h1" variant="h6" color="inherit" noWrap sx={{ flexGrow: 1 }}>
-                DV Performance
-              </Typography>
 
-              {/* AQUI ENTRAMOS COM O SWITCH NO LUGAR DO BOTÃO ANTIGO */}
-              <MaterialUISwitch 
-                checked={isDarkMode} 
-                onChange={toggleTheme} 
-                sx={{ mr: 1 }} 
-              />
+        {/* Se NÃO estiver logado (!isLoggedIn), mostra APENAS a tela de Login */}
+        {!isLoggedIn ? (
+          <Login 
+            glassStyle={glassStyle} 
+            onLogin={() => setIsLoggedIn(true)} 
+          />
+        ) : (
+          /* Se ESTIVER logado, mostra a AppBar, a Sidebar e as páginas do sistema */
+          <Box sx={{ display: 'flex' }}>
+            <AppBar position="fixed" open={open} sx={{ ...glassStyle }}>
+              <Toolbar sx={{ pr: '24px' }}>
+                <IconButton
+                  edge="start"
+                  color="inherit"
+                  aria-label="open drawer"
+                  onClick={toggleDrawer}
+                  sx={{
+                    marginRight: '36px',
+                    ...(open && { display: 'none' }),
+                  }}
+                >
+                  <MenuIcon />
+                </IconButton>
+                
+                <Typography
+                  component="h1"
+                  variant="h6"
+                  color="inherit"
+                  noWrap
+                  sx={{ flexGrow: 1 }}
+                >
+                  DV Performance
+                </Typography>
 
-              <IconButton color="inherit">
-                <Badge badgeContent={978} color="error">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-            </Toolbar>
-          </AppBar>
+                <MaterialUISwitch 
+                  checked={isDarkMode} 
+                  onChange={handleThemeChange} 
+                />
 
-          <Sidebar open={open} toggleDrawer={toggleDrawer} drawerWidth={drawerWidth} />
+                <IconButton color="inherit">
+                  <Badge badgeContent={978} color="secondary">
+                    <NotificationsIcon />
+                  </Badge>
+                </IconButton>
+              </Toolbar>
+            </AppBar>
 
-          <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto' }}>
-            <Toolbar />
-            <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Routes>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/" element={<Home />} />
-                    <Route path="/alunos" element={<Alunos />} />
-                    <Route path="/treinos" element={<Treinos />} />
-                  </Routes>
-                </Grid>
-              </Grid>
-            </Container>
+            <Sidebar open={open} toggleDrawer={toggleDrawer} drawerWidth={drawerWidth} glassStyle={glassStyle} />
+
+           <Box
+             component="main"
+  sx={{
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: '100vh',
+    overflow: 'auto',
+    p: 3,
+    color: 'text.primary',
+  }}
+            >
+              <Toolbar />
+              <Routes>
+                <Route path="/dashboard" element={<Dashboard glassStyle={glassStyle} />} />
+                <Route path="/" element={<Home glassStyle={glassStyle} />} />
+                <Route path="/alunos" element={<Alunos glassStyle={glassStyle} />} />
+                <Route path="/treinos" element={<Treinos glassStyle={glassStyle} />} />
+              </Routes>
+            </Box>
           </Box>
-        </Box>
-      </Router>
-    </ThemeProvider>
+        )}
+      </ThemeProvider>
+    </Router>
   );
 }

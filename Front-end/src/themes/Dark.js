@@ -135,13 +135,25 @@ const DarkTheme = createTheme({
     },
 
     MuiOutlinedInput: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-        },
+  styleOverrides: {
+    root: {
+      borderRadius: 8,
+
+      '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+      },
+
+      '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: 'rgba(255, 255, 255, 0.35)',
+      },
+
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#2563EB',
       },
     },
   },
+},
+},
 });
 
 export default DarkTheme;
