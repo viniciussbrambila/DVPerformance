@@ -3,3 +3,17 @@
 **/.env
 **/.env.*
 *.log
+
+# .NET / C#
+**/bin/
+**/obj/
+
+# Arquivos locais do Rider
+.idea/
+
+# Configurações locais de usuário do Visual Studio
+*.user
+*.suo
+
+# Configurações locais e segredos de desenvolvimento
+appsettings.Development.json
