@@ -1,3 +1,4 @@
+using DVPerformance.Api.Models;
 namespace DVPerformance.Api;
 
 public class Program
@@ -13,36 +14,23 @@ public class Program
         builder.Services.AddOpenApi();
 
         var app = builder.Build();
-
-        // Configure the HTTP request pipeline.
-        if (app.Environment.IsDevelopment())
+        app.MapGet("/Alunos", () =>
         {
-            app.MapOpenApi();
-        }
-
-        app.UseHttpsRedirection();
-
-        app.UseAuthorization();
-
-        var summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
-        app.MapGet("/weatherforecast", (HttpContext httpContext) =>
+            var aluno = new Aluno
             {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                        new WeatherForecast
-                        {
-                            Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                            TemperatureC = Random.Shared.Next(-20, 55),
-                            Summary = summaries[Random.Shared.Next(summaries.Length)]
-                        })
-                    .ToArray();
-                return forecast;
-            })
-            .WithName("GetWeatherForecast");
+                Id = 1,
+                Nome = "João Silva",
+                Sexo = "Masculino",
+                Idade = 25,
+                Experiencia = "Iniciante",
+                FrequenciaSemanal = 4,
+                Objetivo = "Hipertrofia"
+            };
 
+            return aluno;
+        });
+
+       
         app.Run();
     }
 }
