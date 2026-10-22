@@ -1,6 +1,38 @@
 @DVPerformance.Api_HostAddress = http://localhost:5011
 
-GET {{DVPerformance.Api_HostAddress}}/weatherforecast/
+### 1. Listar todos os alunos
+GET {{DVPerformance.Api_HostAddress}}/alunos
 Accept: application/json
 
-###
+### 2. Buscar um aluno específico pelo ID
+GET {{DVPerformance.Api_HostAddress}}/alunos/1
+Accept: application/json
+
+### 3. Cadastrar um novo aluno (POST)
+POST {{DVPerformance.Api_HostAddress}}/alunos
+Content-Type: application/json
+
+{
+  "nome": "Carlos Eduardo",
+  "idade": 22,
+  "sexo": "M",
+  "experiencia": "Iniciante",
+  "frequenciaSemanal": 4,
+  "objetivo": "Hipertrofia"
+}
+
+### 4. Atualizar um aluno existente (PUT)
+PUT {{DVPerformance.Api_HostAddress}}/alunos/1
+Content-Type: application/json
+
+{
+  "nome": "João Carlos Atualizado",
+  "idade": 29,
+  "sexo": "M",
+  "experiencia": "Avançado",
+  "frequenciaSemanal": 5,
+  "objetivo": "Força"
+}
+
+### 5. Excluir um aluno (DELETE)
+DELETE {{DVPerformance.Api_HostAddress}}/alunos/3

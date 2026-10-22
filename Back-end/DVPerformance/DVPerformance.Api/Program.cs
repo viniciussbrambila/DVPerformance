@@ -1,4 +1,5 @@
-using DVPerformance.Api.Models;
+using DVPerformance.Api.Endpoints;
+
 namespace DVPerformance.Api;
 
 public class Program
@@ -7,30 +8,35 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Add services to the container.
+        // 1. Configuração de Serviços
         builder.Services.AddAuthorization();
-
-        // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
 
-        var app = builder.Build();
-        app.MapGet("/Alunos", () =>
+        // Permite que o Front-end (React/Vite) faça requisições para esta API
+        builder.Services.AddCors(options =>
         {
-            var aluno = new Aluno
+            options.AddPolicy("PermitirFrontEnd", policy =>
             {
-                Id = 1,
-                Nome = "João Silva",
-                Sexo = "Masculino",
-                Idade = 25,
-                Experiencia = "Iniciante",
-                FrequenciaSemanal = 4,
-                Objetivo = "Hipertrofia"
-            };
-
-            return aluno;
+                policy.AllowAnyOrigin()
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            });
         });
 
-       
+        var app = builder.Build();
+
+        // 2. Configuração do Pipeline HTTP (Middlewares)
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapOpenApi();
+        }
+
+        app.UseCors("PermitirFrontEnd");
+        app.UseAuthorization();
+
+        // 3. Mapeamento dos Endpoints (Minimal APIs organizadas por arquivo)
+        app.MapAlunoEndpoints();
+
         app.Run();
     }
 }
