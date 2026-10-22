@@ -1,34 +1,52 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Typography, Paper, Box, Button, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Dialog, DialogTitle, 
-  DialogContent, DialogActions, TextField, MenuItem, Grid
+  DialogContent, DialogActions, TextField, MenuItem, Grid, Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-const alunosIniciais = [
-  { id: 1, nome: 'João Carlos', idade: 28, sexo: 'M', objetivo: 'Hipertrofia', experiencia: 'Intermediário', frequenciaSemanal: 5 },
-  { id: 2, nome: 'Maria Clara', idade: 34, sexo: 'F', objetivo: 'Emagrecimento', experiencia: 'Iniciante', frequenciaSemanal: 3 },
-  { id: 3, nome: 'Sr. Antônio', idade: 66, sexo: 'M', objetivo: 'Condicionamento', experiencia: 'Iniciante', frequenciaSemanal: 3 },
-];
+const API_URL = 'http://localhost:5011/alunos';
 
 export default function Alunos({ glassStyle }) {
-  const [alunos, setAlunos] = useState(alunosIniciais);
+  const [alunos, setAlunos] = useState([]);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // Guarda o ID do aluno em edição (ou null se for novo)
   const [tentouGravar, setTentouGravar] = useState(false); // Ativa os avisos nos campos vazios ao tentar salvar
+  const [errosApi, setErrosApi] = useState([]); // Guarda mensagens de erro vindas do Back-end
   const [formData, setFormData] = useState({
     nome: '', idade: '', sexo: '', experiencia: '', frequenciaSemanal: '', objetivo: ''
   });
 
-  const handleAbrirModal = () => setOpen(true);
+  // Carrega a lista de alunos do Back-end ao abrir a página
+  const carregarAlunos = async () => {
+    try {
+      const response = await fetch(API_URL);
+      if (response.ok) {
+        const dados = await response.json();
+        setAlunos(dados);
+      }
+    } catch (erro) {
+      console.error('Erro ao conectar com a API:', erro);
+    }
+  };
+
+  useEffect(() => {
+    carregarAlunos();
+  }, []);
+
+  const handleAbrirModal = () => {
+    setErrosApi([]);
+    setOpen(true);
+  };
 
   const handleFecharModal = () => {
     setOpen(false);
     setEditingId(null); // Sai do modo de edição ao fechar
     setTentouGravar(false); // Limpa os avisos de erro ao fechar
+    setErrosApi([]);
     setFormData({ nome: '', idade: '', sexo: '', experiencia: '', frequenciaSemanal: '', objetivo: '' });
   };
 
@@ -49,6 +67,7 @@ export default function Alunos({ glassStyle }) {
   const handleEditar = (aluno) => {
     setEditingId(aluno.id);
     setTentouGravar(false);
+    setErrosApi([]);
     setFormData({
       nome: aluno.nome,
       idade: String(aluno.idade),
@@ -60,9 +79,19 @@ export default function Alunos({ glassStyle }) {
     setOpen(true);
   };
 
-  // Remove o aluno filtrando a lista pelo ID
-  const handleExcluir = (id) => {
-    setAlunos(alunos.filter((aluno) => aluno.id !== id));
+  // Remove o aluno no Back-end pelo ID
+  const handleExcluir = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setAlunos(alunos.filter((aluno) => aluno.id !== id));
+      }
+    } catch (erro) {
+      console.error('Erro ao excluir aluno:', erro);
+    }
   };
 
   // Verifica se todos os 6 campos estão preenchidos corretamente
@@ -75,22 +104,57 @@ export default function Alunos({ glassStyle }) {
     formData.frequenciaSemanal !== '' &&
     formData.objetivo.trim() !== '';
 
-  const handleGravar = () => {
+  const handleGravar = async () => {
     // Se faltar algum campo, mostra os avisos vermelhos nos campos vazios e interrompe
     if (!formularioValido) {
       setTentouGravar(true);
       return;
     }
 
-    if (editingId) {
-      // Atualiza apenas o aluno que está sendo editado
-      setAlunos(alunos.map((aluno) => (aluno.id === editingId ? { ...aluno, ...formData } : aluno)));
-    } else {
-      // Cria um novo aluno com ID único
-      const novoAluno = { id: Date.now(), ...formData };
-      setAlunos([...alunos, novoAluno]);
+    setErrosApi([]);
+
+    const payload = {
+      nome: formData.nome,
+      idade: Number(formData.idade),
+      sexo: formData.sexo,
+      experiencia: formData.experiencia,
+      frequenciaSemanal: Number(formData.frequenciaSemanal),
+      objetivo: formData.objetivo
+    };
+
+    try {
+      const url = editingId ? `${API_URL}/${editingId}` : API_URL;
+      const metodo = editingId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const dadosResposta = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (dadosResposta?.erros && Array.isArray(dadosResposta.erros)) {
+          setErrosApi(dadosResposta.erros);
+        } else if (dadosResposta?.mensagem) {
+          setErrosApi([dadosResposta.mensagem]);
+        } else {
+          setErrosApi(['Não foi possível salvar os dados do aluno.']);
+        }
+        return;
+      }
+
+      if (editingId) {
+        setAlunos(alunos.map((aluno) => (aluno.id === editingId ? dadosResposta : aluno)));
+      } else {
+        setAlunos([...alunos, dadosResposta]);
+      }
+
+      handleFecharModal();
+    } catch (erro) {
+      setErrosApi(['Não foi possível conectar ao servidor Back-end (verifique se a API está rodando na porta 5011).']);
     }
-    handleFecharModal();
   };
 
   return (
@@ -157,6 +221,13 @@ export default function Alunos({ glassStyle }) {
       >
         <DialogTitle>{editingId ? 'Editar Aluno' : 'Registar Novo Aluno'}</DialogTitle>
         <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+          {errosApi.length > 0 && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errosApi.map((erro, index) => (
+                <div key={index}>{erro}</div>
+              ))}
+            </Alert>
+          )}
           <Grid container spacing={2} sx={{ mt: 2 }}>
             <Grid size={10}>
               <TextField 
@@ -229,16 +300,22 @@ export default function Alunos({ glassStyle }) {
                 ))}
               </TextField>
             </Grid>
-            <Grid size={4}>
+            <Grid size={6}>
               <TextField 
                 fullWidth 
+                select 
                 label="Objetivo" 
                 name="objetivo" 
                 value={formData.objetivo} 
                 onChange={handleChange}
                 error={tentouGravar && !formData.objetivo.trim()}
-                helperText={tentouGravar && !formData.objetivo.trim() ? 'Informe o objetivo' : ''}
-              />
+                helperText={tentouGravar && !formData.objetivo.trim() ? 'Selecione o objetivo' : ''}
+              >
+                <MenuItem value="Hipertrofia">Hipertrofia</MenuItem>
+                <MenuItem value="Emagrecimento">Emagrecimento</MenuItem>
+                <MenuItem value="Força">Força</MenuItem>
+                <MenuItem value="Resistência">Resistência</MenuItem>
+              </TextField>
             </Grid>
           </Grid>
         </DialogContent>
