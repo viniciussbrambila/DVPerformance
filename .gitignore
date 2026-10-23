@@ -1,19 +1,36 @@
+# Front-end / Node
 **/node_modules/
 **/dist/
 **/.env
 **/.env.*
+!**/.env.example
 *.log
+npm-debug.log*
 
-# .NET / C#
-**/bin/
-**/obj/
+# .NET / C# (Ignora maiúsculas e minúsculas em qualquer subpasta)
+**/[Bb]in/
+**/[Oo]bj/
+**/[Dd]ebug/
+**/[Rr]elease/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nupkg
+*.snupkg
 
-# Arquivos locais do Rider
-.idea/
+# IDEs: JetBrains Rider e VS Code
+**/.idea/
+**/.vscode/
 
-# Configurações locais de usuário do Visual Studio
+# IDE: Visual Studio (Cache e configurações locais)
+**/.vs/
 *.user
 *.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+**/Properties/launchSettings.json.user
 
 # Configurações locais e segredos de desenvolvimento
-appsettings.Development.json
+**/appsettings.Development.json
+**/appsettings.Local.json
