@@ -32,7 +32,7 @@ export default function Login({
     }
 
     // Se ambos estiverem preenchidos, avisa o App.jsx que o login foi feito!
-    onLogin();
+    onLogin({ usuario });
   };
   return (
     <Box

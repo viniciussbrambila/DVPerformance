@@ -2,21 +2,9 @@ import Login from "./pages/Login";
 import { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { styled, ThemeProvider } from "@mui/material/styles";
-import {
-  CssBaseline,
-  Box,
-  Toolbar,
-  Typography,
-  IconButton,
-  Badge,
-  Container,
-  Grid,
-  Switch,
-} from "@mui/material";
+import { CssBaseline, Box, IconButton, Badge, Switch } from "@mui/material";
 import Darktheme, { darkGlassStyle } from "./themes/Dark.js";
 import Lighttheme, { lightGlassStyle } from "./themes/Light";
-import MuiAppBar from "@mui/material/AppBar";
-import MenuIcon from "@mui/icons-material/Menu";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 
 import Sidebar from "./components/Sidebar";
@@ -28,24 +16,6 @@ import Cadastro from "./pages/Cadastro";
 import EsqueciSenha from "./pages/EsqueciSenha";
 
 const drawerWidth = 240;
-
-const AppBar = styled(MuiAppBar, {
-  shouldForwardProp: (prop) => prop !== "open",
-})(({ theme, open }) => ({
-  zIndex: theme.zIndex.drawer + 1,
-  transition: theme.transitions.create(["width", "margin"], {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
-  ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(["width", "margin"], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  }),
-}));
 
 // SWITCH PERSONALIZADO AQUI:
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
@@ -105,14 +75,11 @@ const MaterialUISwitch = styled(Switch)(({ theme }) => ({
 }));
 
 export default function App() {
-  const [open, setOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
   const [telaAuth, setTelaAuth] = useState("login"); // 'login' ou 'cadastro'
-
-  const toggleDrawer = () => {
-    setOpen(!open);
-  };
+  const [usuarioLogado, setUsuarioLogado] = useState(null);
+  const [perfilCadastrado, setPerfilCadastrado] = useState("personal");
 
   const handleThemeChange = (event) => {
     setIsDarkMode(event.target.checked);
@@ -129,7 +96,10 @@ export default function App() {
           telaAuth === "login" ? (
             <Login
               glassStyle={glassStyle}
-              onLogin={() => setIsLoggedIn(true)}
+              onLogin={({ usuario }) => {
+                setUsuarioLogado({ nome: usuario, perfil: perfilCadastrado });
+                setIsLoggedIn(true);
+              }}
               onIrCadastro={() => setTelaAuth("cadastro")}
               onIrEsqueciSenha={() => setTelaAuth("esqueci")}
             />
@@ -138,6 +108,7 @@ export default function App() {
               glassStyle={glassStyle}
               onCadastro={(dados) => {
                 console.log("Novo cadastro:", dados);
+                setPerfilCadastrado(dados.perfil);
                 setTelaAuth("login");
               }}
               onVoltarLogin={() => setTelaAuth("login")}
@@ -150,52 +121,40 @@ export default function App() {
             />
           )
         ) : (
-          /* Se ESTIVER logado, mostra a AppBar, a Sidebar e as páginas do sistema */
           <Box sx={{ display: "flex" }}>
-            <AppBar position="fixed" open={open} sx={{ ...glassStyle }}>
-              <Toolbar sx={{ pr: "24px" }}>
-                <IconButton
-                  edge="start"
-                  color="inherit"
-                  aria-label="open drawer"
-                  onClick={toggleDrawer}
-                  sx={{
-                    marginRight: "36px",
-                    ...(open && { display: "none" }),
-                  }}
-                >
-                  <MenuIcon />
-                </IconButton>
-
-                <Typography
-                  component="h1"
-                  variant="h6"
-                  color="inherit"
-                  noWrap
-                  sx={{ flexGrow: 1 }}
-                >
-                  DV Performance
-                </Typography>
-
-                <MaterialUISwitch
-                  checked={isDarkMode}
-                  onChange={handleThemeChange}
-                />
-
-                <IconButton color="inherit">
-                  <Badge badgeContent={978} color="secondary">
-                    <NotificationsIcon />
-                  </Badge>
-                </IconButton>
-              </Toolbar>
-            </AppBar>
-
             <Sidebar
-              open={open}
-              toggleDrawer={toggleDrawer}
               drawerWidth={drawerWidth}
               glassStyle={glassStyle}
+              usuarioLogado={usuarioLogado}
+              onSair={() => {
+                setIsLoggedIn(false);
+                setUsuarioLogado(null);
+                setTelaAuth("login");
+              }}
             />
+
+            <Box
+              sx={{
+                position: "fixed",
+                top: 16,
+                right: 24,
+                zIndex: 1200,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              <MaterialUISwitch
+                checked={isDarkMode}
+                onChange={handleThemeChange}
+              />
+
+              <IconButton color="inherit">
+                <Badge badgeContent={978} color="secondary">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+            </Box>
 
             <Box
               component="main"
@@ -205,10 +164,10 @@ export default function App() {
                 minHeight: "100vh",
                 overflow: "auto",
                 p: 3,
+                pt: 10,
                 color: "text.primary",
               }}
             >
-              <Toolbar />
               <Routes>
                 <Route
                   path="/dashboard"
