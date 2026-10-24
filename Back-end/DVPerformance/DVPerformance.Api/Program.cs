@@ -61,6 +61,7 @@ public class Program
         app.UseAuthorization();
 
         // 4. Mapeamento dos Endpoints (Minimal APIs organizadas por arquivo)
+        app.MapAuthEndpoints();
         app.MapAlunoEndpoints();
 
         app.Run();
