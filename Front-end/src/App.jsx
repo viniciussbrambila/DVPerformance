@@ -14,6 +14,7 @@ import Treinos from "./pages/Treinos";
 import Dashboard from "./pages/Dashboard";
 import Cadastro from "./pages/Cadastro";
 import EsqueciSenha from "./pages/EsqueciSenha";
+import Exercicios from "./pages/Exercicios";
 
 const drawerWidth = 240;
 
@@ -181,6 +182,10 @@ export default function App() {
                 <Route
                   path="/treinos"
                   element={<Treinos glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/exercicios"
+                  element={<Exercicios glassStyle={glassStyle} />}
                 />
               </Routes>
             </Box>
