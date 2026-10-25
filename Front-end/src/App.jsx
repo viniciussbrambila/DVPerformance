@@ -80,7 +80,6 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
   const [telaAuth, setTelaAuth] = useState("login"); // 'login' ou 'cadastro'
   const [usuarioLogado, setUsuarioLogado] = useState(null);
-  const [perfilCadastrado, setPerfilCadastrado] = useState("personal");
 
   const handleThemeChange = (event) => {
     setIsDarkMode(event.target.checked);
@@ -97,8 +96,13 @@ export default function App() {
           telaAuth === "login" ? (
             <Login
               glassStyle={glassStyle}
-              onLogin={({ usuario }) => {
-                setUsuarioLogado({ nome: usuario, perfil: perfilCadastrado });
+              onLogin={(dados) => {
+                const usuario = {
+                  ...dados,
+                  nome: dados.nome || dados.usuario,
+                };
+                localStorage.setItem("usuarioLogado", JSON.stringify(usuario));
+                setUsuarioLogado(usuario);
                 setIsLoggedIn(true);
               }}
               onIrCadastro={() => setTelaAuth("cadastro")}
@@ -107,9 +111,7 @@ export default function App() {
           ) : telaAuth === "cadastro" ? (
             <Cadastro
               glassStyle={glassStyle}
-              onCadastro={(dados) => {
-                console.log("Novo cadastro:", dados);
-                setPerfilCadastrado(dados.perfil);
+              onCadastro={() => {
                 setTelaAuth("login");
               }}
               onVoltarLogin={() => setTelaAuth("login")}
@@ -117,7 +119,7 @@ export default function App() {
           ) : (
             <EsqueciSenha
               glassStyle={glassStyle}
-              onEnviar={(dados) => console.log("Recuperar senha:", dados)}
+              onEnviar={() => {}}
               onVoltarLogin={() => setTelaAuth("login")}
             />
           )
@@ -128,6 +130,7 @@ export default function App() {
               glassStyle={glassStyle}
               usuarioLogado={usuarioLogado}
               onSair={() => {
+                localStorage.removeItem("usuarioLogado");
                 setIsLoggedIn(false);
                 setUsuarioLogado(null);
                 setTelaAuth("login");

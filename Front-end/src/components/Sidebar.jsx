@@ -120,7 +120,7 @@ export default function Sidebar({
 
         <Box sx={{ px: 2.5, py: 1.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: "bold" }} noWrap>
-            {usuarioLogado?.nome}
+            {usuarioLogado?.nome || usuarioLogado?.usuario}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {usuarioLogado?.perfil === "admin" ? "Admin" : "Personal"}

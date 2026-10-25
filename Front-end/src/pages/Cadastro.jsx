@@ -5,17 +5,15 @@ import {
   TextField,
   Button,
   Link,
+  Alert,
   IconButton,
   InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormHelperText,
 } from "@mui/material";
 import { useState } from "react";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+
+const API_CADASTRO_URL = "http://localhost:5011/auth/cadastro";
 
 export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,21 +21,61 @@ export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
-  const [perfil, setPerfil] = useState("");
   const [tentouCadastrar, setTentouCadastrar] = useState(false);
+  const [erroApi, setErroApi] = useState("");
+  const [carregando, setCarregando] = useState(false);
 
+  const usuarioTrim = usuario.trim();
+  const usuarioInvalido = usuarioTrim.length < 3 || usuarioTrim.length > 50;
   const senhaCurta = senha.length < 6;
   const senhasDiferentes = senha !== confirmarSenha;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setTentouCadastrar(true);
+    setErroApi("");
 
-    if (!usuario.trim() || senhaCurta || senhasDiferentes || !perfil) {
+    if (usuarioInvalido || senhaCurta || senhasDiferentes) {
       return;
     }
 
-    onCadastro({ usuario, senha, perfil });
+    setCarregando(true);
+    try {
+      const response = await fetch(API_CADASTRO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usuario: usuarioTrim,
+          senha,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setErroApi(
+          data?.erros?.[0] ||
+            data?.mensagem ||
+            "Não foi possível criar a conta.",
+        );
+        return;
+      }
+
+      const dadosUsuario = {
+        ...data,
+        usuario: data?.usuario || usuarioTrim,
+        nome: data?.nome || data?.usuario || usuarioTrim,
+      };
+
+      localStorage.setItem("usuarioLogado", JSON.stringify(dadosUsuario));
+      onCadastro(dadosUsuario);
+    } catch (erro) {
+      setErroApi(
+        "Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em http://localhost:5011.",
+      );
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const campoSenhaProps = (visivel, setVisivel) => ({
@@ -97,13 +135,19 @@ export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
             gap: 2,
           }}
         >
+          {erroApi && <Alert severity="error">{erroApi}</Alert>}
+
           <TextField
             label="Nome de usuário"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
-            error={tentouCadastrar && !usuario.trim()}
+            error={tentouCadastrar && usuarioInvalido}
             helperText={
-              tentouCadastrar && !usuario.trim() ? "Informe o seu usuário" : ""
+              tentouCadastrar && !usuarioTrim
+                ? "Informe o seu usuário"
+                : tentouCadastrar && usuarioInvalido
+                  ? "O usuário deve ter entre 3 e 50 caracteres"
+                  : ""
             }
           />
 
@@ -135,25 +179,14 @@ export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
             slotProps={campoSenhaProps(showConfirmar, setShowConfirmar)}
           />
 
-          <FormControl fullWidth error={tentouCadastrar && !perfil}>
-            <InputLabel id="perfil-label">Entrar como</InputLabel>
-            <Select
-              labelId="perfil-label"
-              id="perfil"
-              value={perfil}
-              label="Entrar como"
-              onChange={(e) => setPerfil(e.target.value)}
-            >
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="personal">Personal</MenuItem>
-            </Select>
-            {tentouCadastrar && !perfil && (
-              <FormHelperText>Selecione um perfil</FormHelperText>
-            )}
-          </FormControl>
-
-          <Button type="submit" variant="contained" fullWidth size="large">
-            Cadastrar
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            size="large"
+            disabled={carregando}
+          >
+            {carregando ? "Cadastrando..." : "Cadastrar"}
           </Button>
 
           <Typography variant="body2" sx={{ textAlign: "center" }}>

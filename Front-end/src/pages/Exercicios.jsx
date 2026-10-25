@@ -11,6 +11,11 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Grid,
 } from "@mui/material";
 import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
@@ -137,63 +142,61 @@ export default function Exercicios({ glassStyle }) {
         </Button>
       </Box>
 
-      {formAberto && (
-        <Paper
-          elevation={0}
-          component="form"
-          onSubmit={salvar}
-          noValidate
-          sx={{ ...glassStyle, p: 3, borderRadius: 4, mb: 3 }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+      <Dialog
+        open={formAberto}
+        onClose={cancelar}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <Box component="form" onSubmit={salvar} noValidate>
+          <DialogTitle sx={{ fontWeight: 600 }}>
             {editandoId ? "Editar Exercício" : "Novo Exercício"}
-          </Typography>
+          </DialogTitle>
 
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="Nome"
-              value={form.nome}
-              onChange={handleChange("nome")}
-              error={tentouSalvar && !form.nome.trim()}
-              helperText={
-                tentouSalvar && !form.nome.trim() ? "Informe o nome" : ""
-              }
-            />
+          <DialogContent sx={{ pt: 1 }}>
+            <Grid container spacing={2.5} sx={{ mt: 1 }}>
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  label="Nome"
+                  value={form.nome}
+                  onChange={handleChange("nome")}
+                  error={tentouSalvar && !form.nome.trim()}
+                  helperText={
+                    tentouSalvar && !form.nome.trim() ? "Informe o nome" : ""
+                  }
+                />
+              </Grid>
 
-            <TextField
-              label="Grupo Muscular Relacionado"
-              value={form.grupo}
-              onChange={handleChange("grupo")}
-              error={tentouSalvar && !form.grupo.trim()}
-              helperText={
-                tentouSalvar && !form.grupo.trim()
-                  ? "Informe o grupo muscular"
-                  : ""
-              }
-            />
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  label="Grupo Muscular Relacionado"
+                  value={form.grupo}
+                  onChange={handleChange("grupo")}
+                  error={tentouSalvar && !form.grupo.trim()}
+                  helperText={
+                    tentouSalvar && !form.grupo.trim()
+                      ? "Informe o grupo muscular"
+                      : ""
+                  }
+                />
+              </Grid>
 
-            <TextField
-              label="Descrição"
-              value={form.descricao}
-              onChange={handleChange("descricao")}
-              sx={{ gridColumn: { md: "1 / -1" } }}
-            />
-          </Box>
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  label="Descrição"
+                  value={form.descricao}
+                  onChange={handleChange("descricao")}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
 
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 1.5,
-              mt: 3,
-            }}
-          >
+          <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
             <Button
               type="button"
               color="inherit"
@@ -205,13 +208,14 @@ export default function Exercicios({ glassStyle }) {
             <Button
               type="submit"
               variant="contained"
+              color="primary"
               startIcon={<SaveOutlinedIcon />}
             >
-              Salvar
+              {editandoId ? "Salvar Alterações" : "Salvar"}
             </Button>
-          </Box>
-        </Paper>
-      )}
+          </DialogActions>
+        </Box>
+      </Dialog>
 
       <Paper
         elevation={0}

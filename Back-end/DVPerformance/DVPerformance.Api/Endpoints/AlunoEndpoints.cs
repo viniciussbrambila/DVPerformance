@@ -1,13 +1,12 @@
 using System.Text.RegularExpressions;
+using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
 
 public static class AlunoEndpoints
 {
-    // Lista em memória (começa vazia; os alunos serão cadastrados pelo Personal)
-    private static readonly List<Aluno> Alunos = new();
-
     // Opções exatas dos campos de seleção (Select) do Front-end
     private static readonly HashSet<string> SexosPermitidos = new()
     {
@@ -32,21 +31,29 @@ public static class AlunoEndpoints
         // Cria um grupo de rotas com o prefixo "/alunos"
         var grupo = app.MapGroup("/alunos");
 
-        // GET /alunos -> Lista todos os alunos cadastrados
-        grupo.MapGet("/", () =>
+        // GET /alunos?usuarioId=1 -> Lista os alunos cadastrados (filtra pelo Personal se usuarioId for informado)
+        grupo.MapGet("/", async (int? usuarioId, AppDbContext db) =>
         {
-            return Results.Ok(Alunos);
+            var query = db.Alunos.AsQueryable();
+
+            if (usuarioId.HasValue && usuarioId.Value > 0)
+            {
+                query = query.Where(a => a.UsuarioId == usuarioId.Value);
+            }
+
+            var alunos = await query.OrderBy(a => a.Id).ToListAsync();
+            return Results.Ok(alunos);
         });
 
-        // GET /alunos/{id} -> Busca um aluno específico pelo Id
-        grupo.MapGet("/{id:int}", (int id) =>
+        // GET /alunos/{id} -> Busca um aluno específico pelo Id no banco
+        grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
             {
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
             }
 
-            var aluno = Alunos.FirstOrDefault(a => a.Id == id);
+            var aluno = await db.Alunos.FindAsync(id);
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado." });
@@ -55,8 +62,8 @@ public static class AlunoEndpoints
             return Results.Ok(aluno);
         });
 
-        // POST /alunos -> Cadastra um novo aluno enviado pelo Personal
-        grupo.MapPost("/", (Aluno novoAluno) =>
+        // POST /alunos -> Cadastra um novo aluno no banco PostgreSQL vinculado ao Personal
+        grupo.MapPost("/", async (Aluno novoAluno, AppDbContext db) =>
         {
             var erros = ValidarAluno(novoAluno);
             if (erros.Count > 0)
@@ -68,22 +75,38 @@ public static class AlunoEndpoints
                 });
             }
 
+            // Se o Front-end enviou o UsuarioId do Personal logado, verifica se esse Personal existe no banco
+            if (novoAluno.UsuarioId.HasValue && novoAluno.UsuarioId.Value > 0)
+            {
+                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoAluno.UsuarioId.Value);
+                if (!personalExiste)
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "O Personal informado não foi encontrado.",
+                        erros = new[] { "A conta do Personal (usuarioId) não existe no banco de dados." }
+                    });
+                }
+            }
+
+            novoAluno.Id = 0; // Garante que o PostgreSQL gere o ID automaticamente (SERIAL)
             novoAluno.Nome = novoAluno.Nome.Trim();
-            novoAluno.Id = Alunos.Count > 0 ? Alunos.Max(a => a.Id) + 1 : 1;
-            Alunos.Add(novoAluno);
+
+            db.Alunos.Add(novoAluno);
+            await db.SaveChangesAsync();
 
             return Results.Created($"/alunos/{novoAluno.Id}", novoAluno);
         });
 
-        // PUT /alunos/{id} -> Atualiza os dados de um aluno existente
-        grupo.MapPut("/{id:int}", (int id, Aluno dadosAtualizados) =>
+        // PUT /alunos/{id} -> Atualiza os dados de um aluno existente no banco
+        grupo.MapPut("/{id:int}", async (int id, Aluno dadosAtualizados, AppDbContext db) =>
         {
             if (id <= 0)
             {
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
             }
 
-            var alunoExistente = Alunos.FirstOrDefault(a => a.Id == id);
+            var alunoExistente = await db.Alunos.FindAsync(id);
             if (alunoExistente is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado." });
@@ -106,24 +129,33 @@ public static class AlunoEndpoints
             alunoExistente.FrequenciaSemanal = dadosAtualizados.FrequenciaSemanal;
             alunoExistente.Objetivo = dadosAtualizados.Objetivo;
 
+            if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+            {
+                alunoExistente.UsuarioId = dadosAtualizados.UsuarioId;
+            }
+
+            await db.SaveChangesAsync();
+
             return Results.Ok(alunoExistente);
         });
 
-        // DELETE /alunos/{id} -> Remove um aluno pelo Id
-        grupo.MapDelete("/{id:int}", (int id) =>
+        // DELETE /alunos/{id} -> Remove um aluno pelo Id do banco
+        grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
             {
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
             }
 
-            var aluno = Alunos.FirstOrDefault(a => a.Id == id);
+            var aluno = await db.Alunos.FindAsync(id);
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado." });
             }
 
-            Alunos.Remove(aluno);
+            db.Alunos.Remove(aluno);
+            await db.SaveChangesAsync();
+
             return Results.NoContent();
         });
     }

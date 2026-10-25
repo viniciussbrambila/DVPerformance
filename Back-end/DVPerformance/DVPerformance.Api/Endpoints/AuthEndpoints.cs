@@ -1,19 +1,18 @@
+using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
 
 public static class AuthEndpoints
 {
-    // Lista em memória para armazenar as contas criadas (Personal / Admin)
-    private static readonly List<Usuario> Usuarios = new();
-
     public static void MapAuthEndpoints(this WebApplication app)
     {
         // Cria um grupo de rotas com o prefixo "/auth"
         var grupo = app.MapGroup("/auth");
 
-        // POST /auth/cadastro -> Cria uma nova conta no sistema (sempre com poderes de Admin)
-        grupo.MapPost("/cadastro", (AuthRequest? dados) =>
+        // POST /auth/cadastro -> Cria uma nova conta de Personal no banco PostgreSQL
+        grupo.MapPost("/cadastro", async (AuthRequest? dados, AppDbContext db) =>
         {
             var erros = ValidarCadastro(dados);
             if (erros.Count > 0)
@@ -27,9 +26,9 @@ public static class AuthEndpoints
 
             var nomeLimpo = dados!.Usuario.Trim();
 
-            // Verifica se já existe um usuário com o mesmo nome (ignorando maiúsculas/minúsculas)
-            var usuarioJaExiste = Usuarios.Any(u =>
-                string.Equals(u.NomeUsuario, nomeLimpo, StringComparison.OrdinalIgnoreCase));
+            // Verifica no banco se já existe um usuário com o mesmo nome (ignorando maiúsculas/minúsculas)
+            var usuarioJaExiste = await db.Usuarios.AnyAsync(u =>
+                u.NomeUsuario.ToLower() == nomeLimpo.ToLower());
 
             if (usuarioJaExiste)
             {
@@ -42,13 +41,13 @@ public static class AuthEndpoints
 
             var novoUsuario = new Usuario
             {
-                Id = Usuarios.Count > 0 ? Usuarios.Max(u => u.Id) + 1 : 1,
                 NomeUsuario = nomeLimpo,
                 Senha = dados.Senha,
                 Perfil = "admin"
             };
 
-            Usuarios.Add(novoUsuario);
+            db.Usuarios.Add(novoUsuario);
+            await db.SaveChangesAsync();
 
             // Retorna os dados da conta criada sem expor a senha
             return Results.Created($"/auth/usuarios/{novoUsuario.Id}", new
@@ -61,8 +60,8 @@ public static class AuthEndpoints
             });
         });
 
-        // POST /auth/login -> Autentica o usuário para entrar no sistema
-        grupo.MapPost("/login", (AuthRequest? dados) =>
+        // POST /auth/login -> Autentica o Personal no banco PostgreSQL para entrar no sistema
+        grupo.MapPost("/login", async (AuthRequest? dados, AppDbContext db) =>
         {
             var erros = ValidarLogin(dados);
             if (erros.Count > 0)
@@ -76,8 +75,8 @@ public static class AuthEndpoints
 
             var nomeLimpo = dados!.Usuario.Trim();
 
-            var conta = Usuarios.FirstOrDefault(u =>
-                string.Equals(u.NomeUsuario, nomeLimpo, StringComparison.OrdinalIgnoreCase) &&
+            var conta = await db.Usuarios.FirstOrDefaultAsync(u =>
+                u.NomeUsuario.ToLower() == nomeLimpo.ToLower() &&
                 u.Senha == dados.Senha);
 
             if (conta is null)
@@ -99,8 +98,8 @@ public static class AuthEndpoints
             });
         });
 
-        // PUT /auth/recuperar-senha -> Altera a senha de um usuário existente (tela Esqueci Minha Senha)
-        grupo.MapPut("/recuperar-senha", (RecuperarSenhaRequest? dados) =>
+        // PUT /auth/recuperar-senha -> Altera a senha de um usuário existente no banco
+        grupo.MapPut("/recuperar-senha", async (RecuperarSenhaRequest? dados, AppDbContext db) =>
         {
             var erros = ValidarRecuperacaoSenha(dados);
             if (erros.Count > 0)
@@ -114,8 +113,8 @@ public static class AuthEndpoints
 
             var nomeLimpo = dados!.Usuario.Trim();
 
-            var conta = Usuarios.FirstOrDefault(u =>
-                string.Equals(u.NomeUsuario, nomeLimpo, StringComparison.OrdinalIgnoreCase));
+            var conta = await db.Usuarios.FirstOrDefaultAsync(u =>
+                u.NomeUsuario.ToLower() == nomeLimpo.ToLower());
 
             if (conta is null)
             {
@@ -127,6 +126,7 @@ public static class AuthEndpoints
             }
 
             conta.Senha = dados.NovaSenha;
+            await db.SaveChangesAsync();
 
             return Results.Ok(new
             {

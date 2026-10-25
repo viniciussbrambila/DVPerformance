@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
+using DVPerformance.Api.Data;
 using DVPerformance.Api.Endpoints;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api;
 
@@ -13,6 +15,11 @@ public class Program
         // 1. Configuração de Serviços
         builder.Services.AddAuthorization();
         builder.Services.AddOpenApi();
+
+        // Configuração do Banco de Dados PostgreSQL
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(connectionString));
 
         // Bloqueia envio de texto em campos numéricos (ex: "idade": "25" ou "idade": "abc")
         builder.Services.Configure<JsonOptions>(options =>

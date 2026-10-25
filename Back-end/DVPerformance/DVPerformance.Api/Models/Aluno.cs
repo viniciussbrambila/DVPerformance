@@ -15,4 +15,7 @@ public class Aluno
     public int FrequenciaSemanal { get; set; }
 
     public string Objetivo { get; set; } = string.Empty;
+
+    // Chave estrangeira (FK) que vincula o aluno ao Personal que o cadastrou
+    public int? UsuarioId { get; set; }
 }

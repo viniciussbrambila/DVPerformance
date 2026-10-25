@@ -5,12 +5,15 @@ import {
   TextField,
   Button,
   Link,
+  Alert,
   IconButton,
   InputAdornment,
 } from "@mui/material";
 import { useState } from "react";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+
+const API_LOGIN_URL = "http://localhost:5011/auth/login";
 
 export default function Login({
   glassStyle,
@@ -22,8 +25,12 @@ export default function Login({
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [tentouEntrar, setTentouEntrar] = useState(false);
-  const handleSubmit = (e) => {
+  const [erroApi, setErroApi] = useState("");
+  const [carregando, setCarregando] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault(); // Impede o navegador de recarregar a página ao enviar o formulário
+    setErroApi("");
 
     // Se usuário ou senha estiverem vazios, ativa os avisos vermelhos e para aqui
     if (!usuario.trim() || !senha.trim()) {
@@ -31,8 +38,43 @@ export default function Login({
       return;
     }
 
-    // Se ambos estiverem preenchidos, avisa o App.jsx que o login foi feito!
-    onLogin({ usuario });
+    setCarregando(true);
+    try {
+      const response = await fetch(API_LOGIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usuario: usuario.trim(),
+          senha,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setErroApi(
+          data?.erros?.[0] ||
+            data?.mensagem ||
+            "Usuário ou senha incorretos.",
+        );
+        return;
+      }
+
+      const dadosUsuario = {
+        ...data,
+        usuario: data?.usuario || usuario.trim(),
+        nome: data?.nome || data?.usuario || usuario.trim(),
+      };
+
+      localStorage.setItem("usuarioLogado", JSON.stringify(dadosUsuario));
+      onLogin(dadosUsuario);
+    } catch (erro) {
+      setErroApi(
+        "Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em http://localhost:5011.",
+      );
+    } finally {
+      setCarregando(false);
+    }
   };
   return (
     <Box
@@ -74,6 +116,8 @@ export default function Login({
             gap: 2,
           }}
         >
+          {erroApi && <Alert severity="error">{erroApi}</Alert>}
+
           <TextField
             label="Usuário"
             type="text"
@@ -123,8 +167,14 @@ export default function Login({
             Esqueci minha senha
           </Link>
 
-          <Button type="submit" variant="contained" fullWidth size="large">
-            Entrar
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            size="large"
+            disabled={carregando}
+          >
+            {carregando ? "Entrando..." : "Entrar"}
           </Button>
           <Typography variant="body2" sx={{ textAlign: "center" }}>
             Não tem conta?{" "}

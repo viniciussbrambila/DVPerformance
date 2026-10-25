@@ -84,12 +84,12 @@ const LightTheme = createTheme({
       },
     },
 
-    // 3. Modais e Menus com branco mais denso para não misturar com o texto de trás
+    // 3. Modais e Menus com branco sólido para não ficar acinzentado sobre o fundo escuro do modal
     MuiDialog: {
       styleOverrides: {
         paper: {
           ...lightGlassStyle,
-          background: 'rgba(255, 255, 255, 0.92)',
+          background: '#FFFFFF',
         },
       },
     },
