@@ -13,6 +13,8 @@ public class AppDbContext : DbContext
 
     public DbSet<Usuario> Usuarios { get; set; }
 
+    public DbSet<Exercicio> Exercicios { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -90,6 +92,44 @@ public class AppDbContext : DbContext
             entity.HasOne<Usuario>()
                   .WithMany()
                   .HasForeignKey(a => a.UsuarioId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 3. Mapeamento da tabela 'exercicios' (Catálogo de Exercícios separado por Região e Grupo Muscular)
+        modelBuilder.Entity<Exercicio>(entity =>
+        {
+            entity.ToTable("exercicios");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                  .HasColumnName("id");
+
+            entity.Property(e => e.Nome)
+                  .HasColumnName("nome")
+                  .HasMaxLength(100)
+                  .IsRequired();
+
+            entity.Property(e => e.Regiao)
+                  .HasColumnName("regiao")
+                  .HasMaxLength(40)
+                  .IsRequired();
+
+            entity.Property(e => e.Grupo)
+                  .HasColumnName("grupo")
+                  .HasMaxLength(50)
+                  .IsRequired();
+
+            entity.Property(e => e.Descricao)
+                  .HasColumnName("descricao")
+                  .HasMaxLength(255);
+
+            entity.Property(e => e.UsuarioId)
+                  .HasColumnName("usuario_id");
+
+            entity.HasOne<Usuario>()
+                  .WithMany()
+                  .HasForeignKey(e => e.UsuarioId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

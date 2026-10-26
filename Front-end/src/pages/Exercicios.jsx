@@ -1,65 +1,107 @@
+import { useState, useEffect } from "react";
 import {
   Box,
   Paper,
   Typography,
   Button,
   TextField,
-  IconButton,
+  MenuItem,
+  ListSubheader,
+  Grid,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Grid,
+  Alert,
+  Chip,
 } from "@mui/material";
-import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 
-// DADOS TEMPORÁRIOS: quando tiver backend, troque por dados da API.
-const exerciciosIniciais = [
+const API_URL = "http://localhost:5011/exercicios";
+
+// Grupos musculares organizados por Subtítulo (Região do Corpo)
+const CATEGORIAS_GRUPOS = [
   {
-    id: "1",
-    nome: "Supino reto",
-    grupo: "Peito",
-    descricao: "Exercício com barra no banco reto",
+    subtitulo: "Membros Superiores (Parte de Cima)",
+    regiao: "Membros Superiores",
+    grupos: [
+      "Peito",
+      "Costas",
+      "Trapézio",
+      "Ombros",
+      "Bíceps",
+      "Tríceps",
+      "Antebraço",
+    ],
   },
   {
-    id: "2",
-    nome: "Agachamento livre",
-    grupo: "Pernas",
-    descricao: "Exercício composto para membros inferiores",
+    subtitulo: "Membros Inferiores (Parte de Baixo)",
+    regiao: "Membros Inferiores",
+    grupos: [
+      "Quadríceps",
+      "Posterior de Coxa",
+      "Glúteos",
+      "Adutores / Abdutores",
+      "Panturrilha",
+    ],
   },
   {
-    id: "3",
-    nome: "Puxada frontal",
-    grupo: "Costas",
-    descricao: "Exercício na polia alta",
-  },
-  {
-    id: "4",
-    nome: "Rosca direta",
-    grupo: "Bíceps",
-    descricao: "Exercício com barra ou halteres",
+    subtitulo: "Core / Tronco (Centro do Corpo)",
+    regiao: "Core / Tronco",
+    grupos: ["Abdômen", "Lombar"],
   },
 ];
+
+const obterUsuarioLogado = () => {
+  try {
+    const salvo = localStorage.getItem("usuarioLogado");
+    return salvo ? JSON.parse(salvo) : null;
+  } catch {
+    return null;
+  }
+};
 
 const formVazio = { nome: "", grupo: "", descricao: "" };
 
 export default function Exercicios({ glassStyle }) {
-  const [exercicios, setExercicios] = useState(exerciciosIniciais);
+  const [exercicios, setExercicios] = useState([]);
   const [formAberto, setFormAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(formVazio);
   const [tentouSalvar, setTentouSalvar] = useState(false);
+  const [errosApi, setErrosApi] = useState([]);
+
+  const carregarExercicios = async () => {
+    const usuarioLogado = obterUsuarioLogado();
+    const url = usuarioLogado?.id
+      ? `${API_URL}?usuarioId=${usuarioLogado.id}`
+      : API_URL;
+
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const dados = await response.json();
+        setExercicios(dados);
+      }
+    } catch (erro) {
+      console.error("Erro ao carregar exercícios da API:", erro);
+    }
+  };
+
+  useEffect(() => {
+    carregarExercicios();
+  }, []);
 
   const handleChange = (campo) => (e) =>
     setForm((anterior) => ({ ...anterior, [campo]: e.target.value }));
@@ -68,6 +110,7 @@ export default function Exercicios({ glassStyle }) {
     setForm(formVazio);
     setEditandoId(null);
     setTentouSalvar(false);
+    setErrosApi([]);
     setFormAberto(true);
   };
 
@@ -75,10 +118,11 @@ export default function Exercicios({ glassStyle }) {
     setForm({
       nome: exercicio.nome,
       grupo: exercicio.grupo,
-      descricao: exercicio.descricao,
+      descricao: exercicio.descricao || "",
     });
     setEditandoId(exercicio.id);
     setTentouSalvar(false);
+    setErrosApi([]);
     setFormAberto(true);
   };
 
@@ -87,9 +131,10 @@ export default function Exercicios({ glassStyle }) {
     setEditandoId(null);
     setForm(formVazio);
     setTentouSalvar(false);
+    setErrosApi([]);
   };
 
-  const salvar = (e) => {
+  const salvar = async (e) => {
     e.preventDefault();
     setTentouSalvar(true);
 
@@ -97,24 +142,70 @@ export default function Exercicios({ glassStyle }) {
       return;
     }
 
-    if (editandoId) {
-      setExercicios((lista) =>
-        lista.map((ex) => (ex.id === editandoId ? { ...ex, ...form } : ex)),
-      );
-    } else {
-      setExercicios((lista) => [
-        ...lista,
-        { id: crypto.randomUUID(), ...form },
-      ]);
-    }
+    setErrosApi([]);
+    const usuarioLogado = obterUsuarioLogado();
 
-    cancelar();
+    const payload = {
+      nome: form.nome.trim(),
+      grupo: form.grupo.trim(),
+      descricao: form.descricao?.trim() || "",
+      usuarioId: usuarioLogado?.id || null,
+    };
+
+    try {
+      const url = editandoId ? `${API_URL}/${editandoId}` : API_URL;
+      const metodo = editandoId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method: metodo,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const dados = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (dados?.erros && Array.isArray(dados.erros)) {
+          setErrosApi(dados.erros);
+        } else if (dados?.mensagem) {
+          setErrosApi([dados.mensagem]);
+        } else {
+          setErrosApi(["Não foi possível salvar o exercício."]);
+        }
+        return;
+      }
+
+      if (editandoId) {
+        setExercicios((lista) =>
+          lista.map((ex) => (ex.id === editandoId ? dados : ex))
+        );
+      } else {
+        setExercicios((lista) => [...lista, dados]);
+      }
+
+      cancelar();
+    } catch (erro) {
+      console.error("Erro ao salvar exercício:", erro);
+      setErrosApi(["Erro de conexão com o servidor."]);
+    }
   };
 
-  const excluir = (id) => {
-    if (window.confirm("Deseja realmente excluir este exercício?")) {
-      setExercicios((lista) => lista.filter((ex) => ex.id !== id));
-      if (editandoId === id) cancelar();
+  const excluir = async (id) => {
+    if (!window.confirm("Deseja realmente excluir este exercício?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setExercicios((lista) => lista.filter((ex) => ex.id !== id));
+        if (editandoId === id) cancelar();
+      }
+    } catch (erro) {
+      console.error("Erro ao excluir exercício:", erro);
     }
   };
 
@@ -156,11 +247,18 @@ export default function Exercicios({ glassStyle }) {
           </DialogTitle>
 
           <DialogContent sx={{ pt: 1 }}>
+            {errosApi.length > 0 && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {errosApi.map((erro, index) => (
+                  <div key={index}>{erro}</div>
+                ))}
+              </Alert>
+            )}
             <Grid container spacing={2.5} sx={{ mt: 1 }}>
               <Grid size={12}>
                 <TextField
                   fullWidth
-                  label="Nome"
+                  label="Nome do Exercício"
                   value={form.nome}
                   onChange={handleChange("nome")}
                   error={tentouSalvar && !form.nome.trim()}
@@ -173,22 +271,42 @@ export default function Exercicios({ glassStyle }) {
               <Grid size={12}>
                 <TextField
                   fullWidth
+                  select
                   label="Grupo Muscular Relacionado"
                   value={form.grupo}
                   onChange={handleChange("grupo")}
                   error={tentouSalvar && !form.grupo.trim()}
                   helperText={
                     tentouSalvar && !form.grupo.trim()
-                      ? "Informe o grupo muscular"
+                      ? "Selecione o grupo muscular"
                       : ""
                   }
-                />
+                >
+                  {CATEGORIAS_GRUPOS.flatMap((categoria) => [
+                    <ListSubheader
+                      key={categoria.subtitulo}
+                      sx={{
+                        fontWeight: 700,
+                        color: "primary.main",
+                        bgcolor: "background.paper",
+                        lineHeight: "36px",
+                      }}
+                    >
+                      {categoria.subtitulo}
+                    </ListSubheader>,
+                    ...categoria.grupos.map((grupo) => (
+                      <MenuItem key={grupo} value={grupo} sx={{ pl: 3 }}>
+                        {grupo}
+                      </MenuItem>
+                    )),
+                  ])}
+                </TextField>
               </Grid>
 
               <Grid size={12}>
                 <TextField
                   fullWidth
-                  label="Descrição"
+                  label="Descrição / Equipamento"
                   value={form.descricao}
                   onChange={handleChange("descricao")}
                 />
@@ -229,7 +347,7 @@ export default function Exercicios({ glassStyle }) {
                   Nome
                 </TableCell>
                 <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
-                  Grupo Relacionado
+                  Região / Grupo Muscular
                 </TableCell>
                 <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
                   Descrição
@@ -259,8 +377,18 @@ export default function Exercicios({ glassStyle }) {
               {exercicios.map((ex) => (
                 <TableRow key={ex.id} hover>
                   <TableCell sx={{ fontWeight: 500 }}>{ex.nome}</TableCell>
-                  <TableCell sx={{ color: "text.secondary" }}>
-                    {ex.grupo}
+                  <TableCell>
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0.3 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        {ex.regiao}
+                      </Typography>
+                      <Chip
+                        label={ex.grupo}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontWeight: 500 }}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={{ color: "text.secondary" }}>
                     {ex.descricao}

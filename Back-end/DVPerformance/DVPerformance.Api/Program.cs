@@ -70,6 +70,7 @@ public class Program
         // 4. Mapeamento dos Endpoints (Minimal APIs organizadas por arquivo)
         app.MapAuthEndpoints();
         app.MapAlunoEndpoints();
+        app.MapExercicioEndpoints();
 
         app.Run();
     }
