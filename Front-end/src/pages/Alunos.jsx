@@ -42,6 +42,7 @@ export default function Alunos({ glassStyle }) {
   const [alunos, setAlunos] = useState([]);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // Guarda o ID do aluno em edição (ou null se for novo)
+  const [idParaExcluir, setIdParaExcluir] = useState(null); // Guarda o ID do aluno para confirmar exclusão
   const [tentouGravar, setTentouGravar] = useState(false); // Ativa os avisos nos campos vazios ao tentar salvar
   const [errosApi, setErrosApi] = useState([]); // Guarda mensagens de erro vindas do Back-end
   const [formData, setFormData] = useState({
@@ -125,18 +126,31 @@ export default function Alunos({ glassStyle }) {
     setOpen(true);
   };
 
-  // Remove o aluno no Back-end pelo ID
-  const handleExcluir = async (id) => {
+  // Abre o modal de confirmação de exclusão
+  const handleExcluir = (id) => {
+    setIdParaExcluir(id);
+  };
+
+  const handleCancelarExclusao = () => {
+    setIdParaExcluir(null);
+  };
+
+  // Remove o aluno no Back-end pelo ID após confirmação
+  const confirmarExclusao = async () => {
+    if (!idParaExcluir) return;
+
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
+      const response = await fetch(`${API_URL}/${idParaExcluir}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
-        setAlunos(alunos.filter((aluno) => aluno.id !== id));
+        setAlunos(alunos.filter((aluno) => aluno.id !== idParaExcluir));
       }
     } catch (erro) {
       console.error("Erro ao excluir aluno:", erro);
+    } finally {
+      setIdParaExcluir(null);
     }
   };
 
@@ -477,6 +491,37 @@ export default function Alunos({ glassStyle }) {
             onClick={handleGravar}
           >
             {editingId ? "Salvar Alterações" : "Guardar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog
+        open={Boolean(idParaExcluir)}
+        onClose={handleCancelarExclusao}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.35rem" }}>
+          Confirmar exclusão
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
+            Tem certeza de que deseja excluir este cadastro? Esta ação é permanente e não poderá ser desfeita.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button onClick={handleCancelarExclusao} color="inherit">
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmarExclusao}
+          >
+            Excluir cadastro
           </Button>
         </DialogActions>
       </Dialog>

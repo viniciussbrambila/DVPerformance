@@ -78,6 +78,7 @@ export default function Exercicios({ glassStyle }) {
   const [exercicios, setExercicios] = useState([]);
   const [formAberto, setFormAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+  const [idParaExcluir, setIdParaExcluir] = useState(null);
   const [form, setForm] = useState(formVazio);
   const [tentouSalvar, setTentouSalvar] = useState(false);
   const [errosApi, setErrosApi] = useState([]);
@@ -190,22 +191,30 @@ export default function Exercicios({ glassStyle }) {
     }
   };
 
-  const excluir = async (id) => {
-    if (!window.confirm("Deseja realmente excluir este exercício?")) {
-      return;
-    }
+  const excluir = (id) => {
+    setIdParaExcluir(id);
+  };
+
+  const cancelarExclusao = () => {
+    setIdParaExcluir(null);
+  };
+
+  const confirmarExclusao = async () => {
+    if (!idParaExcluir) return;
 
     try {
-      const response = await fetch(`${API_URL}/${id}`, {
+      const response = await fetch(`${API_URL}/${idParaExcluir}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
-        setExercicios((lista) => lista.filter((ex) => ex.id !== id));
-        if (editandoId === id) cancelar();
+        setExercicios((lista) => lista.filter((ex) => ex.id !== idParaExcluir));
+        if (editandoId === idParaExcluir) cancelar();
       }
     } catch (erro) {
       console.error("Erro ao excluir exercício:", erro);
+    } finally {
+      setIdParaExcluir(null);
     }
   };
 
@@ -417,6 +426,36 @@ export default function Exercicios({ glassStyle }) {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog
+        open={Boolean(idParaExcluir)}
+        onClose={cancelarExclusao}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.35rem" }}>
+          Confirmar exclusão
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
+            Tem certeza de que deseja excluir este cadastro? Esta ação é permanente e não poderá ser desfeita.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button onClick={cancelarExclusao} color="inherit">
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmarExclusao}
+          >
+            Excluir cadastro
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
