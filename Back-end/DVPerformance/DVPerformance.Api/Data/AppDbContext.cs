@@ -15,6 +15,8 @@ public class AppDbContext : DbContext
 
     public DbSet<Exercicio> Exercicios { get; set; }
 
+    public DbSet<Maquina> Maquinas { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -45,6 +47,11 @@ public class AppDbContext : DbContext
             entity.Property(u => u.Perfil)
                   .HasColumnName("perfil")
                   .HasMaxLength(20)
+                  .IsRequired();
+
+            entity.Property(u => u.Ativo)
+                  .HasColumnName("ativo")
+                  .HasDefaultValue(true)
                   .IsRequired();
         });
 
@@ -89,6 +96,11 @@ public class AppDbContext : DbContext
             entity.Property(a => a.UsuarioId)
                   .HasColumnName("usuario_id");
 
+            entity.Property(a => a.Ativo)
+                  .HasColumnName("ativo")
+                  .HasDefaultValue(true)
+                  .IsRequired();
+
             entity.HasOne<Usuario>()
                   .WithMany()
                   .HasForeignKey(a => a.UsuarioId)
@@ -127,9 +139,57 @@ public class AppDbContext : DbContext
             entity.Property(e => e.UsuarioId)
                   .HasColumnName("usuario_id");
 
+            entity.Property(e => e.Ativo)
+                  .HasColumnName("ativo")
+                  .HasDefaultValue(true)
+                  .IsRequired();
+
             entity.HasOne<Usuario>()
                   .WithMany()
                   .HasForeignKey(e => e.UsuarioId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 4. Mapeamento da tabela 'maquinas' (Dicionário de Dados pág. 21: id, nome, grupo, descricao + padronização)
+        modelBuilder.Entity<Maquina>(entity =>
+        {
+            entity.ToTable("maquinas");
+
+            entity.HasKey(m => m.Id);
+
+            entity.Property(m => m.Id)
+                  .HasColumnName("id");
+
+            entity.Property(m => m.Nome)
+                  .HasColumnName("nome")
+                  .HasMaxLength(100)
+                  .IsRequired();
+
+            entity.Property(m => m.Regiao)
+                  .HasColumnName("regiao")
+                  .HasMaxLength(40)
+                  .IsRequired();
+
+            entity.Property(m => m.Grupo)
+                  .HasColumnName("grupo")
+                  .HasMaxLength(50)
+                  .IsRequired();
+
+            entity.Property(m => m.Descricao)
+                  .HasColumnName("descricao")
+                  .HasMaxLength(255);
+
+            entity.Property(m => m.UsuarioId)
+                  .HasColumnName("usuario_id");
+
+            entity.Property(m => m.Ativo)
+                  .HasColumnName("ativo")
+                  .HasDefaultValue(true)
+                  .IsRequired();
+
+            entity.HasOne<Usuario>()
+                  .WithMany()
+                  .HasForeignKey(m => m.UsuarioId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

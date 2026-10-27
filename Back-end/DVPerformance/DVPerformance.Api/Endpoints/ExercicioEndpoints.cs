@@ -7,7 +7,7 @@ namespace DVPerformance.Api.Endpoints;
 public static class ExercicioEndpoints
 {
     // Mapa oficial: Grupo Muscular -> Região Corporal (Subtítulo/Categoria)
-    private static readonly Dictionary<string, string>RegiaoPorGrupo = new()
+    private static readonly Dictionary<string, string> RegiaoPorGrupo = new()
     {
         // Membros Superiores (Parte de Cima)
         ["Peito"] = "Membros Superiores",
@@ -35,10 +35,15 @@ public static class ExercicioEndpoints
         // Cria um grupo de rotas com o prefixo "/exercicios"
         var grupo = app.MapGroup("/exercicios");
 
-        // GET /exercicios?usuarioId=1 -> Lista os exercícios cadastrados (padrões + do Personal logado)
-        grupo.MapGet("/", async (int? usuarioId, AppDbContext db) =>
+        // GET /exercicios?usuarioId=1 -> Lista os exercícios ativos (ou todos se incluirInativos=true)
+        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
         {
             var query = db.Exercicios.AsQueryable();
+
+            if (incluirInativos != true)
+            {
+                query = query.Where(e => e.Ativo);
+            }
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
@@ -55,7 +60,7 @@ public static class ExercicioEndpoints
             return Results.Ok(exercicios);
         });
 
-        // GET /exercicios/{id} -> Busca um exercício específico pelo Id no banco
+        // GET /exercicios/{id} -> Busca um exercício ativo específico pelo Id no banco
         grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
@@ -63,10 +68,10 @@ public static class ExercicioEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
             }
 
-            var exercicio = await db.Exercicios.FindAsync(id);
+            var exercicio = await db.Exercicios.FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
             if (exercicio is null)
             {
-                return Results.NotFound(new { mensagem = "Exercício não encontrado." });
+                return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
             }
 
             return Results.Ok(exercicio);
@@ -87,13 +92,13 @@ public static class ExercicioEndpoints
 
             if (novoExercicio!.UsuarioId.HasValue && novoExercicio.UsuarioId.Value > 0)
             {
-                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoExercicio.UsuarioId.Value);
+                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoExercicio.UsuarioId.Value && u.Ativo);
                 if (!personalExiste)
                 {
                     return Results.BadRequest(new
                     {
                         mensagem = "O Personal informado não foi encontrado.",
-                        erros = new[] { "A conta do Personal (usuarioId) não existe no banco de dados." }
+                        erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
                     });
                 }
             }
@@ -105,6 +110,7 @@ public static class ExercicioEndpoints
             novoExercicio.Grupo = grupoSelecionado;
             novoExercicio.Regiao = RegiaoPorGrupo[grupoSelecionado];
             novoExercicio.Descricao = novoExercicio.Descricao?.Trim() ?? string.Empty;
+            novoExercicio.Ativo = true;
 
             db.Exercicios.Add(novoExercicio);
             await db.SaveChangesAsync();
@@ -112,7 +118,7 @@ public static class ExercicioEndpoints
             return Results.Created($"/exercicios/{novoExercicio.Id}", novoExercicio);
         });
 
-        // PUT /exercicios/{id} -> Atualiza um exercício existente no banco
+        // PUT /exercicios/{id} -> Atualiza um exercício ativo existente no banco
         grupo.MapPut("/{id:int}", async (int id, Exercicio? dadosAtualizados, AppDbContext db) =>
         {
             if (id <= 0)
@@ -120,10 +126,10 @@ public static class ExercicioEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
             }
 
-            var exercicioExistente = await db.Exercicios.FindAsync(id);
+            var exercicioExistente = await db.Exercicios.FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
             if (exercicioExistente is null)
             {
-                return Results.NotFound(new { mensagem = "Exercício não encontrado." });
+                return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
             }
 
             var erros = ValidarExercicio(dadosAtualizados);
@@ -153,8 +159,28 @@ public static class ExercicioEndpoints
             return Results.Ok(exercicioExistente);
         });
 
-        // DELETE /exercicios/{id} -> Remove um exercício pelo Id do banco
+        // DELETE /exercicios/{id} -> Desativa o exercício (Soft Delete) mantendo o histórico no banco
         grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
+        {
+            if (id <= 0)
+            {
+                return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
+            }
+
+            var exercicio = await db.Exercicios.FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
+            if (exercicio is null)
+            {
+                return Results.NotFound(new { mensagem = "Exercício não encontrado ou já desativado." });
+            }
+
+            exercicio.Ativo = false;
+            await db.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+
+        // PATCH /exercicios/{id}/reativar -> Reativa um exercício desativado anteriormente
+        grupo.MapPatch("/{id:int}/reativar", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -167,10 +193,10 @@ public static class ExercicioEndpoints
                 return Results.NotFound(new { mensagem = "Exercício não encontrado." });
             }
 
-            db.Exercicios.Remove(exercicio);
+            exercicio.Ativo = true;
             await db.SaveChangesAsync();
 
-            return Results.NoContent();
+            return Results.Ok(exercicio);
         });
     }
 

@@ -18,4 +18,7 @@ public class Aluno
 
     // Chave estrangeira (FK) que vincula o aluno ao Personal que o cadastrou
     public int? UsuarioId { get; set; }
+
+    // Exclusão lógica (Soft Delete): mantém o histórico no banco quando desativado (false)
+    public bool Ativo { get; set; } = true;
 }

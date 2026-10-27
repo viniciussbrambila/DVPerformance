@@ -43,7 +43,8 @@ public static class AuthEndpoints
             {
                 NomeUsuario = nomeLimpo,
                 Senha = dados.Senha,
-                Perfil = "admin"
+                Perfil = "admin",
+                Ativo = true
             };
 
             db.Usuarios.Add(novoUsuario);
@@ -56,6 +57,7 @@ public static class AuthEndpoints
                 usuario = novoUsuario.NomeUsuario,
                 nome = novoUsuario.NomeUsuario,
                 perfil = novoUsuario.Perfil,
+                ativo = novoUsuario.Ativo,
                 mensagem = "Conta criada com sucesso."
             });
         });
@@ -88,17 +90,27 @@ public static class AuthEndpoints
                 }, statusCode: StatusCodes.Status401Unauthorized);
             }
 
+            if (!conta.Ativo)
+            {
+                return Results.Json(new
+                {
+                    mensagem = "Esta conta está desativada.",
+                    erros = new[] { "A conta informada foi desativada. Entre em contato com o suporte para reativá-la." }
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             return Results.Ok(new
             {
                 id = conta.Id,
                 usuario = conta.NomeUsuario,
                 nome = conta.NomeUsuario,
                 perfil = conta.Perfil,
+                ativo = conta.Ativo,
                 mensagem = "Login realizado com sucesso."
             });
         });
 
-        // PUT /auth/recuperar-senha -> Altera a senha de um usuário existente no banco
+        // PUT /auth/recuperar-senha -> Altera a senha de um usuário ativo existente no banco
         grupo.MapPut("/recuperar-senha", async (RecuperarSenhaRequest? dados, AppDbContext db) =>
         {
             var erros = ValidarRecuperacaoSenha(dados);
@@ -114,14 +126,14 @@ public static class AuthEndpoints
             var nomeLimpo = dados!.Usuario.Trim();
 
             var conta = await db.Usuarios.FirstOrDefaultAsync(u =>
-                u.NomeUsuario.ToLower() == nomeLimpo.ToLower());
+                u.NomeUsuario.ToLower() == nomeLimpo.ToLower() && u.Ativo);
 
             if (conta is null)
             {
                 return Results.NotFound(new
                 {
-                    mensagem = "Usuário não encontrado.",
-                    erros = new[] { "Não foi encontrada nenhuma conta com o usuário informado." }
+                    mensagem = "Usuário não encontrado ou desativado.",
+                    erros = new[] { "Não foi encontrada nenhuma conta ativa com o usuário informado." }
                 });
             }
 
@@ -131,6 +143,53 @@ public static class AuthEndpoints
             return Results.Ok(new
             {
                 mensagem = "Senha alterada com sucesso! Você já pode entrar com a nova senha."
+            });
+        });
+
+        // DELETE /auth/usuarios/{id} -> Desativa a conta do Personal (Soft Delete) mantendo o histórico
+        grupo.MapDelete("/usuarios/{id:int}", async (int id, AppDbContext db) =>
+        {
+            if (id <= 0)
+            {
+                return Results.BadRequest(new { mensagem = "O ID do usuário deve ser um número inteiro positivo." });
+            }
+
+            var conta = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == id && u.Ativo);
+            if (conta is null)
+            {
+                return Results.NotFound(new { mensagem = "Usuário não encontrado ou já desativado." });
+            }
+
+            conta.Ativo = false;
+            await db.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+
+        // PATCH /auth/usuarios/{id}/reativar -> Reativa uma conta de Personal desativada anteriormente
+        grupo.MapPatch("/usuarios/{id:int}/reativar", async (int id, AppDbContext db) =>
+        {
+            if (id <= 0)
+            {
+                return Results.BadRequest(new { mensagem = "O ID do usuário deve ser um número inteiro positivo." });
+            }
+
+            var conta = await db.Usuarios.FindAsync(id);
+            if (conta is null)
+            {
+                return Results.NotFound(new { mensagem = "Usuário não encontrado." });
+            }
+
+            conta.Ativo = true;
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                id = conta.Id,
+                usuario = conta.NomeUsuario,
+                perfil = conta.Perfil,
+                ativo = conta.Ativo,
+                mensagem = "Conta reativada com sucesso."
             });
         });
     }

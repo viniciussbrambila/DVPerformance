@@ -16,4 +16,7 @@ public class Exercicio
 
     // Chave estrangeira opcional para vincular ao Personal que cadastrou (ou null se for padrão do sistema)
     public int? UsuarioId { get; set; }
+
+    // Exclusão lógica (Soft Delete): mantém o histórico no banco quando desativado (false)
+    public bool Ativo { get; set; } = true;
 }

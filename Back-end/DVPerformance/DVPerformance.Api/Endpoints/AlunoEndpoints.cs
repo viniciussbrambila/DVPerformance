@@ -31,10 +31,15 @@ public static class AlunoEndpoints
         // Cria um grupo de rotas com o prefixo "/alunos"
         var grupo = app.MapGroup("/alunos");
 
-        // GET /alunos?usuarioId=1 -> Lista os alunos cadastrados (filtra pelo Personal se usuarioId for informado)
-        grupo.MapGet("/", async (int? usuarioId, AppDbContext db) =>
+        // GET /alunos?usuarioId=1 -> Lista os alunos ativos (ou todos se incluirInativos=true)
+        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
         {
             var query = db.Alunos.AsQueryable();
+
+            if (incluirInativos != true)
+            {
+                query = query.Where(a => a.Ativo);
+            }
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
@@ -45,7 +50,7 @@ public static class AlunoEndpoints
             return Results.Ok(alunos);
         });
 
-        // GET /alunos/{id} -> Busca um aluno específico pelo Id no banco
+        // GET /alunos/{id} -> Busca um aluno ativo específico pelo Id no banco
         grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
@@ -53,10 +58,10 @@ public static class AlunoEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
             }
 
-            var aluno = await db.Alunos.FindAsync(id);
+            var aluno = await db.Alunos.FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
             if (aluno is null)
             {
-                return Results.NotFound(new { mensagem = "Aluno não encontrado." });
+                return Results.NotFound(new { mensagem = "Aluno não encontrado ou desativado." });
             }
 
             return Results.Ok(aluno);
@@ -75,22 +80,23 @@ public static class AlunoEndpoints
                 });
             }
 
-            // Se o Front-end enviou o UsuarioId do Personal logado, verifica se esse Personal existe no banco
+            // Se o Front-end enviou o UsuarioId do Personal logado, verifica se esse Personal existe e está ativo no banco
             if (novoAluno.UsuarioId.HasValue && novoAluno.UsuarioId.Value > 0)
             {
-                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoAluno.UsuarioId.Value);
+                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoAluno.UsuarioId.Value && u.Ativo);
                 if (!personalExiste)
                 {
                     return Results.BadRequest(new
                     {
                         mensagem = "O Personal informado não foi encontrado.",
-                        erros = new[] { "A conta do Personal (usuarioId) não existe no banco de dados." }
+                        erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
                     });
                 }
             }
 
             novoAluno.Id = 0; // Garante que o PostgreSQL gere o ID automaticamente (SERIAL)
             novoAluno.Nome = novoAluno.Nome.Trim();
+            novoAluno.Ativo = true;
 
             db.Alunos.Add(novoAluno);
             await db.SaveChangesAsync();
@@ -98,7 +104,7 @@ public static class AlunoEndpoints
             return Results.Created($"/alunos/{novoAluno.Id}", novoAluno);
         });
 
-        // PUT /alunos/{id} -> Atualiza os dados de um aluno existente no banco
+        // PUT /alunos/{id} -> Atualiza os dados de um aluno ativo existente no banco
         grupo.MapPut("/{id:int}", async (int id, Aluno dadosAtualizados, AppDbContext db) =>
         {
             if (id <= 0)
@@ -106,10 +112,10 @@ public static class AlunoEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
             }
 
-            var alunoExistente = await db.Alunos.FindAsync(id);
+            var alunoExistente = await db.Alunos.FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
             if (alunoExistente is null)
             {
-                return Results.NotFound(new { mensagem = "Aluno não encontrado." });
+                return Results.NotFound(new { mensagem = "Aluno não encontrado ou desativado." });
             }
 
             var erros = ValidarAluno(dadosAtualizados);
@@ -139,8 +145,28 @@ public static class AlunoEndpoints
             return Results.Ok(alunoExistente);
         });
 
-        // DELETE /alunos/{id} -> Remove um aluno pelo Id do banco
+        // DELETE /alunos/{id} -> Desativa o aluno (Soft Delete) mantendo o histórico no banco
         grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
+        {
+            if (id <= 0)
+            {
+                return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
+            }
+
+            var aluno = await db.Alunos.FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
+            if (aluno is null)
+            {
+                return Results.NotFound(new { mensagem = "Aluno não encontrado ou já desativado." });
+            }
+
+            aluno.Ativo = false;
+            await db.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+
+        // PATCH /alunos/{id}/reativar -> Reativa um aluno que havia sido desativado anteriormente
+        grupo.MapPatch("/{id:int}/reativar", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -153,10 +179,10 @@ public static class AlunoEndpoints
                 return Results.NotFound(new { mensagem = "Aluno não encontrado." });
             }
 
-            db.Alunos.Remove(aluno);
+            aluno.Ativo = true;
             await db.SaveChangesAsync();
 
-            return Results.NoContent();
+            return Results.Ok(aluno);
         });
     }
 

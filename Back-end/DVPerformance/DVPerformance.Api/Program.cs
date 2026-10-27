@@ -71,6 +71,7 @@ public class Program
         app.MapAuthEndpoints();
         app.MapAlunoEndpoints();
         app.MapExercicioEndpoints();
+        app.MapMaquinaEndpoints();
 
         app.Run();
     }

@@ -10,6 +10,9 @@ public class Usuario
 
     // Por padrão, todo Personal cadastrado tem perfil e permissões de Admin
     public string Perfil { get; set; } = "admin";
+
+    // Exclusão lógica (Soft Delete): mantém o histórico no banco quando desativado (false)
+    public bool Ativo { get; set; } = true;
 }
 
 // Dados enviados pelo Front-end no Cadastro e no Login
