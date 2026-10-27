@@ -14,7 +14,8 @@ import Treinos from "./pages/Treinos";
 import Dashboard from "./pages/Dashboard";
 import Cadastro from "./pages/Cadastro";
 import EsqueciSenha from "./pages/EsqueciSenha";
-import Exercicios from "./pages/Exercicios";
+import Exercicios from "./pages/Exercicios.jsx";
+import Maquinas from "./pages/Maquinas";
 
 const drawerWidth = 240;
 
@@ -189,6 +190,10 @@ export default function App() {
                 <Route
                   path="/exercicios"
                   element={<Exercicios glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/maquinas"
+                  element={<Maquinas glassStyle={glassStyle} />}
                 />
               </Routes>
             </Box>

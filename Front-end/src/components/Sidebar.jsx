@@ -90,7 +90,7 @@ export default function Sidebar({
           <ListItemText primary="Exercícios" />
         </ListItemButton>
 
-        <ListItemButton component={Link} to="/" sx={itemSx}>
+        <ListItemButton component={Link} to="/maquinas" sx={itemSx}>
           <ListItemIcon sx={iconSx}>
             <FitnessCenterIcon />
           </ListItemIcon>
