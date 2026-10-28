@@ -40,6 +40,13 @@ public class Program
 
         var app = builder.Build();
 
+        // Aplica as Migrations automaticamente ao iniciar a API (cria/atualiza o banco e as tabelas)
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.Migrate();
+        }
+
         // 2. Middleware para capturar erros de tipo no JSON (ex: enviar texto em campo numérico)
         app.Use(async (context, next) =>
         {
