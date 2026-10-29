@@ -16,6 +16,9 @@ import Cadastro from "./pages/Cadastro";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import Exercicios from "./pages/Exercicios.jsx";
 import Maquinas from "./pages/Maquinas";
+import PlanosExportados from "./pages/PlanosExportados";
+import { planosIniciais } from "./data/planosIniciais";
+import PlanoDetalhe from "./pages/PlanoDetalhe";
 
 const drawerWidth = 240;
 
@@ -81,6 +84,20 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
   const [telaAuth, setTelaAuth] = useState("login"); // 'login' ou 'cadastro'
   const [usuarioLogado, setUsuarioLogado] = useState(null);
+  const [planos, setPlanos] = useState(planosIniciais);
+  const adicionarPlano = (plano) => {
+    const novoId = crypto.randomUUID();
+    setPlanos((lista) => [{ id: novoId, ...plano }, ...lista]);
+    return novoId;
+  };
+
+  const atualizarPlano = (id, dados) =>
+    setPlanos((lista) =>
+      lista.map((p) => (p.id === id ? { ...p, ...dados } : p)),
+    );
+
+  const excluirPlano = (id) =>
+    setPlanos((lista) => lista.filter((p) => p.id !== id));
 
   const handleThemeChange = (event) => {
     setIsDarkMode(event.target.checked);
@@ -139,6 +156,7 @@ export default function App() {
             />
 
             <Box
+              className="no-print"
               sx={{
                 position: "fixed",
                 top: 16,
@@ -185,7 +203,12 @@ export default function App() {
                 />
                 <Route
                   path="/treinos"
-                  element={<Treinos glassStyle={glassStyle} />}
+                  element={
+                    <Treinos
+                      glassStyle={glassStyle}
+                      onGerarPlano={adicionarPlano}
+                    />
+                  }
                 />
                 <Route
                   path="/exercicios"
@@ -194,6 +217,27 @@ export default function App() {
                 <Route
                   path="/maquinas"
                   element={<Maquinas glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/planos"
+                  element={
+                    <PlanosExportados
+                      glassStyle={glassStyle}
+                      planos={planos}
+                      onAtualizar={atualizarPlano}
+                      onExcluir={excluirPlano}
+                    />
+                  }
+                />
+                <Route
+                  path="/planos/:id"
+                  element={
+                    <PlanoDetalhe
+                      glassStyle={glassStyle}
+                      planos={planos}
+                      onAtualizar={atualizarPlano}
+                    />
+                  }
                 />
               </Routes>
             </Box>

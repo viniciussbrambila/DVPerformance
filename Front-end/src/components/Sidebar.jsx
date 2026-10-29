@@ -107,7 +107,7 @@ export default function Sidebar({
           Relatórios
         </ListSubheader>
 
-        <ListItemButton sx={itemSx}>
+        <ListItemButton component={Link} to="/planos" sx={itemSx}>
           <ListItemIcon sx={iconSx}>
             <AssignmentIcon />
           </ListItemIcon>

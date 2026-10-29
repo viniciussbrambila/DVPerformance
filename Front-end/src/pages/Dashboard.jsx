@@ -117,7 +117,7 @@ export default function Dashboard({ glassStyle }) {
           glassStyle={glassStyle}
           icone={<DescriptionOutlinedIcon />}
           texto="Ver Planos"
-          onClick={() => navigate("/treinos")}
+          onClick={() => navigate("/planos")}
         />
       </Box>
     </Box>

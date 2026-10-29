@@ -8,12 +8,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert,
   CircularProgress,
 } from "@mui/material";
 import { useState } from "react";
 import BoltIcon from "@mui/icons-material/Bolt";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import { useNavigate } from "react-router-dom";
 
 // DADOS TEMPORÁRIOS: quando tiver backend, troque por dados da API.
 const alunosMock = [
@@ -111,15 +111,13 @@ function gerarPlano(aluno, exercicios) {
   };
 }
 
-export default function Treinos({ glassStyle }) {
+export default function Treinos({ glassStyle, onGerarPlano }) {
   const [alunoId, setAlunoId] = useState("");
   const [gerando, setGerando] = useState(false);
-  const [planoGerado, setPlanoGerado] = useState(null);
 
   const handleGerar = () => {
     if (!alunoId) return;
     setGerando(true);
-    setPlanoGerado(null);
 
     // Simula o tempo de geração
     setTimeout(() => {
@@ -130,9 +128,15 @@ export default function Treinos({ glassStyle }) {
       }
 
       const plano = gerarPlano(aluno, exerciciosMock);
-      console.log("Plano gerado:", plano); // depois trocar pela chamada à API
-      setPlanoGerado({ aluno: aluno.nome, dias: plano.dias.length });
+      const novoId = onGerarPlano({
+        ...plano,
+        aluno: aluno.nome,
+        objetivo: aluno.objetivo,
+        frequencia: aluno.frequencia,
+      });
+
       setGerando(false);
+      navigate(`/planos/${novoId}`);
     }, 1500);
   };
 
@@ -187,12 +191,6 @@ export default function Treinos({ glassStyle }) {
             gap: 2,
           }}
         >
-          {planoGerado && (
-            <Alert severity="success" sx={{ textAlign: "left" }}>
-              Plano de {planoGerado.dias} dias gerado para {planoGerado.aluno}!
-            </Alert>
-          )}
-
           <FormControl fullWidth disabled={gerando}>
             <InputLabel id="aluno-label">Selecione um aluno...</InputLabel>
             <Select
@@ -200,10 +198,7 @@ export default function Treinos({ glassStyle }) {
               id="aluno"
               value={alunoId}
               label="Selecione um aluno..."
-              onChange={(e) => {
-                setAlunoId(e.target.value);
-                setPlanoGerado(null);
-              }}
+              onChange={(e) => setAlunoId(e.target.value)}
               sx={{ textAlign: "left" }}
             >
               {alunosMock.map((a) => (
