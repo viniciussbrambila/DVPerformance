@@ -9,9 +9,7 @@ import {
   Box,
   Typography,
 } from "@mui/material";
-
-import { Link } from "react-router-dom";
-
+import { Link, useLocation } from "react-router-dom";
 import PeopleIcon from "@mui/icons-material/People";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
@@ -20,8 +18,20 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-const itemSx = { minHeight: 48, px: 2.5 };
 const iconSx = { minWidth: 0, mr: 3, justifyContent: "center" };
+const itemSx = {
+  minHeight: 48,
+  px: 2.5,
+  mx: 1,
+  mb: 0.5,
+  borderRadius: 2,
+  "&.Mui-selected": {
+    bgcolor: "primary.main",
+    color: "primary.contrastText",
+    "&:hover": { bgcolor: "primary.dark" },
+    "& .MuiListItemIcon-root": { color: "inherit" },
+  },
+};
 
 export default function Sidebar({
   drawerWidth,
@@ -29,6 +39,9 @@ export default function Sidebar({
   onSair,
   usuarioLogado,
 }) {
+  const { pathname } = useLocation();
+  const estaAtivo = (rota) =>
+    pathname === rota || pathname.startsWith(`${rota}/`);
   return (
     <Drawer
       variant="permanent"
@@ -62,35 +75,60 @@ export default function Sidebar({
       <Divider />
 
       <List component="nav">
-        <ListItemButton component={Link} to="/dashboard" sx={itemSx}>
+        <ListItemButton
+          component={Link}
+          to="/dashboard"
+          selected={estaAtivo("/dashboard")}
+          sx={itemSx}
+        >
           <ListItemIcon sx={iconSx}>
             <DashboardIcon />
           </ListItemIcon>
           <ListItemText primary="Dashboard" />
         </ListItemButton>
 
-        <ListItemButton component={Link} to="/treinos" sx={itemSx}>
+        <ListItemButton
+          component={Link}
+          to="/treinos"
+          selected={estaAtivo("/treinos")}
+          sx={itemSx}
+        >
           <ListItemIcon sx={iconSx}>
             <AddTaskIcon />
           </ListItemIcon>
           <ListItemText primary="Gerar Treino" />
         </ListItemButton>
 
-        <ListItemButton component={Link} to="/alunos" sx={itemSx}>
+        <ListItemButton
+          component={Link}
+          to="/alunos"
+          selected={estaAtivo("/alunos")}
+          sx={itemSx}
+        >
           <ListItemIcon sx={iconSx}>
             <PeopleIcon />
           </ListItemIcon>
           <ListItemText primary="Alunos" />
         </ListItemButton>
 
-        <ListItemButton component={Link} to="/Exercicios" sx={itemSx}>
+        <ListItemButton
+          component={Link}
+          to="/exercicios"
+          selected={estaAtivo("/exercicios")}
+          sx={itemSx}
+        >
           <ListItemIcon sx={iconSx}>
             <DirectionsRunIcon />
           </ListItemIcon>
           <ListItemText primary="Exercícios" />
         </ListItemButton>
 
-        <ListItemButton component={Link} to="/maquinas" sx={itemSx}>
+        <ListItemButton
+          component={Link}
+          to="/maquinas"
+          selected={estaAtivo("/maquinas")}
+          sx={itemSx}
+        >
           <ListItemIcon sx={iconSx}>
             <FitnessCenterIcon />
           </ListItemIcon>
@@ -107,7 +145,12 @@ export default function Sidebar({
           Relatórios
         </ListSubheader>
 
-        <ListItemButton component={Link} to="/planos" sx={itemSx}>
+        <ListItemButton
+          component={Link}
+          to="/planos"
+          selected={estaAtivo("/planos")}
+          sx={itemSx}
+        >
           <ListItemIcon sx={iconSx}>
             <AssignmentIcon />
           </ListItemIcon>

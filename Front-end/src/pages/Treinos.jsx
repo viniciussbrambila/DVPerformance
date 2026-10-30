@@ -9,36 +9,23 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Alert,
 } from "@mui/material";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BoltIcon from "@mui/icons-material/Bolt";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import { useNavigate } from "react-router-dom";
 
-// DADOS TEMPORÁRIOS: quando tiver backend, troque por dados da API.
-const alunosMock = [
-  {
-    id: "1",
-    nome: "Ana Souza",
-    objetivo: "Emagrecimento",
-    frequencia: 4,
-    experiencia: "Iniciante",
-  },
-  {
-    id: "2",
-    nome: "Carlos Lima",
-    objetivo: "Força",
-    frequencia: 5,
-    experiencia: "Avançado",
-  },
-  {
-    id: "3",
-    nome: "Marina Alves",
-    objetivo: "Resistência",
-    frequencia: 3,
-    experiencia: "Intermediário",
-  },
-];
+const API_URL = "http://localhost:5011/alunos";
+
+const obterUsuarioLogado = () => {
+  try {
+    const salvo = localStorage.getItem("usuarioLogado");
+    return salvo ? JSON.parse(salvo) : null;
+  } catch {
+    return null;
+  }
+};
 
 const exerciciosMock = [
   { id: "e1", nome: "Supino reto" },
@@ -56,52 +43,38 @@ const exerciciosMock = [
 ];
 
 function gerarPlano(aluno, exercicios) {
-  let series = 3;
-  let repeticoes = "10-12";
-  let descanso = "60s";
-  let exerciciosPorDia = 5;
+  const frequencia = Number(aluno.frequenciaSemanal);
+  for (let i = 1; i <= frequencia; i++) {
+    let series = 3;
+    let repeticoes = "10-12";
+    let descanso = "60s";
+    let exerciciosPorDia = 5;
 
-  if (aluno.experiencia === "Iniciante") {
-    series = 3;
-    exerciciosPorDia = 4;
-  } else if (aluno.experiencia === "Intermediário") {
-    series = 4;
-    exerciciosPorDia = 5;
-  } else {
-    series = 4;
-    exerciciosPorDia = 6;
+    if (aluno.experiencia === "Iniciante") {
+      series = 3;
+      exerciciosPorDia = 4;
+    } else if (aluno.experiencia === "Intermediário") {
+      series = 4;
+      exerciciosPorDia = 5;
+    } else {
+      series = 4;
+      exerciciosPorDia = 6;
+    }
+
+    if (aluno.objetivo === "Força") {
+      repeticoes = "6-8";
+      descanso = "120s";
+    } else if (aluno.objetivo === "Resistência") {
+      repeticoes = "15-20";
+      descanso = "45s";
+    } else if (aluno.objetivo === "Emagrecimento") {
+      repeticoes = "12-15";
+      descanso = "45s";
+    }
   }
-
-  if (aluno.objetivo === "Força") {
-    repeticoes = "4-6";
-    descanso = "120s";
-  } else if (aluno.objetivo === "Resistência") {
-    repeticoes = "15-20";
-    descanso = "45s";
-  } else if (aluno.objetivo === "Emagrecimento") {
-    repeticoes = "12-15";
-    descanso = "45s";
-  }
-
   // Embaralha os exercícios para dar variedade
   const embaralhados = [...exercicios].sort(() => 0.5 - Math.random());
   const dias = [];
-
-  for (let i = 1; i <= aluno.frequencia; i++) {
-    const exerciciosDoDia = [];
-    for (let j = 0; j < exerciciosPorDia; j++) {
-      const ex = embaralhados[(i * exerciciosPorDia + j) % embaralhados.length];
-      exerciciosDoDia.push({
-        id: crypto.randomUUID(),
-        exercicioId: ex.id,
-        nome: ex.nome,
-        series,
-        repeticoes,
-        descanso,
-      });
-    }
-    dias.push({ nome: `Dia ${i}`, exercicios: exerciciosDoDia });
-  }
 
   return {
     alunoId: aluno.id,
@@ -112,8 +85,37 @@ function gerarPlano(aluno, exercicios) {
 }
 
 export default function Treinos({ glassStyle, onGerarPlano }) {
+  const navigate = useNavigate();
   const [alunoId, setAlunoId] = useState("");
   const [gerando, setGerando] = useState(false);
+  const [alunos, setAlunos] = useState([]);
+  const [erroAlunos, setErroAlunos] = useState("");
+
+  useEffect(() => {
+    const carregarAlunos = async () => {
+      const usuarioLogado = obterUsuarioLogado();
+      if (!usuarioLogado?.id) {
+        setErroAlunos("Usuário logado não identificado. Faça login novamente.");
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_URL}?usuarioId=${usuarioLogado.id}`,
+        );
+        if (response.ok) {
+          setAlunos(await response.json());
+        } else {
+          setErroAlunos("Não foi possível carregar os alunos.");
+        }
+      } catch (erro) {
+        console.error("Erro ao conectar com a API:", erro);
+        setErroAlunos("Não foi possível conectar ao servidor.");
+      }
+    };
+
+    carregarAlunos();
+  }, []);
 
   const handleGerar = () => {
     if (!alunoId) return;
@@ -121,7 +123,7 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
 
     // Simula o tempo de geração
     setTimeout(() => {
-      const aluno = alunosMock.find((a) => a.id === alunoId);
+      const aluno = alunos.find((a) => String(a.id) === String(alunoId));
       if (!aluno) {
         setGerando(false);
         return;
@@ -132,7 +134,7 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
         ...plano,
         aluno: aluno.nome,
         objetivo: aluno.objetivo,
-        frequencia: aluno.frequencia,
+        frequencia: Number(aluno.frequenciaSemanal),
       });
 
       setGerando(false);
@@ -191,6 +193,7 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
             gap: 2,
           }}
         >
+          {erroAlunos && <Alert severity="error">{erroAlunos}</Alert>}
           <FormControl fullWidth disabled={gerando}>
             <InputLabel id="aluno-label">Selecione um aluno...</InputLabel>
             <Select
@@ -201,9 +204,14 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
               onChange={(e) => setAlunoId(e.target.value)}
               sx={{ textAlign: "left" }}
             >
-              {alunosMock.map((a) => (
+              {alunos.length === 0 && (
+                <MenuItem disabled value="">
+                  Nenhum aluno cadastrado
+                </MenuItem>
+              )}
+              {alunos.map((a) => (
                 <MenuItem key={a.id} value={a.id}>
-                  {a.nome} - {a.objetivo} ({a.frequencia}x)
+                  {a.nome} - {a.objetivo} ({a.frequenciaSemanal}x)
                 </MenuItem>
               ))}
             </Select>

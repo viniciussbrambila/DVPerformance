@@ -1,6 +1,11 @@
 import Login from "./pages/Login";
 import { useState } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { styled, ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box, IconButton, Badge, Switch } from "@mui/material";
 import Darktheme, { darkGlassStyle } from "./themes/Dark.js";
@@ -8,7 +13,6 @@ import Lighttheme, { lightGlassStyle } from "./themes/Light";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 
 import Sidebar from "./components/Sidebar";
-import Home from "./pages/Home";
 import Alunos from "./pages/Alunos";
 import Treinos from "./pages/Treinos";
 import Dashboard from "./pages/Dashboard";
@@ -196,10 +200,9 @@ export default function App() {
                   path="/dashboard"
                   element={<Dashboard glassStyle={glassStyle} />}
                 />
-                <Route path="/" element={<Home glassStyle={glassStyle} />} />
                 <Route
-                  path="/alunos"
-                  element={<Alunos glassStyle={glassStyle} />}
+                  path="/"
+                  element={<Navigate to="/dashboard" replace />}
                 />
                 <Route
                   path="/treinos"
@@ -238,6 +241,10 @@ export default function App() {
                       onAtualizar={atualizarPlano}
                     />
                   }
+                />
+                <Route
+                  path="/alunos"
+                  element={<Alunos glassStyle={glassStyle} />}
                 />
               </Routes>
             </Box>

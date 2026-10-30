@@ -4,6 +4,8 @@ import { useState } from "react";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import AddTaskIcon from "@mui/icons-material/AddTask";
+import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
+import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 
 function CardContagem({ glassStyle, icone, titulo, valor }) {
   return (
@@ -118,6 +120,18 @@ export default function Dashboard({ glassStyle }) {
           icone={<DescriptionOutlinedIcon />}
           texto="Ver Planos"
           onClick={() => navigate("/planos")}
+        />
+        <BotaoAcesso
+          glassStyle={glassStyle}
+          icone={<DirectionsRunIcon />}
+          texto="Exercícios"
+          onClick={() => navigate("/exercicios")}
+        />
+        <BotaoAcesso
+          glassStyle={glassStyle}
+          icone={<FitnessCenterIcon />}
+          texto="Máquinas"
+          onClick={() => navigate("/maquinas")}
         />
       </Box>
     </Box>
