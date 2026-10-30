@@ -6,30 +6,6 @@ namespace DVPerformance.Api.Endpoints;
 
 public static class MaquinaEndpoints
 {
-    // Mapa oficial: Grupo Muscular -> Região Corporal (Subtítulo/Categoria)
-    private static readonly Dictionary<string, string> RegiaoPorGrupo = new()
-    {
-        // Membros Superiores (Parte de Cima)
-        ["Peito"] = "Membros Superiores",
-        ["Costas"] = "Membros Superiores",
-        ["Trapézio"] = "Membros Superiores",
-        ["Ombros"] = "Membros Superiores",
-        ["Bíceps"] = "Membros Superiores",
-        ["Tríceps"] = "Membros Superiores",
-        ["Antebraço"] = "Membros Superiores",
-
-        // Membros Inferiores (Parte de Baixo)
-        ["Quadríceps"] = "Membros Inferiores",
-        ["Posterior de Coxa"] = "Membros Inferiores",
-        ["Glúteos"] = "Membros Inferiores",
-        ["Adutores / Abdutores"] = "Membros Inferiores",
-        ["Panturrilha"] = "Membros Inferiores",
-
-        // Core / Tronco
-        ["Abdômen"] = "Core / Tronco",
-        ["Lombar"] = "Core / Tronco"
-    };
-
     public static void MapMaquinaEndpoints(this WebApplication app)
     {
         // Cria um grupo de rotas com o prefixo "/maquinas" (RF03 - Gerenciar Catálogo de Máquinas)
@@ -38,7 +14,9 @@ public static class MaquinaEndpoints
         // GET /maquinas?usuarioId=1 -> Lista as máquinas ativas (padrões do sistema + do usuário logado)
         grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
         {
-            var query = db.Maquinas.AsQueryable();
+            var query = db.Maquinas
+                .Include(m => m.GrupoMuscular)
+                .AsQueryable();
 
             if (incluirInativos != true)
             {
@@ -52,8 +30,9 @@ public static class MaquinaEndpoints
             }
 
             var maquinas = await query
-                .OrderBy(m => m.Regiao)
-                .ThenBy(m => m.Grupo)
+                .OrderBy(m => m.GrupoMuscular!.Regiao)
+                .ThenBy(m => m.GrupoMuscular!.OrdemPrioridade)
+                .ThenBy(m => m.GrupoMuscular!.Nome)
                 .ThenBy(m => m.Nome)
                 .ToListAsync();
 
@@ -68,7 +47,10 @@ public static class MaquinaEndpoints
                 return Results.BadRequest(new { mensagem = "O ID da máquina deve ser um número inteiro positivo." });
             }
 
-            var maquina = await db.Maquinas.FirstOrDefaultAsync(m => m.Id == id && m.Ativo);
+            var maquina = await db.Maquinas
+                .Include(m => m.GrupoMuscular)
+                .FirstOrDefaultAsync(m => m.Id == id && m.Ativo);
+
             if (maquina is null)
             {
                 return Results.NotFound(new { mensagem = "Máquina não encontrada ou desativada." });
@@ -77,10 +59,10 @@ public static class MaquinaEndpoints
             return Results.Ok(maquina);
         });
 
-        // POST /maquinas -> Cadastra uma nova máquina no banco PostgreSQL (RF03 / RN18)
+        // POST /maquinas -> Cadastra uma nova máquina no banco PostgreSQL vinculada a grupos_musculares (RF03 / RN18)
         grupo.MapPost("/", async (Maquina? novaMaquina, AppDbContext db) =>
         {
-            var erros = ValidarMaquina(novaMaquina);
+            var (erros, grupoMuscular) = await ValidarMaquinaAsync(novaMaquina, db);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -113,12 +95,10 @@ public static class MaquinaEndpoints
                 }
             }
 
-            var grupoSelecionado = novaMaquina.Grupo.Trim();
-
             novaMaquina.Id = 0; // Garante geração automática de ID pelo PostgreSQL (SERIAL)
             novaMaquina.Nome = novaMaquina.Nome.Trim();
-            novaMaquina.Grupo = grupoSelecionado;
-            novaMaquina.Regiao = RegiaoPorGrupo[grupoSelecionado];
+            novaMaquina.GrupoMuscularId = grupoMuscular!.Id;
+            novaMaquina.GrupoMuscular = grupoMuscular;
             novaMaquina.Descricao = novaMaquina.Descricao?.Trim() ?? string.Empty;
             novaMaquina.Ativo = true;
 
@@ -136,13 +116,16 @@ public static class MaquinaEndpoints
                 return Results.BadRequest(new { mensagem = "O ID da máquina deve ser um número inteiro positivo." });
             }
 
-            var maquinaExistente = await db.Maquinas.FirstOrDefaultAsync(m => m.Id == id && m.Ativo);
+            var maquinaExistente = await db.Maquinas
+                .Include(m => m.GrupoMuscular)
+                .FirstOrDefaultAsync(m => m.Id == id && m.Ativo);
+
             if (maquinaExistente is null)
             {
                 return Results.NotFound(new { mensagem = "Máquina não encontrada ou desativada." });
             }
 
-            var erros = ValidarMaquina(dadosAtualizados);
+            var (erros, grupoMuscular) = await ValidarMaquinaAsync(dadosAtualizados, db);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -177,11 +160,9 @@ public static class MaquinaEndpoints
                 maquinaExistente.UsuarioId = dadosAtualizados.UsuarioId;
             }
 
-            var grupoSelecionado = dadosAtualizados.Grupo.Trim();
-
             maquinaExistente.Nome = dadosAtualizados.Nome.Trim();
-            maquinaExistente.Grupo = grupoSelecionado;
-            maquinaExistente.Regiao = RegiaoPorGrupo[grupoSelecionado];
+            maquinaExistente.GrupoMuscularId = grupoMuscular!.Id;
+            maquinaExistente.GrupoMuscular = grupoMuscular;
             maquinaExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
             await db.SaveChangesAsync();
@@ -217,7 +198,10 @@ public static class MaquinaEndpoints
                 return Results.BadRequest(new { mensagem = "O ID da máquina deve ser um número inteiro positivo." });
             }
 
-            var maquina = await db.Maquinas.FindAsync(id);
+            var maquina = await db.Maquinas
+                .Include(m => m.GrupoMuscular)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
             if (maquina is null)
             {
                 return Results.NotFound(new { mensagem = "Máquina não encontrada." });
@@ -231,14 +215,16 @@ public static class MaquinaEndpoints
     }
 
     // Valida os atributos da Máquina conforme a seção 8.1 (Dicionário de Dados - pág. 21) do Documento de Estágio
-    private static List<string> ValidarMaquina(Maquina? maquina)
+    private static async Task<(List<string> erros, GrupoMuscular? grupoMuscular)> ValidarMaquinaAsync(
+        Maquina? maquina,
+        AppDbContext db)
     {
         var erros = new List<string>();
 
         if (maquina is null)
         {
             erros.Add("Os dados da máquina não foram enviados.");
-            return erros;
+            return (erros, null);
         }
 
         // 1. Validação do Nome (Dicionário de Dados: varchar 100, Não Nulo / Obrigatório)
@@ -252,9 +238,20 @@ public static class MaquinaEndpoints
             erros.Add("O nome da máquina deve ter entre 2 e 100 caracteres.");
         }
 
-        // 2. Validação do Grupo Muscular (Dicionário de Dados: grupoMuscular varchar 50, Não Nulo / Obrigatório)
-        var grupo = maquina.Grupo?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(grupo) || !RegiaoPorGrupo.ContainsKey(grupo))
+        // 2. Validação do Grupo Muscular (aceita tanto o ID da tabela grupos_musculares quanto o nome enviado pelo Front-end)
+        GrupoMuscular? grupoEncontrado = null;
+        if (maquina.GrupoMuscularId > 0)
+        {
+            grupoEncontrado = await db.GruposMusculares.FindAsync(maquina.GrupoMuscularId);
+        }
+        else if (!string.IsNullOrWhiteSpace(maquina.Grupo))
+        {
+            var nomeGrupo = maquina.Grupo.Trim();
+            grupoEncontrado = await db.GruposMusculares
+                .FirstOrDefaultAsync(g => g.Nome == nomeGrupo);
+        }
+
+        if (grupoEncontrado is null)
         {
             erros.Add("Selecione um grupo muscular válido na lista.");
         }
@@ -266,6 +263,6 @@ public static class MaquinaEndpoints
             erros.Add("A descrição da máquina deve ter no máximo 255 caracteres.");
         }
 
-        return erros;
+        return (erros, grupoEncontrado);
     }
 }

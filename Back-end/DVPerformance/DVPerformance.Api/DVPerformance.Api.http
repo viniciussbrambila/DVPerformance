@@ -1,38 +1,29 @@
-@DVPerformance.Api_HostAddress = http://localhost:5011
+@host = http://localhost:5011
 
-### 1. Listar todos os alunos
-GET {{DVPerformance.Api_HostAddress}}/alunos
+### Grupos Musculares (Prioridade 1 a 4)
+GET {{host}}/grupos-musculares
 Accept: application/json
 
-### 2. Buscar um aluno específico pelo ID
-GET {{DVPerformance.Api_HostAddress}}/alunos/1
+### Listar Alunos
+GET {{host}}/alunos
 Accept: application/json
 
-### 3. Cadastrar um novo aluno (POST)
-POST {{DVPerformance.Api_HostAddress}}/alunos
-Content-Type: application/json
+### Listar Exercícios
+GET {{host}}/exercicios
+Accept: application/json
 
-{
-  "nome": "Carlos Eduardo",
-  "idade": 22,
-  "sexo": "M",
-  "experiencia": "Iniciante",
-  "frequenciaSemanal": 4,
-  "objetivo": "Hipertrofia"
-}
+### Listar Máquinas
+GET {{host}}/maquinas
+Accept: application/json
 
-### 4. Atualizar um aluno existente (PUT)
-PUT {{DVPerformance.Api_HostAddress}}/alunos/1
-Content-Type: application/json
+### Gerar Treino Automático para um Aluno (informe o ID real do aluno)
+POST {{host}}/treinos/gerar/1
+Accept: application/json
 
-{
-  "nome": "João Carlos Atualizado",
-  "idade": 29,
-  "sexo": "M",
-  "experiencia": "Avançado",
-  "frequenciaSemanal": 5,
-  "objetivo": "Força"
-}
+### Listar Treinos Gerados
+GET {{host}}/treinos
+Accept: application/json
 
-### 5. Excluir um aluno (DELETE)
-DELETE {{DVPerformance.Api_HostAddress}}/alunos/3
+### Buscar Treinos de um Aluno específico
+GET {{host}}/treinos/aluno/1
+Accept: application/json

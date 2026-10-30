@@ -6,39 +6,28 @@ namespace DVPerformance.Api.Endpoints;
 
 public static class ExercicioEndpoints
 {
-    // Mapa oficial: Grupo Muscular -> Região Corporal (Subtítulo/Categoria)
-    private static readonly Dictionary<string, string> RegiaoPorGrupo = new()
-    {
-        // Membros Superiores (Parte de Cima)
-        ["Peito"] = "Membros Superiores",
-        ["Costas"] = "Membros Superiores",
-        ["Trapézio"] = "Membros Superiores",
-        ["Ombros"] = "Membros Superiores",
-        ["Bíceps"] = "Membros Superiores",
-        ["Tríceps"] = "Membros Superiores",
-        ["Antebraço"] = "Membros Superiores",
-
-        // Membros Inferiores (Parte de Baixo)
-        ["Quadríceps"] = "Membros Inferiores",
-        ["Posterior de Coxa"] = "Membros Inferiores",
-        ["Glúteos"] = "Membros Inferiores",
-        ["Adutores / Abdutores"] = "Membros Inferiores",
-        ["Panturrilha"] = "Membros Inferiores",
-
-        // Core / Tronco
-        ["Abdômen"] = "Core / Tronco",
-        ["Lombar"] = "Core / Tronco"
-    };
-
     public static void MapExercicioEndpoints(this WebApplication app)
     {
+        // Rota auxiliar para consultar a tabela unificada de Grupos Musculares e suas prioridades (1 a 4)
+        app.MapGet("/grupos-musculares", async (AppDbContext db) =>
+        {
+            var grupos = await db.GruposMusculares
+                .OrderBy(g => g.OrdemPrioridade)
+                .ThenBy(g => g.Nome)
+                .ToListAsync();
+
+            return Results.Ok(grupos);
+        });
+
         // Cria um grupo de rotas com o prefixo "/exercicios"
         var grupo = app.MapGroup("/exercicios");
 
         // GET /exercicios?usuarioId=1 -> Lista os exercícios ativos (ou todos se incluirInativos=true)
         grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
         {
-            var query = db.Exercicios.AsQueryable();
+            var query = db.Exercicios
+                .Include(e => e.GrupoMuscular)
+                .AsQueryable();
 
             if (incluirInativos != true)
             {
@@ -52,8 +41,9 @@ public static class ExercicioEndpoints
             }
 
             var exercicios = await query
-                .OrderBy(e => e.Regiao)
-                .ThenBy(e => e.Grupo)
+                .OrderBy(e => e.GrupoMuscular!.Regiao)
+                .ThenBy(e => e.GrupoMuscular!.OrdemPrioridade)
+                .ThenBy(e => e.GrupoMuscular!.Nome)
                 .ThenBy(e => e.Nome)
                 .ToListAsync();
 
@@ -68,7 +58,10 @@ public static class ExercicioEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
             }
 
-            var exercicio = await db.Exercicios.FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
+            var exercicio = await db.Exercicios
+                .Include(e => e.GrupoMuscular)
+                .FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
+
             if (exercicio is null)
             {
                 return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
@@ -77,10 +70,10 @@ public static class ExercicioEndpoints
             return Results.Ok(exercicio);
         });
 
-        // POST /exercicios -> Cadastra um novo exercício no banco PostgreSQL
+        // POST /exercicios -> Cadastra um novo exercício no banco PostgreSQL vinculado a grupos_musculares
         grupo.MapPost("/", async (Exercicio? novoExercicio, AppDbContext db) =>
         {
-            var erros = ValidarExercicio(novoExercicio);
+            var (erros, grupoMuscular) = await ValidarExercicioAsync(novoExercicio, db);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -103,12 +96,10 @@ public static class ExercicioEndpoints
                 }
             }
 
-            var grupoSelecionado = novoExercicio.Grupo.Trim();
-
             novoExercicio.Id = 0; // Garante geração automática de ID pelo PostgreSQL (SERIAL)
             novoExercicio.Nome = novoExercicio.Nome.Trim();
-            novoExercicio.Grupo = grupoSelecionado;
-            novoExercicio.Regiao = RegiaoPorGrupo[grupoSelecionado];
+            novoExercicio.GrupoMuscularId = grupoMuscular!.Id;
+            novoExercicio.GrupoMuscular = grupoMuscular;
             novoExercicio.Descricao = novoExercicio.Descricao?.Trim() ?? string.Empty;
             novoExercicio.Ativo = true;
 
@@ -126,13 +117,16 @@ public static class ExercicioEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
             }
 
-            var exercicioExistente = await db.Exercicios.FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
+            var exercicioExistente = await db.Exercicios
+                .Include(e => e.GrupoMuscular)
+                .FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
+
             if (exercicioExistente is null)
             {
                 return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
             }
 
-            var erros = ValidarExercicio(dadosAtualizados);
+            var (erros, grupoMuscular) = await ValidarExercicioAsync(dadosAtualizados, db);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -142,11 +136,9 @@ public static class ExercicioEndpoints
                 });
             }
 
-            var grupoSelecionado = dadosAtualizados!.Grupo.Trim();
-
-            exercicioExistente.Nome = dadosAtualizados.Nome.Trim();
-            exercicioExistente.Grupo = grupoSelecionado;
-            exercicioExistente.Regiao = RegiaoPorGrupo[grupoSelecionado];
+            exercicioExistente.Nome = dadosAtualizados!.Nome.Trim();
+            exercicioExistente.GrupoMuscularId = grupoMuscular!.Id;
+            exercicioExistente.GrupoMuscular = grupoMuscular;
             exercicioExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
             if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
@@ -187,7 +179,10 @@ public static class ExercicioEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
             }
 
-            var exercicio = await db.Exercicios.FindAsync(id);
+            var exercicio = await db.Exercicios
+                .Include(e => e.GrupoMuscular)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
             if (exercicio is null)
             {
                 return Results.NotFound(new { mensagem = "Exercício não encontrado." });
@@ -200,14 +195,16 @@ public static class ExercicioEndpoints
         });
     }
 
-    private static List<string> ValidarExercicio(Exercicio? exercicio)
+    private static async Task<(List<string> erros, GrupoMuscular? grupoMuscular)> ValidarExercicioAsync(
+        Exercicio? exercicio,
+        AppDbContext db)
     {
         var erros = new List<string>();
 
         if (exercicio is null)
         {
             erros.Add("Os dados do exercício não foram enviados.");
-            return erros;
+            return (erros, null);
         }
 
         // 1. Validação do Nome (obrigatório, entre 2 e 100 caracteres)
@@ -221,9 +218,20 @@ public static class ExercicioEndpoints
             erros.Add("O nome do exercício deve ter entre 2 e 100 caracteres.");
         }
 
-        // 2. Validação do Grupo Muscular (Select obrigatório entre os grupos padronizados)
-        var grupo = exercicio.Grupo?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(grupo) || !RegiaoPorGrupo.ContainsKey(grupo))
+        // 2. Validação do Grupo Muscular (aceita tanto o ID da tabela grupos_musculares quanto o nome enviado pelo Front-end)
+        GrupoMuscular? grupoEncontrado = null;
+        if (exercicio.GrupoMuscularId > 0)
+        {
+            grupoEncontrado = await db.GruposMusculares.FindAsync(exercicio.GrupoMuscularId);
+        }
+        else if (!string.IsNullOrWhiteSpace(exercicio.Grupo))
+        {
+            var nomeGrupo = exercicio.Grupo.Trim();
+            grupoEncontrado = await db.GruposMusculares
+                .FirstOrDefaultAsync(g => g.Nome == nomeGrupo);
+        }
+
+        if (grupoEncontrado is null)
         {
             erros.Add("Selecione um grupo muscular válido na lista.");
         }
@@ -235,6 +243,6 @@ public static class ExercicioEndpoints
             erros.Add("A descrição do exercício deve ter no máximo 255 caracteres.");
         }
 
-        return erros;
+        return (erros, grupoEncontrado);
     }
 }

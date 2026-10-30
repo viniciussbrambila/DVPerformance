@@ -13,9 +13,15 @@ public class AppDbContext : DbContext
 
     public DbSet<Usuario> Usuarios { get; set; }
 
+    public DbSet<GrupoMuscular> GruposMusculares { get; set; }
+
     public DbSet<Exercicio> Exercicios { get; set; }
 
     public DbSet<Maquina> Maquinas { get; set; }
+
+    public DbSet<Treino> Treinos { get; set; }
+
+    public DbSet<ItemTreino> ItensTreino { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -107,7 +113,54 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // 3. Mapeamento da tabela 'exercicios' (Catálogo de Exercícios separado por Região e Grupo Muscular)
+        // 3. Mapeamento da tabela mestre 'grupos_musculares' (unifica área muscular de Exercícios e Máquinas + Ordem de Prioridade no treino)
+        modelBuilder.Entity<GrupoMuscular>(entity =>
+        {
+            entity.ToTable("grupos_musculares");
+
+            entity.HasKey(g => g.Id);
+
+            entity.Property(g => g.Id)
+                  .HasColumnName("id");
+
+            entity.Property(g => g.Nome)
+                  .HasColumnName("nome")
+                  .HasMaxLength(50)
+                  .IsRequired();
+
+            entity.HasIndex(g => g.Nome)
+                  .IsUnique();
+
+            entity.Property(g => g.Regiao)
+                  .HasColumnName("regiao")
+                  .HasMaxLength(40)
+                  .IsRequired();
+
+            entity.Property(g => g.OrdemPrioridade)
+                  .HasColumnName("ordem_prioridade")
+                  .IsRequired();
+
+            // Carga padrão dos 14 grupos musculares com prioridade anatômica:
+            // 1 = Músculo Grande (Base) | 2 = Médio (Sinergista) | 3 = Pequeno (Auxiliar) | 4 = Core / Finalizador
+            entity.HasData(
+                new GrupoMuscular { Id = 1, Nome = "Peito", Regiao = "Membros Superiores", OrdemPrioridade = 1 },
+                new GrupoMuscular { Id = 2, Nome = "Costas", Regiao = "Membros Superiores", OrdemPrioridade = 1 },
+                new GrupoMuscular { Id = 3, Nome = "Quadríceps", Regiao = "Membros Inferiores", OrdemPrioridade = 1 },
+                new GrupoMuscular { Id = 4, Nome = "Posterior de Coxa", Regiao = "Membros Inferiores", OrdemPrioridade = 1 },
+                new GrupoMuscular { Id = 5, Nome = "Glúteos", Regiao = "Membros Inferiores", OrdemPrioridade = 1 },
+                new GrupoMuscular { Id = 6, Nome = "Ombros", Regiao = "Membros Superiores", OrdemPrioridade = 2 },
+                new GrupoMuscular { Id = 7, Nome = "Trapézio", Regiao = "Membros Superiores", OrdemPrioridade = 2 },
+                new GrupoMuscular { Id = 8, Nome = "Adutores / Abdutores", Regiao = "Membros Inferiores", OrdemPrioridade = 2 },
+                new GrupoMuscular { Id = 9, Nome = "Bíceps", Regiao = "Membros Superiores", OrdemPrioridade = 3 },
+                new GrupoMuscular { Id = 10, Nome = "Tríceps", Regiao = "Membros Superiores", OrdemPrioridade = 3 },
+                new GrupoMuscular { Id = 11, Nome = "Panturrilha", Regiao = "Membros Inferiores", OrdemPrioridade = 3 },
+                new GrupoMuscular { Id = 12, Nome = "Antebraço", Regiao = "Membros Superiores", OrdemPrioridade = 4 },
+                new GrupoMuscular { Id = 13, Nome = "Abdômen", Regiao = "Core / Tronco", OrdemPrioridade = 4 },
+                new GrupoMuscular { Id = 14, Nome = "Lombar", Regiao = "Core / Tronco", OrdemPrioridade = 4 }
+            );
+        });
+
+        // 4. Mapeamento da tabela 'exercicios' (vinculada a grupos_musculares sem redundância de colunas)
         modelBuilder.Entity<Exercicio>(entity =>
         {
             entity.ToTable("exercicios");
@@ -122,14 +175,8 @@ public class AppDbContext : DbContext
                   .HasMaxLength(100)
                   .IsRequired();
 
-            entity.Property(e => e.Regiao)
-                  .HasColumnName("regiao")
-                  .HasMaxLength(40)
-                  .IsRequired();
-
-            entity.Property(e => e.Grupo)
-                  .HasColumnName("grupo")
-                  .HasMaxLength(50)
+            entity.Property(e => e.GrupoMuscularId)
+                  .HasColumnName("grupo_muscular_id")
                   .IsRequired();
 
             entity.Property(e => e.Descricao)
@@ -144,13 +191,18 @@ public class AppDbContext : DbContext
                   .HasDefaultValue(true)
                   .IsRequired();
 
+            entity.HasOne(e => e.GrupoMuscular)
+                  .WithMany()
+                  .HasForeignKey(e => e.GrupoMuscularId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasOne<Usuario>()
                   .WithMany()
                   .HasForeignKey(e => e.UsuarioId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // 4. Mapeamento da tabela 'maquinas' (Dicionário de Dados pág. 21: id, nome, grupo, descricao + padronização)
+        // 5. Mapeamento da tabela 'maquinas' (vinculada a grupos_musculares sem redundância de colunas)
         modelBuilder.Entity<Maquina>(entity =>
         {
             entity.ToTable("maquinas");
@@ -165,14 +217,8 @@ public class AppDbContext : DbContext
                   .HasMaxLength(100)
                   .IsRequired();
 
-            entity.Property(m => m.Regiao)
-                  .HasColumnName("regiao")
-                  .HasMaxLength(40)
-                  .IsRequired();
-
-            entity.Property(m => m.Grupo)
-                  .HasColumnName("grupo")
-                  .HasMaxLength(50)
+            entity.Property(m => m.GrupoMuscularId)
+                  .HasColumnName("grupo_muscular_id")
                   .IsRequired();
 
             entity.Property(m => m.Descricao)
@@ -187,10 +233,131 @@ public class AppDbContext : DbContext
                   .HasDefaultValue(true)
                   .IsRequired();
 
+            entity.HasOne(m => m.GrupoMuscular)
+                  .WithMany()
+                  .HasForeignKey(m => m.GrupoMuscularId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasOne<Usuario>()
                   .WithMany()
                   .HasForeignKey(m => m.UsuarioId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 6. Mapeamento da tabela 'treinos' (Cabeçalho da Ficha de Treino gerada para o Aluno)
+        modelBuilder.Entity<Treino>(entity =>
+        {
+            entity.ToTable("treinos");
+
+            entity.HasKey(t => t.Id);
+
+            entity.Property(t => t.Id)
+                  .HasColumnName("id");
+
+            entity.Property(t => t.AlunoId)
+                  .HasColumnName("aluno_id")
+                  .IsRequired();
+
+            entity.Property(t => t.UsuarioId)
+                  .HasColumnName("usuario_id");
+
+            entity.Property(t => t.NomePlano)
+                  .HasColumnName("nome_plano")
+                  .HasMaxLength(150)
+                  .IsRequired();
+
+            entity.Property(t => t.Divisao)
+                  .HasColumnName("divisao")
+                  .HasMaxLength(80)
+                  .IsRequired();
+
+            entity.Property(t => t.TempoAerobico)
+                  .HasColumnName("tempo_aerobico")
+                  .HasMaxLength(120)
+                  .IsRequired();
+
+            entity.Property(t => t.DataCriacao)
+                  .HasColumnName("data_criacao")
+                  .IsRequired();
+
+            entity.Property(t => t.Ativo)
+                  .HasColumnName("ativo")
+                  .HasDefaultValue(true)
+                  .IsRequired();
+
+            entity.HasOne<Aluno>()
+                  .WithMany()
+                  .HasForeignKey(t => t.AlunoId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<Usuario>()
+                  .WithMany()
+                  .HasForeignKey(t => t.UsuarioId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(t => t.Itens)
+                  .WithOne(i => i.Treino)
+                  .HasForeignKey(i => i.TreinoId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 7. Mapeamento da tabela 'itens_treino' (ItemTreino: id_item, divisao_treino, ordem_exercicio, series, repeticao, tempo_descanso, tempo_aerobico + FKs para exercicios e maquinas)
+        modelBuilder.Entity<ItemTreino>(entity =>
+        {
+            entity.ToTable("itens_treino");
+
+            entity.HasKey(i => i.Id);
+
+            entity.Property(i => i.Id)
+                  .HasColumnName("id_item");
+
+            entity.Property(i => i.TreinoId)
+                  .HasColumnName("treino_id")
+                  .IsRequired();
+
+            entity.Property(i => i.DivisaoTreino)
+                  .HasColumnName("divisao_treino")
+                  .HasMaxLength(100)
+                  .IsRequired();
+
+            entity.Property(i => i.OrdemExercicio)
+                  .HasColumnName("ordem_exercicio")
+                  .IsRequired();
+
+            entity.Property(i => i.ExercicioId)
+                  .HasColumnName("exercicio_id");
+
+            entity.Property(i => i.MaquinaId)
+                  .HasColumnName("maquina_id");
+
+            entity.Property(i => i.Series)
+                  .HasColumnName("series")
+                  .IsRequired();
+
+            entity.Property(i => i.Repeticao)
+                  .HasColumnName("repeticao")
+                  .HasMaxLength(30)
+                  .IsRequired();
+
+            entity.Property(i => i.TempoDescanso)
+                  .HasColumnName("tempo_descanso")
+                  .HasMaxLength(30)
+                  .IsRequired();
+
+            entity.Property(i => i.TempoAerobico)
+                  .HasColumnName("tempo_aerobico")
+                  .HasMaxLength(120)
+                  .IsRequired();
+
+            entity.HasOne(i => i.Exercicio)
+                  .WithMany()
+                  .HasForeignKey(i => i.ExercicioId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(i => i.Maquina)
+                  .WithMany()
+                  .HasForeignKey(i => i.MaquinaId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

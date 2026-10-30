@@ -79,6 +79,7 @@ public class Program
         app.MapAlunoEndpoints();
         app.MapExercicioEndpoints();
         app.MapMaquinaEndpoints();
+        app.MapTreinoEndpoints();
 
         app.Run();
     }
