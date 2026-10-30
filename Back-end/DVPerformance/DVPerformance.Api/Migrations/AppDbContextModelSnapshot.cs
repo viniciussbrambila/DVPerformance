@@ -119,7 +119,7 @@ namespace DVPerformance.Api.Migrations
 
                     b.HasIndex("GrupoMuscularId");
 
-                    b.HasIndex("UsuarioId");
+                    b.HasIndex("UsuarioId", "Ativo");
 
                     b.ToTable("exercicios", (string)null);
                 });
@@ -360,7 +360,7 @@ namespace DVPerformance.Api.Migrations
 
                     b.HasIndex("GrupoMuscularId");
 
-                    b.HasIndex("UsuarioId");
+                    b.HasIndex("UsuarioId", "Ativo");
 
                     b.ToTable("maquinas", (string)null);
                 });
@@ -433,6 +433,12 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("ativo");
+
+                    b.Property<bool>("CatalogoInicializado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("catalogo_inicializado");
 
                     b.Property<string>("NomeUsuario")
                         .IsRequired()

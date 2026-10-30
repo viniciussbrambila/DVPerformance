@@ -91,7 +91,7 @@ public static class TreinoEndpoints
             return Results.Ok(treinos);
         });
 
-        // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha usando apenas os exercícios e máquinas cadastrados no banco
+        // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha usando os exercícios e máquinas ativos da conta do Personal
         grupo.MapPost("/gerar/{alunoId:int}", async (int alunoId, int? usuarioId, AppDbContext db) =>
         {
             if (alunoId <= 0)
@@ -105,24 +105,47 @@ public static class TreinoEndpoints
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou inativo no sistema." });
             }
 
+            // Identifica o Personal dono da ficha (pelo query param ou pelo vínculo do próprio aluno)
+            var donoId = (usuarioId.HasValue && usuarioId.Value > 0)
+                ? usuarioId.Value
+                : aluno.UsuarioId;
+
+            if (donoId.HasValue && donoId.Value > 0)
+            {
+                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, donoId.Value);
+            }
+
             var gruposMusculares = await db.GruposMusculares.ToListAsync();
 
             var exerciciosDisponiveis = await db.Exercicios
                 .Include(e => e.GrupoMuscular)
-                .Where(e => e.Ativo && (usuarioId == null || e.UsuarioId == null || e.UsuarioId == usuarioId))
+                .Where(e => e.Ativo && (donoId == null || e.UsuarioId == donoId || e.UsuarioId == null))
                 .ToListAsync();
 
             var maquinasDisponiveis = await db.Maquinas
                 .Include(m => m.GrupoMuscular)
-                .Where(m => m.Ativo && (usuarioId == null || m.UsuarioId == null || m.UsuarioId == usuarioId))
+                .Where(m => m.Ativo && (donoId == null || m.UsuarioId == donoId || m.UsuarioId == null))
                 .ToListAsync();
+
+            if (donoId is null)
+            {
+                exerciciosDisponiveis = exerciciosDisponiveis
+                    .GroupBy(e => (e.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(e.Nome)))
+                    .Select(g => g.First())
+                    .ToList();
+
+                maquinasDisponiveis = maquinasDisponiveis
+                    .GroupBy(m => (m.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(m.Nome)))
+                    .Select(g => g.First())
+                    .ToList();
+            }
 
             if (exerciciosDisponiveis.Count == 0 && maquinasDisponiveis.Count == 0)
             {
                 return Results.BadRequest(new
                 {
-                    mensagem = "Não há exercícios nem máquinas cadastrados no sistema para gerar o treino.",
-                    erros = new[] { "Cadastre exercícios e máquinas no catálogo antes de gerar uma ficha automática." }
+                    mensagem = "Não há exercícios nem máquinas ativos na sua conta para gerar o treino.",
+                    erros = new[] { "Cadastre ou restaure exercícios e máquinas no catálogo antes de gerar uma ficha automática." }
                 });
             }
 
@@ -139,7 +162,7 @@ public static class TreinoEndpoints
             // Executa o Motor de Prescrição Inteligente usando a tabela unificada grupos_musculares e sua OrdemPrioridade (1 a 4)
             var novoTreino = GerarTreinoPersonalizado(
                 aluno,
-                usuarioId ?? aluno.UsuarioId,
+                donoId,
                 gruposMusculares,
                 exerciciosDisponiveis,
                 maquinasDisponiveis);
@@ -743,7 +766,7 @@ public static class TreinoEndpoints
             return resultadoDireto;
         }
 
-        // 2º Caso o Personal ainda não tenha cadastrado nenhum item daquele músculo específico,
+        // 2º Caso o Personal tenha removido todos os itens daquele músculo específico,
         // busca outro item ainda não usado da mesma Região Corporal (ex: outro músculo de "Membros Superiores")
         var maquinasDaRegiao = maquinas
             .Where(m => m.GrupoMuscular?.Regiao == grupoAlvo.Regiao && !usadosMaquina.Contains(m.Id))

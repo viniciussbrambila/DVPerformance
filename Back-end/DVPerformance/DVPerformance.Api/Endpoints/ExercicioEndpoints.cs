@@ -22,9 +22,14 @@ public static class ExercicioEndpoints
         // Cria um grupo de rotas com o prefixo "/exercicios"
         var grupo = app.MapGroup("/exercicios");
 
-        // GET /exercicios?usuarioId=1 -> Lista os exercícios ativos (ou todos se incluirInativos=true)
+        // GET /exercicios?usuarioId=1 -> Lista os exercícios ativos da conta do Personal (pré-cadastrados + personalizados)
         grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
         {
+            if (usuarioId.HasValue && usuarioId.Value > 0)
+            {
+                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, usuarioId.Value);
+            }
+
             var query = db.Exercicios
                 .Include(e => e.GrupoMuscular)
                 .AsQueryable();
@@ -36,18 +41,34 @@ public static class ExercicioEndpoints
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
-                // Retorna exercícios globais (UsuarioId == null) e os criados por este Personal
-                query = query.Where(e => e.UsuarioId == null || e.UsuarioId == usuarioId.Value);
+                // Retorna os exercícios da conta deste Personal (e eventuais registros sem vínculo)
+                query = query.Where(e => e.UsuarioId == usuarioId.Value || e.UsuarioId == null);
+
+                var exerciciosPersonal = await query
+                    .OrderBy(e => e.GrupoMuscular!.Regiao)
+                    .ThenBy(e => e.GrupoMuscular!.OrdemPrioridade)
+                    .ThenBy(e => e.GrupoMuscular!.Nome)
+                    .ThenBy(e => e.Nome)
+                    .ToListAsync();
+
+                return Results.Ok(exerciciosPersonal);
             }
 
-            var exercicios = await query
+            // Caso a requisição não informe usuarioId (ex.: testes gerais), evita exibir cópias repetidas entre múltiplos Personals
+            var todos = await query
+                .OrderBy(e => e.Id)
+                .ToListAsync();
+
+            var exerciciosUnicos = todos
+                .GroupBy(e => (e.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(e.Nome)))
+                .Select(g => g.First())
                 .OrderBy(e => e.GrupoMuscular!.Regiao)
                 .ThenBy(e => e.GrupoMuscular!.OrdemPrioridade)
                 .ThenBy(e => e.GrupoMuscular!.Nome)
                 .ThenBy(e => e.Nome)
-                .ToListAsync();
+                .ToList();
 
-            return Results.Ok(exercicios);
+            return Results.Ok(exerciciosUnicos);
         });
 
         // GET /exercicios/{id} -> Busca um exercício ativo específico pelo Id no banco
@@ -70,7 +91,7 @@ public static class ExercicioEndpoints
             return Results.Ok(exercicio);
         });
 
-        // POST /exercicios -> Cadastra um novo exercício no banco PostgreSQL vinculado a grupos_musculares
+        // POST /exercicios -> Cadastra um novo exercício personalizado na conta do Personal
         grupo.MapPost("/", async (Exercicio? novoExercicio, AppDbContext db) =>
         {
             var (erros, grupoMuscular) = await ValidarExercicioAsync(novoExercicio, db);
@@ -83,7 +104,10 @@ public static class ExercicioEndpoints
                 });
             }
 
-            if (novoExercicio!.UsuarioId.HasValue && novoExercicio.UsuarioId.Value > 0)
+            var nomeLimpo = novoExercicio!.Nome.Trim();
+            var descricaoLimpa = novoExercicio.Descricao?.Trim() ?? string.Empty;
+
+            if (novoExercicio.UsuarioId.HasValue && novoExercicio.UsuarioId.Value > 0)
             {
                 var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoExercicio.UsuarioId.Value && u.Ativo);
                 if (!personalExiste)
@@ -94,13 +118,43 @@ public static class ExercicioEndpoints
                         erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
                     });
                 }
+
+                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, novoExercicio.UsuarioId.Value);
+
+                var mesmoNomeExistente = await db.Exercicios
+                    .Include(e => e.GrupoMuscular)
+                    .FirstOrDefaultAsync(e =>
+                        e.UsuarioId == novoExercicio.UsuarioId.Value &&
+                        e.Nome.ToLower() == nomeLimpo.ToLower());
+
+                if (mesmoNomeExistente is not null)
+                {
+                    if (mesmoNomeExistente.Ativo)
+                    {
+                        return Results.Conflict(new
+                        {
+                            mensagem = "Este exercício já está cadastrado na sua conta.",
+                            erros = new[] { "Você já possui um exercício ativo com este nome no seu catálogo." }
+                        });
+                    }
+
+                    // Se estava removido (Soft Delete), reativa e atualiza com os dados informados pelo Personal
+                    mesmoNomeExistente.Nome = nomeLimpo;
+                    mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
+                    mesmoNomeExistente.GrupoMuscular = grupoMuscular;
+                    mesmoNomeExistente.Descricao = descricaoLimpa;
+                    mesmoNomeExistente.Ativo = true;
+
+                    await db.SaveChangesAsync();
+                    return Results.Created($"/exercicios/{mesmoNomeExistente.Id}", mesmoNomeExistente);
+                }
             }
 
             novoExercicio.Id = 0; // Garante geração automática de ID pelo PostgreSQL (SERIAL)
-            novoExercicio.Nome = novoExercicio.Nome.Trim();
+            novoExercicio.Nome = nomeLimpo;
             novoExercicio.GrupoMuscularId = grupoMuscular!.Id;
             novoExercicio.GrupoMuscular = grupoMuscular;
-            novoExercicio.Descricao = novoExercicio.Descricao?.Trim() ?? string.Empty;
+            novoExercicio.Descricao = descricaoLimpa;
             novoExercicio.Ativo = true;
 
             db.Exercicios.Add(novoExercicio);
@@ -109,7 +163,33 @@ public static class ExercicioEndpoints
             return Results.Created($"/exercicios/{novoExercicio.Id}", novoExercicio);
         });
 
-        // PUT /exercicios/{id} -> Atualiza um exercício ativo existente no banco
+        // POST /exercicios/restaurar-padrao?usuarioId=1 -> Restaura os exercícios pré-cadastrados que o Personal tenha removido, mantendo os criados por ele
+        grupo.MapPost("/restaurar-padrao", async (int usuarioId, AppDbContext db) =>
+        {
+            if (usuarioId <= 0)
+            {
+                return Results.BadRequest(new { mensagem = "Informe um usuarioId válido para restaurar os exercícios padrão." });
+            }
+
+            var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == usuarioId && u.Ativo);
+            if (!personalExiste)
+            {
+                return Results.NotFound(new { mensagem = "Conta de Personal não encontrada ou desativada." });
+            }
+
+            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarExerciciosPadraoAsync(db, usuarioId);
+
+            return Results.Ok(new
+            {
+                usuarioId,
+                inseridos,
+                reativados,
+                totalPadrao = CatalogoPadraoService.ExerciciosPadrao.Count,
+                mensagem = "Exercícios pré-cadastrados restaurados com sucesso na conta do Personal."
+            });
+        });
+
+        // PUT /exercicios/{id} -> Atualiza um exercício ativo existente na conta do Personal
         grupo.MapPut("/{id:int}", async (int id, Exercicio? dadosAtualizados, AppDbContext db) =>
         {
             if (id <= 0)
@@ -151,7 +231,7 @@ public static class ExercicioEndpoints
             return Results.Ok(exercicioExistente);
         });
 
-        // DELETE /exercicios/{id} -> Desativa o exercício (Soft Delete) mantendo o histórico no banco
+        // DELETE /exercicios/{id} -> Remove o exercício da conta do Personal (Soft Delete, preservando fichas antigas)
         grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)

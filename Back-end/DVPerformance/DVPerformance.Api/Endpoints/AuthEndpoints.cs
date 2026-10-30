@@ -11,7 +11,7 @@ public static class AuthEndpoints
         // Cria um grupo de rotas com o prefixo "/auth"
         var grupo = app.MapGroup("/auth");
 
-        // POST /auth/cadastro -> Cria uma nova conta de Personal no banco PostgreSQL
+        // POST /auth/cadastro -> Cria uma nova conta de Personal no banco PostgreSQL já com todos os exercícios e máquinas pré-cadastrados
         grupo.MapPost("/cadastro", async (AuthRequest? dados, AppDbContext db) =>
         {
             var erros = ValidarCadastro(dados);
@@ -44,11 +44,15 @@ public static class AuthEndpoints
                 NomeUsuario = nomeLimpo,
                 Senha = dados.Senha,
                 Perfil = "admin",
+                CatalogoInicializado = false,
                 Ativo = true
             };
 
             db.Usuarios.Add(novoUsuario);
             await db.SaveChangesAsync();
+
+            // Provisiona automaticamente o catálogo completo de exercícios e máquinas na nova conta do Personal
+            await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, novoUsuario);
 
             // Retorna os dados da conta criada sem expor a senha
             return Results.Created($"/auth/usuarios/{novoUsuario.Id}", new
@@ -58,11 +62,11 @@ public static class AuthEndpoints
                 nome = novoUsuario.NomeUsuario,
                 perfil = novoUsuario.Perfil,
                 ativo = novoUsuario.Ativo,
-                mensagem = "Conta criada com sucesso."
+                mensagem = "Conta criada com sucesso com exercícios e máquinas pré-cadastrados."
             });
         });
 
-        // POST /auth/login -> Autentica o Personal no banco PostgreSQL para entrar no sistema
+        // POST /auth/login -> Autentica o Personal no banco PostgreSQL e garante os pré-cadastros caso a conta seja antiga
         grupo.MapPost("/login", async (AuthRequest? dados, AppDbContext db) =>
         {
             var erros = ValidarLogin(dados);
@@ -97,6 +101,12 @@ public static class AuthEndpoints
                     mensagem = "Esta conta está desativada.",
                     erros = new[] { "A conta informada foi desativada. Entre em contato com o suporte para reativá-la." }
                 }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            // Garante que contas antigas recebam os pré-cadastros ao entrar (respeitando personalizações posteriores)
+            if (!conta.CatalogoInicializado)
+            {
+                await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, conta);
             }
 
             return Results.Ok(new
@@ -182,6 +192,11 @@ public static class AuthEndpoints
 
             conta.Ativo = true;
             await db.SaveChangesAsync();
+
+            if (!conta.CatalogoInicializado)
+            {
+                await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, conta);
+            }
 
             return Results.Ok(new
             {

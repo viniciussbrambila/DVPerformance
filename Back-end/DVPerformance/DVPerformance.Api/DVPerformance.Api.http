@@ -4,16 +4,24 @@
 GET {{host}}/grupos-musculares
 Accept: application/json
 
-### Listar Alunos
-GET {{host}}/alunos
+### Listar Alunos do Personal
+GET {{host}}/alunos?usuarioId=1
 Accept: application/json
 
-### Listar Exercícios
-GET {{host}}/exercicios
+### Listar Exercícios da Conta do Personal (Pré-cadastrados + Personalizados)
+GET {{host}}/exercicios?usuarioId=1
 Accept: application/json
 
-### Listar Máquinas
-GET {{host}}/maquinas
+### Restaurar Exercícios Pré-Cadastrados Removidos pelo Personal
+POST {{host}}/exercicios/restaurar-padrao?usuarioId=1
+Accept: application/json
+
+### Listar Máquinas da Conta do Personal (Pré-cadastradas + Personalizadas)
+GET {{host}}/maquinas?usuarioId=1
+Accept: application/json
+
+### Restaurar Máquinas Pré-Cadastradas Removidas pelo Personal
+POST {{host}}/maquinas/restaurar-padrao?usuarioId=1
 Accept: application/json
 
 ### Gerar Treino Automático para um Aluno (informe o ID real do aluno)
@@ -21,7 +29,7 @@ POST {{host}}/treinos/gerar/1
 Accept: application/json
 
 ### Listar Treinos Gerados
-GET {{host}}/treinos
+GET {{host}}/treinos?usuarioId=1
 Accept: application/json
 
 ### Buscar Treinos de um Aluno específico

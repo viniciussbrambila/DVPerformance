@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace DVPerformance.Api.Models;
 
 public class Usuario
@@ -10,6 +12,10 @@ public class Usuario
 
     // Por padrão, todo Personal cadastrado tem perfil e permissões de Admin
     public string Perfil { get; set; } = "admin";
+
+    // Indica se a carga inicial de exercícios e máquinas pré-cadastrados já foi provisionada nesta conta
+    [JsonIgnore]
+    public bool CatalogoInicializado { get; set; } = false;
 
     // Exclusão lógica (Soft Delete): mantém o histórico no banco quando desativado (false)
     public bool Ativo { get; set; } = true;

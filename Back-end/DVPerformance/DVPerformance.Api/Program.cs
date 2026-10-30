@@ -8,7 +8,7 @@ namespace DVPerformance.Api;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -40,11 +40,13 @@ public class Program
 
         var app = builder.Build();
 
-        // Aplica as Migrations automaticamente ao iniciar a API (cria/atualiza o banco e as tabelas)
+        // Aplica as Migrations automaticamente ao iniciar a API e provisiona o catálogo pré-cadastrado
+        // para todas as contas antigas já existentes no banco de dados
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.Migrate();
+            await db.Database.MigrateAsync();
+            await CatalogoPadraoService.InicializarContasPendentesAsync(db);
         }
 
         // 2. Middleware para capturar erros de tipo no JSON (ex: enviar texto em campo numérico)
@@ -81,6 +83,6 @@ public class Program
         app.MapMaquinaEndpoints();
         app.MapTreinoEndpoints();
 
-        app.Run();
+        await app.RunAsync();
     }
 }

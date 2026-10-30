@@ -55,6 +55,11 @@ public class AppDbContext : DbContext
                   .HasMaxLength(20)
                   .IsRequired();
 
+            entity.Property(u => u.CatalogoInicializado)
+                  .HasColumnName("catalogo_inicializado")
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
             entity.Property(u => u.Ativo)
                   .HasColumnName("ativo")
                   .HasDefaultValue(true)
@@ -191,6 +196,8 @@ public class AppDbContext : DbContext
                   .HasDefaultValue(true)
                   .IsRequired();
 
+            entity.HasIndex(e => new { e.UsuarioId, e.Ativo });
+
             entity.HasOne(e => e.GrupoMuscular)
                   .WithMany()
                   .HasForeignKey(e => e.GrupoMuscularId)
@@ -232,6 +239,8 @@ public class AppDbContext : DbContext
                   .HasColumnName("ativo")
                   .HasDefaultValue(true)
                   .IsRequired();
+
+            entity.HasIndex(m => new { m.UsuarioId, m.Ativo });
 
             entity.HasOne(m => m.GrupoMuscular)
                   .WithMany()
