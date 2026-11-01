@@ -1,5 +1,9 @@
 import Login from "./pages/Login";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  limparCacheSessao,
+  preCarregarSessao,
+} from "./utils/cacheSessao";
 import {
   BrowserRouter as Router,
   Routes,
@@ -21,7 +25,6 @@ import EsqueciSenha from "./pages/EsqueciSenha";
 import Exercicios from "./pages/Exercicios.jsx";
 import Maquinas from "./pages/Maquinas";
 import PlanosExportados from "./pages/PlanosExportados";
-import { planosIniciais } from "./data/planosIniciais";
 import PlanoDetalhe from "./pages/PlanoDetalhe";
 
 const drawerWidth = 240;
@@ -88,20 +91,14 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
   const [telaAuth, setTelaAuth] = useState("login"); // 'login' ou 'cadastro'
   const [usuarioLogado, setUsuarioLogado] = useState(null);
-  const [planos, setPlanos] = useState(planosIniciais);
-  const adicionarPlano = (plano) => {
-    const novoId = crypto.randomUUID();
-    setPlanos((lista) => [{ id: novoId, ...plano }, ...lista]);
-    return novoId;
-  };
 
-  const atualizarPlano = (id, dados) =>
-    setPlanos((lista) =>
-      lista.map((p) => (p.id === id ? { ...p, ...dados } : p)),
-    );
-
-  const excluirPlano = (id) =>
-    setPlanos((lista) => lista.filter((p) => p.id !== id));
+  useEffect(() => {
+    if (!isLoggedIn || !usuarioLogado?.id) return;
+    const timer = setTimeout(() => {
+      preCarregarSessao(usuarioLogado.id);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [isLoggedIn, usuarioLogado?.id]);
 
   const handleThemeChange = (event) => {
     setIsDarkMode(event.target.checked);
@@ -119,6 +116,7 @@ export default function App() {
             <Login
               glassStyle={glassStyle}
               onLogin={(dados) => {
+                limparCacheSessao();
                 const usuario = {
                   ...dados,
                   nome: dados.nome || dados.usuario,
@@ -152,6 +150,7 @@ export default function App() {
               glassStyle={glassStyle}
               usuarioLogado={usuarioLogado}
               onSair={() => {
+                limparCacheSessao();
                 localStorage.removeItem("usuarioLogado");
                 setIsLoggedIn(false);
                 setUsuarioLogado(null);
@@ -206,12 +205,7 @@ export default function App() {
                 />
                 <Route
                   path="/treinos"
-                  element={
-                    <Treinos
-                      glassStyle={glassStyle}
-                      onGerarPlano={adicionarPlano}
-                    />
-                  }
+                  element={<Treinos glassStyle={glassStyle} />}
                 />
                 <Route
                   path="/exercicios"
@@ -223,24 +217,11 @@ export default function App() {
                 />
                 <Route
                   path="/planos"
-                  element={
-                    <PlanosExportados
-                      glassStyle={glassStyle}
-                      planos={planos}
-                      onAtualizar={atualizarPlano}
-                      onExcluir={excluirPlano}
-                    />
-                  }
+                  element={<PlanosExportados glassStyle={glassStyle} />}
                 />
                 <Route
                   path="/planos/:id"
-                  element={
-                    <PlanoDetalhe
-                      glassStyle={glassStyle}
-                      planos={planos}
-                      onAtualizar={atualizarPlano}
-                    />
-                  }
+                  element={<PlanoDetalhe glassStyle={glassStyle} />}
                 />
                 <Route
                   path="/alunos"

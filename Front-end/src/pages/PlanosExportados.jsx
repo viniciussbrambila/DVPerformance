@@ -17,15 +17,35 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@mui/icons-material/Search";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import {
+  buscarComCache,
+  lerCache,
+  salvarCache,
+  temCache,
+  removerCache,
+  expirarCachePorPrefixo,
+} from "../utils/cacheSessao";
+
+const API_URL = "http://localhost:5011/treinos";
+
+const obterUsuarioLogado = () => {
+  try {
+    const salvo = localStorage.getItem("usuarioLogado");
+    return salvo ? JSON.parse(salvo) : null;
+  } catch {
+    return null;
+  }
+};
 
 const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
@@ -34,36 +54,92 @@ const corChip = { Validado: "success", Rascunho: "warning", Exportado: "info" };
 function montarTexto(plano) {
   const linhas = [
     "DV Performance - Plano de Treino",
+    plano.nomePlano ? `Protocolo: ${plano.nomePlano}` : null,
     `Aluno: ${plano.aluno}`,
     `Objetivo: ${plano.objetivo}`,
     `Frequência: ${plano.frequencia}x/semana`,
+    plano.divisao ? `Divisão: ${plano.divisao}` : null,
+    plano.tempoAerobico ? `Orientação Aeróbica: ${plano.tempoAerobico}` : null,
     `Data: ${formatarData(plano.data)}`,
     "",
-  ];
+  ].filter((l) => l !== null);
 
-  plano.dias.forEach((dia) => {
+  (plano.dias || []).forEach((dia) => {
     linhas.push(dia.nome);
-    dia.exercicios.forEach((ex) => {
+    (dia.exercicios || []).forEach((ex) => {
+      const rotuloGrupo = ex.grupo ? ` [${ex.grupo}]` : "";
       linhas.push(
-        `  - ${ex.nome}: ${ex.series}x${ex.repeticoes} (descanso ${ex.descanso})`,
+        `  - ${ex.nome}${rotuloGrupo}: ${ex.series}x${ex.repeticoes} (descanso ${ex.descanso})`,
       );
     });
+    if (dia.tempoAerobico) {
+      linhas.push(`  * Cardio do dia: ${dia.tempoAerobico}`);
+    }
     linhas.push("");
   });
 
   return linhas.join("\n");
 }
 
-export default function PlanosExportados({
-  glassStyle,
-  planos,
-  onAtualizar,
-  onExcluir,
-}) {
+const obterChavePlanos = () => {
+  const usuarioLogado = obterUsuarioLogado();
+  return `planos:${usuarioLogado?.id || "geral"}`;
+};
+
+export default function PlanosExportados({ glassStyle }) {
   const navigate = useNavigate();
+  const [planos, setPlanos] = useState(
+    () => lerCache(obterChavePlanos()) || [],
+  );
+  const [carregando, setCarregando] = useState(
+    () => !temCache(obterChavePlanos()),
+  );
+  const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [planoParaExcluir, setPlanoParaExcluir] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
+
+  useEffect(() => {
+    const carregar = async () => {
+      setErro("");
+      const usuarioLogado = obterUsuarioLogado();
+      const chave = `planos:${usuarioLogado?.id || "geral"}`;
+      const query = usuarioLogado?.id ? `?usuarioId=${usuarioLogado.id}` : "";
+
+      if (!temCache(chave)) {
+        setCarregando(true);
+      }
+
+      try {
+        const dados = await buscarComCache(chave, async () => {
+          const response = await fetch(`${API_URL}${query}`);
+          if (!response.ok) {
+            throw new Error("Não foi possível carregar os planos de treino.");
+          }
+          const lista = await response.json();
+          if (Array.isArray(lista)) {
+            lista.forEach((p) => {
+              if (p?.id != null) salvarCache(`planoDetalhe:${p.id}`, p);
+            });
+          }
+          return lista;
+        });
+        setPlanos(dados);
+      } catch (err) {
+        console.error("Erro ao carregar planos:", err);
+        if (!temCache(chave)) {
+          setErro(
+            err.message || "Não foi possível carregar os planos do servidor.",
+          );
+        }
+      } finally {
+        setCarregando(false);
+      }
+    };
+
+    carregar();
+  }, []);
 
   const planosFiltrados = planos.filter((p) => {
     const bateNome = p.aluno.toLowerCase().includes(busca.trim().toLowerCase());
@@ -71,7 +147,7 @@ export default function PlanosExportados({
     return bateNome && bateStatus;
   });
 
-  const baixarTxt = (plano) => {
+  const baixarTxt = async (plano) => {
     const blob = new Blob([montarTexto(plano)], {
       type: "text/plain;charset=utf-8",
     });
@@ -81,15 +157,70 @@ export default function PlanosExportados({
     link.download = `plano-${plano.aluno.toLowerCase().replace(/\s+/g, "-")}.txt`;
     link.click();
     URL.revokeObjectURL(url);
-    onAtualizar(plano.id, { status: "Exportado" });
+
+    try {
+      const response = await fetch(`${API_URL}/${plano.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Exportado" }),
+      });
+
+      if (response.ok) {
+        const chave = obterChavePlanos();
+        setPlanos((lista) => {
+          const novaLista = lista.map((p) =>
+            p.id === plano.id ? { ...p, status: "Exportado" } : p,
+          );
+          salvarCache(chave, novaLista);
+          return novaLista;
+        });
+        const detalheAtual = lerCache(`planoDetalhe:${plano.id}`);
+        if (detalheAtual) {
+          salvarCache(`planoDetalhe:${plano.id}`, {
+            ...detalheAtual,
+            status: "Exportado",
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar status do plano:", err);
+    }
   };
 
-  const confirmarExclusao = () => {
-    onExcluir(planoParaExcluir.id);
-    setPlanoParaExcluir(null);
+  const confirmarExclusao = async () => {
+    if (!planoParaExcluir) return;
+    setExcluindo(true);
+    setErro("");
+
+    try {
+      const response = await fetch(`${API_URL}/${planoParaExcluir.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const dados = await response.json().catch(() => null);
+        throw new Error(dados?.mensagem || "Não foi possível excluir o plano.");
+      }
+
+      const chave = obterChavePlanos();
+      setPlanos((lista) => {
+        const novaLista = lista.filter((p) => p.id !== planoParaExcluir.id);
+        salvarCache(chave, novaLista);
+        return novaLista;
+      });
+      removerCache(`planoDetalhe:${planoParaExcluir.id}`);
+      expirarCachePorPrefixo("dashboard:");
+      setPlanoParaExcluir(null);
+    } catch (err) {
+      console.error("Erro ao excluir plano:", err);
+      setErro(err.message || "Não foi possível excluir o plano.");
+      setPlanoParaExcluir(null);
+    } finally {
+      setExcluindo(false);
+    }
   };
 
-  const cabecalhoSx = { fontWeight: 600, color: "text.secondary" };
+  const cabecalhoSx = { fontWeight: 600, color: "text.primary" };
 
   return (
     <Box>
@@ -113,6 +244,12 @@ export default function PlanosExportados({
           Novo Treino
         </Button>
       </Box>
+
+      {erro && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {erro}
+        </Alert>
+      )}
 
       <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
         <TextField
@@ -164,7 +301,15 @@ export default function PlanosExportados({
             </TableHead>
 
             <TableBody>
-              {planosFiltrados.length === 0 && (
+              {carregando && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                    <CircularProgress size={32} />
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!carregando && planosFiltrados.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -176,54 +321,64 @@ export default function PlanosExportados({
                 </TableRow>
               )}
 
-              {planosFiltrados.map((p) => (
-                <TableRow key={p.id} hover>
-                  <TableCell sx={{ color: "text.secondary" }}>
-                    {formatarData(p.data)}
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{p.aluno}</TableCell>
-                  <TableCell sx={{ color: "text.secondary" }}>
-                    {p.objetivo}
-                  </TableCell>
-                  <TableCell sx={{ color: "text.secondary" }}>
-                    {p.frequencia}x/semana
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={p.status}
-                      size="small"
-                      color={corChip[p.status] || "default"}
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      aria-label="Visualizar plano"
-                      onClick={() => navigate(`/planos/${p.id}`)}
-                      sx={{ mr: 1, bgcolor: "action.hover" }}
-                    >
-                      <VisibilityOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      aria-label="Baixar plano"
-                      onClick={() => baixarTxt(p)}
-                      sx={{ mr: 1, bgcolor: "action.hover" }}
-                    >
-                      <FileDownloadOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      aria-label="Excluir plano"
-                      onClick={() => setPlanoParaExcluir(p)}
-                      sx={{ bgcolor: "action.hover" }}
-                    >
-                      <DeleteOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {!carregando &&
+                planosFiltrados.map((p) => (
+                  <TableRow key={p.id} hover>
+                    <TableCell sx={{ color: "text.secondary" }}>
+                      {formatarData(p.data)}
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {p.aluno}
+                      </Typography>
+                      {p.divisao && (
+                        <Typography variant="caption" color="text.secondary">
+                          {p.divisao}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ color: "text.secondary" }}>
+                      {p.objetivo}
+                    </TableCell>
+                    <TableCell sx={{ color: "text.secondary" }}>
+                      {p.frequencia}x/semana
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={p.status}
+                        size="small"
+                        color={corChip[p.status] || "default"}
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        aria-label="Visualizar plano"
+                        onClick={() => navigate(`/planos/${p.id}`)}
+                        sx={{ mr: 1, bgcolor: "action.hover" }}
+                      >
+                        <VisibilityOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="Baixar plano"
+                        onClick={() => baixarTxt(p)}
+                        sx={{ mr: 1, bgcolor: "action.hover" }}
+                      >
+                        <FileDownloadOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="Excluir plano"
+                        onClick={() => setPlanoParaExcluir(p)}
+                        sx={{ bgcolor: "action.hover" }}
+                      >
+                        <DeleteOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </TableContainer>
@@ -231,35 +386,36 @@ export default function PlanosExportados({
 
       <Dialog
         open={Boolean(planoParaExcluir)}
-        onClose={() => setPlanoParaExcluir(null)}
+        onClose={() => !excluindo && setPlanoParaExcluir(null)}
         maxWidth="xs"
         fullWidth
-        slotProps={{ paper: { sx: { ...glassStyle, borderRadius: 4 } } }}
+        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
       >
-        <DialogTitle sx={{ fontWeight: "bold" }}>
+        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.35rem" }}>
           Confirmar exclusão
         </DialogTitle>
 
         <DialogContent>
-          <DialogContentText sx={{ color: "text.primary" }}>
+          <Typography color="text.secondary">
             Tem certeza de que deseja excluir este plano de treino? Esta ação é
             permanente e não poderá ser desfeita.
-          </DialogContentText>
+          </Typography>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
           <Button
             color="inherit"
+            disabled={excluindo}
             onClick={() => setPlanoParaExcluir(null)}
-            sx={{ fontWeight: "bold" }}
           >
             Cancelar
           </Button>
           <Button
             variant="contained"
             color="error"
+            disabled={excluindo}
             onClick={confirmarExclusao}
-            sx={{ fontWeight: "bold" }}
           >
             Excluir plano
           </Button>

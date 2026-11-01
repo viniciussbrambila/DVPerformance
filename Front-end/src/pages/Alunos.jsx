@@ -19,6 +19,7 @@ import {
   MenuItem,
   Grid,
   Alert,
+  CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -26,6 +27,13 @@ import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import {
+  buscarComCache,
+  lerCache,
+  salvarCache,
+  temCache,
+  expirarCachePorPrefixo,
+} from "../utils/cacheSessao";
 
 const API_URL = "http://localhost:5011/alunos";
 
@@ -38,8 +46,20 @@ const obterUsuarioLogado = () => {
   }
 };
 
+const obterChaveAlunos = () => {
+  const usuario = obterUsuarioLogado();
+  return usuario?.id ? `alunos:${usuario.id}` : null;
+};
+
 export default function Alunos({ glassStyle }) {
-  const [alunos, setAlunos] = useState([]);
+  const [alunos, setAlunos] = useState(() => {
+    const chave = obterChaveAlunos();
+    return (chave && lerCache(chave)) || [];
+  });
+  const [carregando, setCarregando] = useState(() => {
+    const chave = obterChaveAlunos();
+    return Boolean(chave && !temCache(chave));
+  });
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // Guarda o ID do aluno em edição (ou null se for novo)
   const [idParaExcluir, setIdParaExcluir] = useState(null); // Guarda o ID do aluno para confirmar exclusão
@@ -59,17 +79,25 @@ export default function Alunos({ glassStyle }) {
     const usuarioLogado = obterUsuarioLogado();
     if (!usuarioLogado?.id) {
       setAlunos([]);
+      setCarregando(false);
       return;
     }
 
+    const chave = `alunos:${usuarioLogado.id}`;
+
     try {
-      const response = await fetch(`${API_URL}?usuarioId=${usuarioLogado.id}`);
-      if (response.ok) {
-        const dados = await response.json();
-        setAlunos(dados);
-      }
+      const dados = await buscarComCache(chave, async () => {
+        const response = await fetch(
+          `${API_URL}?usuarioId=${usuarioLogado.id}`,
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      });
+      setAlunos(dados);
     } catch (erro) {
       console.error("Erro ao conectar com a API:", erro);
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -145,7 +173,15 @@ export default function Alunos({ glassStyle }) {
       });
 
       if (response.ok) {
-        setAlunos(alunos.filter((aluno) => aluno.id !== idParaExcluir));
+        const chave = obterChaveAlunos();
+        setAlunos((lista) => {
+          const novaLista = lista.filter((aluno) => aluno.id !== idParaExcluir);
+          if (chave) salvarCache(chave, novaLista);
+          return novaLista;
+        });
+        expirarCachePorPrefixo("dashboard:");
+        expirarCachePorPrefixo("planos:");
+        expirarCachePorPrefixo("planoDetalhe:");
       }
     } catch (erro) {
       console.error("Erro ao excluir aluno:", erro);
@@ -212,14 +248,30 @@ export default function Alunos({ glassStyle }) {
         return;
       }
 
+      const chave = `alunos:${usuarioLogado.id}`;
+      setAlunos((lista) => {
+        const novaLista = editingId
+          ? lista.map((aluno) =>
+              aluno.id === editingId ? dadosResposta : aluno,
+            )
+          : [...lista, dadosResposta];
+        salvarCache(chave, novaLista);
+        return novaLista;
+      });
+
       if (editingId) {
-        setAlunos(
-          alunos.map((aluno) =>
-            aluno.id === editingId ? dadosResposta : aluno,
-          ),
-        );
+        expirarCachePorPrefixo("planos:");
+        expirarCachePorPrefixo("planoDetalhe:");
       } else {
-        setAlunos([...alunos, dadosResposta]);
+        const chaveDash = `dashboard:${usuarioLogado.id}`;
+        const dashAtual = lerCache(chaveDash);
+        if (dashAtual) {
+          salvarCache(chaveDash, {
+            ...dashAtual,
+            totalAlunos: (dashAtual.totalAlunos ?? 0) + 1,
+          });
+        }
+        expirarCachePorPrefixo("dashboard:");
       }
 
       handleFecharModal();
@@ -284,6 +336,26 @@ export default function Alunos({ glassStyle }) {
             </TableRow>
           </TableHead>
           <TableBody>
+            {carregando && alunos.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                  <CircularProgress size={32} />
+                </TableCell>
+              </TableRow>
+            )}
+
+            {!carregando && alunos.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  align="center"
+                  sx={{ py: 4, color: "text.secondary" }}
+                >
+                  Nenhum aluno cadastrado.
+                </TableCell>
+              </TableRow>
+            )}
+
             {alunos.map((aluno) => (
               <TableRow
                 key={aluno.id}

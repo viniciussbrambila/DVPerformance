@@ -21,12 +21,20 @@ import {
   DialogActions,
   Alert,
   Chip,
+  CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import {
+  buscarComCache,
+  lerCache,
+  salvarCache,
+  temCache,
+  expirarCachePorPrefixo,
+} from "../utils/cacheSessao";
 
 const API_URL = "http://localhost:5011/exercicios";
 
@@ -74,8 +82,18 @@ const obterUsuarioLogado = () => {
 
 const formVazio = { nome: "", grupo: "", descricao: "" };
 
+const obterChaveExercicios = () => {
+  const usuarioLogado = obterUsuarioLogado();
+  return `exercicios:${usuarioLogado?.id || "geral"}`;
+};
+
 export default function Exercicios({ glassStyle }) {
-  const [exercicios, setExercicios] = useState([]);
+  const [exercicios, setExercicios] = useState(
+    () => lerCache(obterChaveExercicios()) || [],
+  );
+  const [carregando, setCarregando] = useState(
+    () => !temCache(obterChaveExercicios()),
+  );
   const [formAberto, setFormAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [idParaExcluir, setIdParaExcluir] = useState(null);
@@ -85,18 +103,22 @@ export default function Exercicios({ glassStyle }) {
 
   const carregarExercicios = async () => {
     const usuarioLogado = obterUsuarioLogado();
+    const chave = `exercicios:${usuarioLogado?.id || "geral"}`;
     const url = usuarioLogado?.id
       ? `${API_URL}?usuarioId=${usuarioLogado.id}`
       : API_URL;
 
     try {
-      const response = await fetch(url);
-      if (response.ok) {
-        const dados = await response.json();
-        setExercicios(dados);
-      }
+      const dados = await buscarComCache(chave, async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      });
+      setExercicios(dados);
     } catch (erro) {
       console.error("Erro ao carregar exercícios da API:", erro);
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -176,12 +198,18 @@ export default function Exercicios({ glassStyle }) {
         return;
       }
 
+      const chave = obterChaveExercicios();
+      setExercicios((lista) => {
+        const novaLista = editandoId
+          ? lista.map((ex) => (ex.id === editandoId ? dados : ex))
+          : [...lista, dados];
+        salvarCache(chave, novaLista);
+        return novaLista;
+      });
+
       if (editandoId) {
-        setExercicios((lista) =>
-          lista.map((ex) => (ex.id === editandoId ? dados : ex))
-        );
-      } else {
-        setExercicios((lista) => [...lista, dados]);
+        expirarCachePorPrefixo("planos:");
+        expirarCachePorPrefixo("planoDetalhe:");
       }
 
       cancelar();
@@ -208,7 +236,14 @@ export default function Exercicios({ glassStyle }) {
       });
 
       if (response.ok) {
-        setExercicios((lista) => lista.filter((ex) => ex.id !== idParaExcluir));
+        const chave = obterChaveExercicios();
+        setExercicios((lista) => {
+          const novaLista = lista.filter((ex) => ex.id !== idParaExcluir);
+          salvarCache(chave, novaLista);
+          return novaLista;
+        });
+        expirarCachePorPrefixo("planos:");
+        expirarCachePorPrefixo("planoDetalhe:");
         if (editandoId === idParaExcluir) cancelar();
       }
     } catch (erro) {
@@ -352,18 +387,18 @@ export default function Exercicios({ glassStyle }) {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                <TableCell sx={{ fontWeight: 600, color: "text.primary" }}>
                   Nome
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                <TableCell sx={{ fontWeight: 600, color: "text.primary" }}>
                   Região / Grupo Muscular
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                <TableCell sx={{ fontWeight: 600, color: "text.primary" }}>
                   Descrição
                 </TableCell>
                 <TableCell
                   align="right"
-                  sx={{ fontWeight: 600, color: "text.secondary" }}
+                  sx={{ fontWeight: 600, color: "text.primary" }}
                 >
                   Ações
                 </TableCell>
@@ -371,7 +406,15 @@ export default function Exercicios({ glassStyle }) {
             </TableHead>
 
             <TableBody>
-              {exercicios.length === 0 && (
+              {carregando && exercicios.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
+                    <CircularProgress size={32} />
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!carregando && exercicios.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={4}

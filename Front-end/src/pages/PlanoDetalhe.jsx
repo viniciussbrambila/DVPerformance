@@ -14,80 +14,167 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-} from '@mui/material';
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import CloseIcon from '@mui/icons-material/Close';
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+  CircularProgress,
+} from "@mui/material";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import {
+  buscarComCache,
+  lerCache,
+  salvarCache,
+  temCache,
+  removerCache,
+  atualizarItemEmListasCache,
+} from "../utils/cacheSessao";
 
-const formatarData = (iso) => new Date(iso).toLocaleDateString('pt-BR');
+const API_URL = "http://localhost:5011/treinos";
+
+const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
 const cabecalhoSx = {
   fontWeight: 700,
-  textTransform: 'uppercase',
-  color: 'text.secondary',
+  textTransform: "uppercase",
+  color: "text.secondary",
 };
 
-const CAMPOS = ['series', 'repeticoes', 'descanso'];
+const CAMPOS = ["series", "repeticoes", "descanso"];
 
 const LIMITES = {
   series: { min: 1, max: 10 },
-  repeticoes: { min: 6, max: 25 },
-  descanso: { min: 30, max: 200 },
+  repeticoes: { min: 1, max: 30 },
+  descanso: { min: 15, max: 300 },
 };
 
-// Retorna a mensagem de erro, ou '' quando o valor é válido.
 function validarCampo(campo, valor) {
   const { min, max } = LIMITES[campo];
   const texto = String(valor).trim();
 
-  if (campo === 'repeticoes') {
+  if (campo === "repeticoes") {
     const m = texto.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
-    if (!m) return 'Ex.: 10-12';
+    if (!m) return "Ex.: 8-12";
 
     const inicio = Number(m[1]);
     const fim = m[2] !== undefined ? Number(m[2]) : inicio;
 
-    if (inicio < min || inicio > max || fim < min || fim > max) return `${min} a ${max}`;
-    if (inicio > fim) return 'Ordem inválida';
-    return '';
+    if (inicio < min || inicio > max || fim < min || fim > max)
+      return `${min} a ${max}`;
+    if (inicio > fim) return "Ordem inválida";
+    return "";
   }
 
   if (!/^\d+$/.test(texto)) return `${min} a ${max}`;
   const numero = Number(texto);
-  return numero < min || numero > max ? `${min} a ${max}` : '';
+  return numero < min || numero > max ? `${min} a ${max}` : "";
 }
 
-const normalizarRepeticoes = (valor) => String(valor).trim().replace(/\s*-\s*/, '-');
+const normalizarRepeticoes = (valor) =>
+  String(valor)
+    .trim()
+    .replace(/\s*-\s*/, "-");
 
-export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
+export default function PlanoDetalhe({ glassStyle }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const plano = planos.find((p) => p.id === id);
+
+  const [plano, setPlano] = useState(
+    () => lerCache(`planoDetalhe:${id}`) || null,
+  );
+  const [carregando, setCarregando] = useState(
+    () => !temCache(`planoDetalhe:${id}`),
+  );
+  const [erroApi, setErroApi] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   const [editando, setEditando] = useState(false);
   const [diasEdicao, setDiasEdicao] = useState([]);
 
+  useEffect(() => {
+    const chave = `planoDetalhe:${id}`;
+    const salvo = lerCache(chave);
+
+    if (salvo) {
+      setPlano(salvo);
+      setCarregando(false);
+    } else {
+      setPlano(null);
+      setCarregando(true);
+    }
+
+    const carregar = async () => {
+      setErroApi("");
+
+      try {
+        const dados = await buscarComCache(chave, async () => {
+          const response = await fetch(`${API_URL}/${id}`);
+          if (response.status === 404) {
+            const erro404 = new Error("NAO_ENCONTRADO");
+            erro404.status = 404;
+            throw erro404;
+          }
+          if (!response.ok) {
+            throw new Error("Não foi possível carregar a ficha de treino.");
+          }
+          return response.json();
+        });
+        setPlano(dados);
+      } catch (err) {
+        if (err?.status === 404) {
+          removerCache(chave);
+          setPlano(null);
+          return;
+        }
+        console.error("Erro ao carregar detalhes do plano:", err);
+        if (!temCache(chave)) {
+          setErroApi(
+            err.message || "Não foi possível carregar os detalhes deste plano.",
+          );
+        }
+      } finally {
+        setCarregando(false);
+      }
+    };
+
+    carregar();
+  }, [id]);
+
+  if (carregando) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   if (!plano) {
     return (
       <Box>
-        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>
+        {erroApi && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {erroApi}
+          </Alert>
+        )}
+        <Typography variant="h5" sx={{ fontWeight: "bold", mb: 2 }}>
           Plano não encontrado
         </Typography>
-        <Button variant="contained" startIcon={<ArrowBackIcon />} onClick={() => navigate('/planos')}>
+        <Button
+          variant="contained"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/planos")}
+        >
           Voltar para Planos
         </Button>
       </Box>
     );
   }
 
-  const dias = editando ? diasEdicao : plano.dias;
+  const dias = editando ? diasEdicao : plano.dias || [];
 
-  // Valida todos os campos durante a edição
   const erros = {};
   if (editando) {
     diasEdicao.forEach((dia, i) => {
@@ -102,13 +189,14 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
   const temErros = Object.keys(erros).length > 0;
 
   const iniciarEdicao = () => {
+    setErroApi("");
     setDiasEdicao(
-      plano.dias.map((dia) => ({
+      (plano.dias || []).map((dia) => ({
         ...dia,
-        exercicios: dia.exercicios.map((ex) => ({
+        exercicios: (dia.exercicios || []).map((ex) => ({
           ...ex,
           series: String(ex.series),
-          descanso: String(parseInt(ex.descanso, 10)), // '60s' -> '60'
+          descanso: String(parseInt(ex.descanso, 10) || 60),
         })),
       })),
     );
@@ -130,8 +218,10 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
     );
   };
 
-  const salvarEdicao = () => {
+  const salvarEdicao = async () => {
     if (temErros) return;
+    setSalvando(true);
+    setErroApi("");
 
     const diasFinal = diasEdicao.map((dia) => ({
       ...dia,
@@ -143,40 +233,135 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
       })),
     }));
 
-    onAtualizar(plano.id, { dias: diasFinal });
-    setEditando(false);
+    const originaisPorId = new Map();
+    (plano.dias || []).forEach((d) =>
+      (d.exercicios || []).forEach((ex) => originaisPorId.set(ex.id, ex)),
+    );
+
+    const itensModificados = [];
+    diasFinal.forEach((d) =>
+      d.exercicios.forEach((ex) => {
+        const orig = originaisPorId.get(ex.id);
+        if (
+          !orig ||
+          orig.series !== ex.series ||
+          orig.repeticoes !== ex.repeticoes ||
+          orig.descanso !== ex.descanso
+        ) {
+          itensModificados.push(ex);
+        }
+      }),
+    );
+
+    try {
+      await Promise.all(
+        itensModificados.map(async (item) => {
+          const response = await fetch(`${API_URL}/itens/${item.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: Number(item.id),
+              treinoId: Number(item.treinoId),
+              divisaoTreino: String(item.divisaoTreino),
+              ordemExercicio: Number(item.ordemExercicio),
+              exercicioId:
+                item.exercicioId != null ? Number(item.exercicioId) : null,
+              maquinaId:
+                item.maquinaId != null ? Number(item.maquinaId) : null,
+              series: Number(item.series),
+              repeticao: String(item.repeticoes),
+              tempoDescanso: String(item.descanso),
+              tempoAerobico: String(item.tempoAerobico || ""),
+            }),
+          });
+
+          if (!response.ok) {
+            const dados = await response.json().catch(() => null);
+            throw new Error(
+              dados?.mensagem || "Não foi possível salvar o item do treino.",
+            );
+          }
+        }),
+      );
+
+      setPlano((atual) => {
+        const atualizado = { ...atual, dias: diasFinal };
+        salvarCache(`planoDetalhe:${atual.id}`, atualizado);
+        return atualizado;
+      });
+      atualizarItemEmListasCache("planos:", plano.id, { dias: diasFinal });
+      setEditando(false);
+    } catch (err) {
+      console.error("Erro ao salvar itens do treino:", err);
+      setErroApi(
+        err.message || "Não foi possível salvar as alterações no servidor.",
+      );
+    } finally {
+      setSalvando(false);
+    }
   };
 
-  const validar = () => onAtualizar(plano.id, { status: 'Validado' });
+  const atualizarStatusNoBanco = async (novoStatus) => {
+    try {
+      const response = await fetch(`${API_URL}/${plano.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: novoStatus }),
+      });
 
-  const exportarPdf = () => {
-    onAtualizar(plano.id, { status: 'Exportado' });
+      if (!response.ok) {
+        const dados = await response.json().catch(() => null);
+        setErroApi(
+          dados?.mensagem || "Não foi possível atualizar o status do plano.",
+        );
+        return false;
+      }
 
-    // Abre a janela de impressão do navegador: escolha "Salvar como PDF".
+      setPlano((atual) => {
+        const atualizado = { ...atual, status: novoStatus };
+        salvarCache(`planoDetalhe:${atual.id}`, atualizado);
+        return atualizado;
+      });
+      atualizarItemEmListasCache("planos:", plano.id, { status: novoStatus });
+      return true;
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+      setErroApi("Erro de conexão ao atualizar o status do plano.");
+      return false;
+    }
+  };
+
+  const validar = () => {
+    atualizarStatusNoBanco("Validado");
+  };
+
+  const exportarPdf = async () => {
+    const ok = await atualizarStatusNoBanco("Exportado");
+    if (!ok) return;
+
     setTimeout(() => {
       const tituloAnterior = document.title;
-      document.title = `plano-${plano.aluno.toLowerCase().replace(/\s+/g, '-')}`;
+      document.title = `plano-${plano.aluno.toLowerCase().replace(/\s+/g, "-")}`;
       window.print();
       document.title = tituloAnterior;
     }, 300);
   };
 
   const infos = [
-    ['Aluno', plano.aluno],
-    ['Objetivo', plano.objetivo],
-    ['Frequência', `${plano.frequencia} dias/semana`],
-    ['Data', formatarData(plano.data)],
+    ["Aluno", plano.aluno],
+    ["Objetivo", plano.objetivo],
+    ["Frequência", `${plano.frequencia} dias/semana`],
+    ["Data", formatarData(plano.data)],
   ];
 
   return (
     <Box>
-      {/* Na impressão, esconde a barra lateral e os botões */}
       <GlobalStyles
         styles={{
-          '@media print': {
-            '.MuiDrawer-root, .no-print': { display: 'none !important' },
-            'html, body': { background: '#fff !important' },
-            main: { padding: '0 !important', overflow: 'visible !important' },
+          "@media print": {
+            ".MuiDrawer-root, .no-print": { display: "none !important" },
+            "html, body": { background: "#fff !important" },
+            main: { padding: "0 !important", overflow: "visible !important" },
           },
         }}
       />
@@ -184,47 +369,55 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
       <Box
         className="no-print"
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
           gap: 2,
           mb: 3,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Button
             color="inherit"
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/planos')}
-            sx={{ color: 'text.secondary' }}
+            onClick={() => navigate("/planos")}
+            sx={{ color: "text.secondary" }}
           >
             Planos
           </Button>
 
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
             Plano de Treino
           </Typography>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
           {editando ? (
             <>
-              <Button color="inherit" startIcon={<CloseIcon />} onClick={() => setEditando(false)}>
+              <Button
+                color="inherit"
+                disabled={salvando}
+                startIcon={<CloseIcon />}
+                onClick={() => {
+                  setErroApi("");
+                  setEditando(false);
+                }}
+              >
                 Cancelar
               </Button>
               <Button
                 variant="contained"
                 startIcon={<SaveOutlinedIcon />}
                 onClick={salvarEdicao}
-                disabled={temErros}
+                disabled={temErros || salvando}
               >
-                Salvar
+                {salvando ? "Salvando..." : "Salvar"}
               </Button>
             </>
           ) : (
             <>
-              {plano.status === 'Rascunho' && (
+              {plano.status === "Rascunho" && (
                 <Button
                   variant="contained"
                   color="success"
@@ -241,7 +434,7 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
                 size="large"
                 startIcon={<EditOutlinedIcon />}
                 onClick={iniciarEdicao}
-                sx={{ bgcolor: 'action.hover' }}
+                sx={{ bgcolor: "action.hover" }}
               >
                 Editar
               </Button>
@@ -252,9 +445,9 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
                 startIcon={<PrintOutlinedIcon />}
                 onClick={exportarPdf}
                 sx={{
-                  bgcolor: 'text.primary',
-                  color: 'background.default',
-                  '&:hover': { bgcolor: 'text.secondary' },
+                  bgcolor: "text.primary",
+                  color: "background.default",
+                  "&:hover": { bgcolor: "text.secondary" },
                 }}
               >
                 Exportar PDF
@@ -264,10 +457,16 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
         </Box>
       </Box>
 
+      {erroApi && (
+        <Alert severity="error" className="no-print" sx={{ mb: 3 }}>
+          {erroApi}
+        </Alert>
+      )}
+
       {editando && (
         <Alert severity="info" className="no-print" sx={{ mb: 3 }}>
-          Limites: séries de 1 a 10 · repetições de 6 a 25 (ex.: 10-12) · descanso de 30 a 200
-          segundos.
+          Limites: séries de 1 a 10 · repetições de 1 a 30 (ex.: 8-12) ·
+          descanso de 15 a 300 segundos.
         </Alert>
       )}
 
@@ -277,48 +476,68 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
           ...glassStyle,
           p: { xs: 3, md: 5 },
           borderRadius: 4,
-          '@media print': {
-            background: '#fff !important',
-            color: '#000 !important',
-            boxShadow: 'none !important',
-            border: 'none !important',
-            backdropFilter: 'none !important',
-            '& .MuiTypography-root, & .MuiTableCell-root': { color: '#000 !important' },
-            '& .info-faixa': {
-              backgroundColor: '#f3f4f6 !important',
-              printColorAdjust: 'exact',
-              WebkitPrintColorAdjust: 'exact',
+          "@media print": {
+            background: "#fff !important",
+            color: "#000 !important",
+            boxShadow: "none !important",
+            border: "none !important",
+            backdropFilter: "none !important",
+            "& .MuiTypography-root, & .MuiTableCell-root": {
+              color: "#000 !important",
             },
-            '& .rotulo-dia': {
-              backgroundColor: '#000 !important',
-              color: '#fff !important',
-              printColorAdjust: 'exact',
-              WebkitPrintColorAdjust: 'exact',
+            "& .info-faixa": {
+              backgroundColor: "#f3f4f6 !important",
+              printColorAdjust: "exact",
+              WebkitPrintColorAdjust: "exact",
+            },
+            "& .rotulo-dia": {
+              backgroundColor: "#000 !important",
+              color: "#fff !important",
+              printColorAdjust: "exact",
+              WebkitPrintColorAdjust: "exact",
             },
           },
         }}
       >
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
+        <Box sx={{ textAlign: "center", mb: 3 }}>
           <Typography variant="h3" sx={{ fontWeight: 800 }}>
             DV PERFORMANCE
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ letterSpacing: 3 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ letterSpacing: 3 }}
+          >
             PRESCRIÇÃO DE TREINAMENTO
           </Typography>
+          {plano.nomePlano && (
+            <Typography
+              variant="subtitle1"
+              color="text.secondary"
+              sx={{ mt: 1, fontWeight: 600 }}
+            >
+              {plano.nomePlano}
+            </Typography>
+          )}
         </Box>
 
-        <Divider sx={{ borderBottomWidth: 2, borderColor: 'text.primary', mb: 4 }} />
+        <Divider
+          sx={{ borderBottomWidth: 2, borderColor: "text.primary", mb: 4 }}
+        />
 
         <Box
           className="info-faixa"
           sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "repeat(2, 1fr)",
+              md: "repeat(4, 1fr)",
+            },
             gap: 2,
             p: 2.5,
-            mb: 5,
+            mb: plano.tempoAerobico ? 3 : 5,
             borderRadius: 3,
-            bgcolor: 'action.hover',
+            bgcolor: "action.hover",
           }}
         >
           {infos.map(([rotulo, valor]) => (
@@ -326,7 +545,7 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ fontWeight: 700, textTransform: 'uppercase' }}
+                sx={{ fontWeight: 700, textTransform: "uppercase" }}
               >
                 {rotulo}
               </Typography>
@@ -337,19 +556,45 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
           ))}
         </Box>
 
+        {plano.tempoAerobico && (
+          <Box
+            className="info-faixa"
+            sx={{
+              p: 2,
+              mb: 5,
+              borderRadius: 3,
+              bgcolor: "action.hover",
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 700, textTransform: "uppercase" }}
+            >
+              Orientação de Cardio / Aeróbico
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+              {plano.tempoAerobico}
+            </Typography>
+          </Box>
+        )}
+
         {dias.map((dia, indiceDia) => (
-          <Box key={`${dia.nome}-${indiceDia}`} sx={{ mb: 5, breakInside: 'avoid' }}>
+          <Box
+            key={`${dia.nome}-${indiceDia}`}
+            sx={{ mb: 5, breakInside: "avoid" }}
+          >
             <Typography
               className="rotulo-dia"
               variant="h5"
               sx={{
-                display: 'inline-block',
-                fontWeight: 'bold',
+                display: "inline-block",
+                fontWeight: "bold",
                 px: 2.5,
                 py: 1,
                 mb: 2,
-                bgcolor: 'text.primary',
-                color: 'background.default',
+                bgcolor: "text.primary",
+                color: "background.default",
               }}
             >
               {dia.nome}
@@ -359,17 +604,32 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={cabecalhoSx}>Exercício</TableCell>
-                    <TableCell align="center" sx={cabecalhoSx}>Séries</TableCell>
-                    <TableCell align="center" sx={cabecalhoSx}>Repetições</TableCell>
-                    <TableCell align="center" sx={cabecalhoSx}>Descanso</TableCell>
+                    <TableCell sx={cabecalhoSx}>Exercício / Máquina</TableCell>
+                    <TableCell align="center" sx={cabecalhoSx}>
+                      Séries
+                    </TableCell>
+                    <TableCell align="center" sx={cabecalhoSx}>
+                      Repetições
+                    </TableCell>
+                    <TableCell align="center" sx={cabecalhoSx}>
+                      Descanso
+                    </TableCell>
                   </TableRow>
                 </TableHead>
 
                 <TableBody>
-                  {dia.exercicios.map((ex, indiceEx) => (
-                    <TableRow key={`${ex.nome}-${indiceEx}`}>
-                      <TableCell sx={{ fontWeight: 700 }}>{ex.nome}</TableCell>
+                  {(dia.exercicios || []).map((ex, indiceEx) => (
+                    <TableRow key={ex.id ?? `${ex.nome}-${indiceEx}`}>
+                      <TableCell>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {ex.nome}
+                        </Typography>
+                        {ex.grupo && (
+                          <Typography variant="caption" color="text.secondary">
+                            {ex.grupo} · {ex.tipo}
+                          </Typography>
+                        )}
+                      </TableCell>
 
                       {CAMPOS.map((campo) => {
                         const chave = `${indiceDia}-${indiceEx}-${campo}`;
@@ -379,29 +639,47 @@ export default function PlanoDetalhe({ glassStyle, planos, onAtualizar }) {
                           <TableCell
                             key={campo}
                             align="center"
-                            sx={{ color: campo === 'descanso' ? 'text.secondary' : 'text.primary' }}
+                            sx={{
+                              color:
+                                campo === "descanso"
+                                  ? "text.secondary"
+                                  : "text.primary",
+                            }}
                           >
                             {editando ? (
                               <TextField
                                 size="small"
-                                type={campo === 'repeticoes' ? 'text' : 'number'}
+                                type={
+                                  campo === "repeticoes" ? "text" : "number"
+                                }
                                 value={ex[campo]}
                                 onChange={(e) =>
-                                  alterarCampo(indiceDia, indiceEx, campo, e.target.value)
+                                  alterarCampo(
+                                    indiceDia,
+                                    indiceEx,
+                                    campo,
+                                    e.target.value,
+                                  )
                                 }
                                 error={Boolean(erros[chave])}
-                                helperText={erros[chave] || ''}
+                                helperText={erros[chave] || ""}
                                 sx={{ width: 120 }}
                                 slotProps={{
                                   htmlInput: {
-                                    style: { textAlign: 'center' },
-                                    ...(campo !== 'repeticoes' && { min, max, step: 1 }),
+                                    style: { textAlign: "center" },
+                                    ...(campo !== "repeticoes" && {
+                                      min,
+                                      max,
+                                      step: 1,
+                                    }),
                                   },
                                   input:
-                                    campo === 'descanso'
+                                    campo === "descanso"
                                       ? {
                                           endAdornment: (
-                                            <InputAdornment position="end">s</InputAdornment>
+                                            <InputAdornment position="end">
+                                              s
+                                            </InputAdornment>
                                           ),
                                         }
                                       : undefined,

@@ -15,8 +15,15 @@ import { useState, useEffect } from "react";
 import BoltIcon from "@mui/icons-material/Bolt";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import { useNavigate } from "react-router-dom";
+import {
+  buscarComCache,
+  lerCache,
+  salvarCache,
+  expirarCachePorPrefixo,
+} from "../utils/cacheSessao";
 
-const API_URL = "http://localhost:5011/alunos";
+const ALUNOS_API_URL = "http://localhost:5011/alunos";
+const TREINOS_API_URL = "http://localhost:5011/treinos";
 
 const obterUsuarioLogado = () => {
   try {
@@ -27,119 +34,89 @@ const obterUsuarioLogado = () => {
   }
 };
 
-const exerciciosMock = [
-  { id: "e1", nome: "Supino reto" },
-  { id: "e2", nome: "Agachamento livre" },
-  { id: "e3", nome: "Remada curvada" },
-  { id: "e4", nome: "Desenvolvimento com halteres" },
-  { id: "e5", nome: "Leg press" },
-  { id: "e6", nome: "Puxada frontal" },
-  { id: "e7", nome: "Rosca direta" },
-  { id: "e8", nome: "Tríceps na polia" },
-  { id: "e9", nome: "Cadeira extensora" },
-  { id: "e10", nome: "Mesa flexora" },
-  { id: "e11", nome: "Elevação lateral" },
-  { id: "e12", nome: "Panturrilha em pé" },
-];
-
-function gerarPlano(aluno, exercicios) {
-  const frequencia = Number(aluno.frequenciaSemanal);
-  for (let i = 1; i <= frequencia; i++) {
-    let series = 3;
-    let repeticoes = "10-12";
-    let descanso = "60s";
-    let exerciciosPorDia = 5;
-
-    if (aluno.experiencia === "Iniciante") {
-      series = 3;
-      exerciciosPorDia = 4;
-    } else if (aluno.experiencia === "Intermediário") {
-      series = 4;
-      exerciciosPorDia = 5;
-    } else {
-      series = 4;
-      exerciciosPorDia = 6;
-    }
-
-    if (aluno.objetivo === "Força") {
-      repeticoes = "6-8";
-      descanso = "120s";
-    } else if (aluno.objetivo === "Resistência") {
-      repeticoes = "15-20";
-      descanso = "45s";
-    } else if (aluno.objetivo === "Emagrecimento") {
-      repeticoes = "12-15";
-      descanso = "45s";
-    }
-  }
-  // Embaralha os exercícios para dar variedade
-  const embaralhados = [...exercicios].sort(() => 0.5 - Math.random());
-  const dias = [];
-
-  return {
-    alunoId: aluno.id,
-    data: new Date().toISOString(),
-    status: "Rascunho",
-    dias,
-  };
-}
-
-export default function Treinos({ glassStyle, onGerarPlano }) {
+export default function Treinos({ glassStyle }) {
   const navigate = useNavigate();
+  const usuarioInicial = obterUsuarioLogado();
   const [alunoId, setAlunoId] = useState("");
   const [gerando, setGerando] = useState(false);
-  const [alunos, setAlunos] = useState([]);
-  const [erroAlunos, setErroAlunos] = useState("");
+  const [alunos, setAlunos] = useState(
+    () =>
+      (usuarioInicial?.id && lerCache(`alunos:${usuarioInicial.id}`)) || [],
+  );
+  const [erros, setErros] = useState([]);
 
   useEffect(() => {
     const carregarAlunos = async () => {
       const usuarioLogado = obterUsuarioLogado();
       if (!usuarioLogado?.id) {
-        setErroAlunos("Usuário logado não identificado. Faça login novamente.");
+        setErros(["Usuário logado não identificado. Faça login novamente."]);
         return;
       }
 
+      const chave = `alunos:${usuarioLogado.id}`;
+
       try {
-        const response = await fetch(
-          `${API_URL}?usuarioId=${usuarioLogado.id}`,
-        );
-        if (response.ok) {
-          setAlunos(await response.json());
-        } else {
-          setErroAlunos("Não foi possível carregar os alunos.");
-        }
+        const dados = await buscarComCache(chave, async () => {
+          const response = await fetch(
+            `${ALUNOS_API_URL}?usuarioId=${usuarioLogado.id}`,
+          );
+          if (!response.ok) {
+            throw new Error("Não foi possível carregar os alunos.");
+          }
+          return response.json();
+        });
+        setAlunos(dados);
       } catch (erro) {
         console.error("Erro ao conectar com a API:", erro);
-        setErroAlunos("Não foi possível conectar ao servidor.");
+        if (!lerCache(chave)) {
+          setErros(["Não foi possível conectar ao servidor."]);
+        }
       }
     };
 
     carregarAlunos();
   }, []);
 
-  const handleGerar = () => {
+  const handleGerar = async () => {
     if (!alunoId) return;
     setGerando(true);
+    setErros([]);
 
-    // Simula o tempo de geração
-    setTimeout(() => {
-      const aluno = alunos.find((a) => String(a.id) === String(alunoId));
-      if (!aluno) {
-        setGerando(false);
+    const usuarioLogado = obterUsuarioLogado();
+    const query = usuarioLogado?.id ? `?usuarioId=${usuarioLogado.id}` : "";
+
+    try {
+      const response = await fetch(
+        `${TREINOS_API_URL}/gerar/${alunoId}${query}`,
+        { method: "POST" },
+      );
+
+      const dados = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (dados?.erros && Array.isArray(dados.erros)) {
+          setErros(dados.erros);
+        } else if (dados?.mensagem) {
+          setErros([dados.mensagem]);
+        } else {
+          setErros(["Não foi possível gerar o plano de treino."]);
+        }
         return;
       }
 
-      const plano = gerarPlano(aluno, exerciciosMock);
-      const novoId = onGerarPlano({
-        ...plano,
-        aluno: aluno.nome,
-        objetivo: aluno.objetivo,
-        frequencia: Number(aluno.frequenciaSemanal),
-      });
+      if (dados?.id != null) {
+        salvarCache(`planoDetalhe:${dados.id}`, dados);
+      }
+      expirarCachePorPrefixo("planos:");
+      expirarCachePorPrefixo("dashboard:");
 
+      navigate(`/planos/${dados.id}`);
+    } catch (erro) {
+      console.error("Erro ao gerar treino:", erro);
+      setErros(["Erro de conexão ao gerar o plano de treino no servidor."]);
+    } finally {
       setGerando(false);
-      navigate(`/planos/${novoId}`);
-    }, 1500);
+    }
   };
 
   return (
@@ -180,8 +157,8 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
           Selecione um aluno abaixo. O sistema analisará o perfil (idade, sexo,
-          experiência e frequência) e gerará um plano de treino otimizado
-          utilizando nossa biblioteca de exercícios e máquinas.
+          experiência, objetivo e frequência) e gerará um plano de treino
+          otimizado utilizando nossa biblioteca de exercícios e máquinas.
         </Typography>
 
         <Box
@@ -193,7 +170,14 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
             gap: 2,
           }}
         >
-          {erroAlunos && <Alert severity="error">{erroAlunos}</Alert>}
+          {erros.length > 0 && (
+            <Alert severity="error" sx={{ textAlign: "left" }}>
+              {erros.map((msg, idx) => (
+                <div key={idx}>{msg}</div>
+              ))}
+            </Alert>
+          )}
+
           <FormControl fullWidth disabled={gerando}>
             <InputLabel id="aluno-label">Selecione um aluno...</InputLabel>
             <Select
@@ -201,7 +185,10 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
               id="aluno"
               value={alunoId}
               label="Selecione um aluno..."
-              onChange={(e) => setAlunoId(e.target.value)}
+              onChange={(e) => {
+                setAlunoId(e.target.value);
+                setErros([]);
+              }}
               sx={{ textAlign: "left" }}
             >
               {alunos.length === 0 && (
@@ -225,7 +212,9 @@ export default function Treinos({ glassStyle, onGerarPlano }) {
             disabled={!alunoId || gerando}
             startIcon={!gerando && <RocketLaunchIcon />}
           >
-            {gerando ? "Analisando perfil e gerando treino..." : "Gerar Treino"}
+            {gerando
+              ? "Analisando perfil e gerando treino..."
+              : "Gerar Treino"}
           </Button>
         </Box>
       </Paper>

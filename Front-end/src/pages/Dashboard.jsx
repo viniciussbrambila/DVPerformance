@@ -1,11 +1,25 @@
 import { Box, Paper, Typography, Avatar, ButtonBase } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import AddTaskIcon from "@mui/icons-material/AddTask";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import { buscarComCache, lerCache } from "../utils/cacheSessao";
+
+const DASHBOARD_RESUMO_URL = "http://localhost:5011/dashboard/resumo";
+const ALUNOS_API_URL = "http://localhost:5011/alunos";
+const TREINOS_API_URL = "http://localhost:5011/treinos";
+
+const obterUsuarioLogado = () => {
+  try {
+    const salvo = localStorage.getItem("usuarioLogado");
+    return salvo ? JSON.parse(salvo) : null;
+  } catch {
+    return null;
+  }
+};
 
 function CardContagem({ glassStyle, icone, titulo, valor }) {
   return (
@@ -72,10 +86,59 @@ function BotaoAcesso({ glassStyle, icone, texto, onClick }) {
 
 export default function Dashboard({ glassStyle }) {
   const navigate = useNavigate();
+  const usuarioInicial = obterUsuarioLogado();
+  const chaveCache = usuarioInicial?.id ? `dashboard:${usuarioInicial.id}` : null;
+  const resumoSalvo = chaveCache ? lerCache(chaveCache) : null;
 
-  // Por enquanto valores fixos. Quando tiver backend, troque por dados da API.
-  const [totalAlunos] = useState(0);
-  const [totalPlanos] = useState(0);
+  const [totalAlunos, setTotalAlunos] = useState(
+    resumoSalvo?.totalAlunos ?? 0,
+  );
+  const [totalPlanos, setTotalPlanos] = useState(
+    resumoSalvo?.totalPlanos ?? 0,
+  );
+
+  useEffect(() => {
+    const carregarContagens = async () => {
+      const usuarioLogado = obterUsuarioLogado();
+      if (!usuarioLogado?.id) return;
+
+      const chave = `dashboard:${usuarioLogado.id}`;
+
+      try {
+        const resumo = await buscarComCache(chave, async () => {
+          const resp = await fetch(
+            `${DASHBOARD_RESUMO_URL}?usuarioId=${usuarioLogado.id}`,
+          );
+
+          if (resp.ok) {
+            return resp.json();
+          }
+
+          if (resp.status === 404) {
+            const [respAlunos, respTreinos] = await Promise.all([
+              fetch(`${ALUNOS_API_URL}?usuarioId=${usuarioLogado.id}`),
+              fetch(`${TREINOS_API_URL}?usuarioId=${usuarioLogado.id}`),
+            ]);
+            const alunos = respAlunos.ok ? await respAlunos.json() : [];
+            const treinos = respTreinos.ok ? await respTreinos.json() : [];
+            return {
+              totalAlunos: alunos.length,
+              totalPlanos: treinos.length,
+            };
+          }
+
+          throw new Error(`HTTP ${resp.status}`);
+        });
+
+        setTotalAlunos(resumo.totalAlunos ?? 0);
+        setTotalPlanos(resumo.totalPlanos ?? 0);
+      } catch (erro) {
+        console.error("Erro ao carregar contagens do dashboard:", erro);
+      }
+    };
+
+    carregarContagens();
+  }, []);
 
   return (
     <Box>

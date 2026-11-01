@@ -21,12 +21,20 @@ import {
   DialogActions,
   Alert,
   Chip,
+  CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import {
+  buscarComCache,
+  lerCache,
+  salvarCache,
+  temCache,
+  expirarCachePorPrefixo,
+} from "../utils/cacheSessao";
 
 const API_URL = "http://localhost:5011/maquinas";
 
@@ -74,8 +82,18 @@ const obterUsuarioLogado = () => {
 
 const formVazio = { nome: "", grupo: "", descricao: "" };
 
+const obterChaveMaquinas = () => {
+  const usuarioLogado = obterUsuarioLogado();
+  return `maquinas:${usuarioLogado?.id || "geral"}`;
+};
+
 export default function Maquinas({ glassStyle }) {
-  const [maquinas, setMaquinas] = useState([]);
+  const [maquinas, setMaquinas] = useState(
+    () => lerCache(obterChaveMaquinas()) || [],
+  );
+  const [carregando, setCarregando] = useState(
+    () => !temCache(obterChaveMaquinas()),
+  );
   const [formAberto, setFormAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [idParaExcluir, setIdParaExcluir] = useState(null);
@@ -85,18 +103,22 @@ export default function Maquinas({ glassStyle }) {
 
   const carregarMaquinas = async () => {
     const usuarioLogado = obterUsuarioLogado();
+    const chave = `maquinas:${usuarioLogado?.id || "geral"}`;
     const url = usuarioLogado?.id
       ? `${API_URL}?usuarioId=${usuarioLogado.id}`
       : API_URL;
 
     try {
-      const response = await fetch(url);
-      if (response.ok) {
-        const dados = await response.json();
-        setMaquinas(dados);
-      }
+      const dados = await buscarComCache(chave, async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      });
+      setMaquinas(dados);
     } catch (erro) {
       console.error("Erro ao carregar máquinas da API:", erro);
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -176,12 +198,18 @@ export default function Maquinas({ glassStyle }) {
         return;
       }
 
+      const chave = obterChaveMaquinas();
+      setMaquinas((lista) => {
+        const novaLista = editandoId
+          ? lista.map((maq) => (maq.id === editandoId ? dados : maq))
+          : [...lista, dados];
+        salvarCache(chave, novaLista);
+        return novaLista;
+      });
+
       if (editandoId) {
-        setMaquinas((lista) =>
-          lista.map((maq) => (maq.id === editandoId ? dados : maq))
-        );
-      } else {
-        setMaquinas((lista) => [...lista, dados]);
+        expirarCachePorPrefixo("planos:");
+        expirarCachePorPrefixo("planoDetalhe:");
       }
 
       cancelar();
@@ -208,7 +236,14 @@ export default function Maquinas({ glassStyle }) {
       });
 
       if (response.ok) {
-        setMaquinas((lista) => lista.filter((maq) => maq.id !== idParaExcluir));
+        const chave = obterChaveMaquinas();
+        setMaquinas((lista) => {
+          const novaLista = lista.filter((maq) => maq.id !== idParaExcluir);
+          salvarCache(chave, novaLista);
+          return novaLista;
+        });
+        expirarCachePorPrefixo("planos:");
+        expirarCachePorPrefixo("planoDetalhe:");
         if (editandoId === idParaExcluir) cancelar();
       }
     } catch (erro) {
@@ -354,18 +389,18 @@ export default function Maquinas({ glassStyle }) {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                <TableCell sx={{ fontWeight: 600, color: "text.primary" }}>
                   Nome
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                <TableCell sx={{ fontWeight: 600, color: "text.primary" }}>
                   Região / Grupo Muscular
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                <TableCell sx={{ fontWeight: 600, color: "text.primary" }}>
                   Descrição
                 </TableCell>
                 <TableCell
                   align="right"
-                  sx={{ fontWeight: 600, color: "text.secondary" }}
+                  sx={{ fontWeight: 600, color: "text.primary" }}
                 >
                   Ações
                 </TableCell>
@@ -373,7 +408,15 @@ export default function Maquinas({ glassStyle }) {
             </TableHead>
 
             <TableBody>
-              {maquinas.length === 0 && (
+              {carregando && maquinas.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
+                    <CircularProgress size={32} />
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!carregando && maquinas.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={4}
