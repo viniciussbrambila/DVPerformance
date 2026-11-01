@@ -1,24 +1,20 @@
 version: 2
 updates:
-  # Verifica semanalmente atualizacoes de pacotes do Back-end (.NET / NuGet)
+  # Atua SOMENTE para alertas criticos de seguranca (open-pull-requests-limit: 0 desativa atualizacoes comuns de versao)
   - package-ecosystem: "nuget"
     directory: "/Back-end/DVPerformance"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 0
 
-  # Verifica semanalmente atualizacoes de pacotes do Front-end (npm)
   - package-ecosystem: "npm"
     directory: "/Front-end"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 0
 
-  # Mantem as versoes das proprias GitHub Actions atualizadas
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
+    open-pull-requests-limit: 0
