@@ -4,17 +4,26 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
 
+public record AtualizarStatusTreinoRequest(string Status);
+
 public static class TreinoEndpoints
 {
+    private static readonly HashSet<string> StatusPermitidos = new()
+    {
+        "Rascunho", "Validado", "Exportado"
+    };
+
     public static void MapTreinoEndpoints(this WebApplication app)
     {
         var grupo = app.MapGroup("/treinos");
 
-        // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos (com os itens, exercicio/maquina e grupo muscular unificado)
+        // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos já enriquecidos com dados do aluno, status e dias agrupados
         grupo.MapGet("/", async (int? usuarioId, int? alunoId, bool? incluirInativos, AppDbContext db) =>
         {
             var query = db.Treinos
-                .Include(t => t.Itens.OrderBy(i => i.DivisaoTreino).ThenBy(i => i.OrdemExercicio))
+                .AsNoTracking()
+                .Include(t => t.Aluno)
+                .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
                 .Include(t => t.Itens)
@@ -24,7 +33,7 @@ public static class TreinoEndpoints
 
             if (incluirInativos != true)
             {
-                query = query.Where(t => t.Ativo);
+                query = query.Where(t => t.Ativo && (t.Aluno == null || t.Aluno.Ativo));
             }
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
@@ -41,10 +50,10 @@ public static class TreinoEndpoints
                 .OrderByDescending(t => t.DataCriacao)
                 .ToListAsync();
 
-            return Results.Ok(lista);
+            return Results.Ok(lista.Select(FormatarPlanoResposta));
         });
 
-        // GET /treinos/{id} -> Busca uma ficha de treino específica pelo ID com todos os itens
+        // GET /treinos/{id} -> Busca uma ficha de treino específica pelo ID com todos os itens e dias estruturados
         grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
@@ -53,20 +62,22 @@ public static class TreinoEndpoints
             }
 
             var treino = await db.Treinos
-                .Include(t => t.Itens.OrderBy(i => i.DivisaoTreino).ThenBy(i => i.OrdemExercicio))
+                .AsNoTracking()
+                .Include(t => t.Aluno)
+                .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
                 .Include(t => t.Itens)
                     .ThenInclude(i => i.Maquina)
                         .ThenInclude(m => m!.GrupoMuscular)
-                .FirstOrDefaultAsync(t => t.Id == id);
+                .FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
 
             if (treino is null)
             {
                 return Results.NotFound(new { mensagem = "Ficha de treino não encontrada." });
             }
 
-            return Results.Ok(treino);
+            return Results.Ok(FormatarPlanoResposta(treino));
         });
 
         // GET /treinos/aluno/{alunoId} -> Lista o histórico de fichas de treino de um aluno específico
@@ -78,8 +89,10 @@ public static class TreinoEndpoints
             }
 
             var treinos = await db.Treinos
+                .AsNoTracking()
                 .Where(t => t.AlunoId == alunoId && t.Ativo)
-                .Include(t => t.Itens.OrderBy(i => i.DivisaoTreino).ThenBy(i => i.OrdemExercicio))
+                .Include(t => t.Aluno)
+                .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
                 .Include(t => t.Itens)
@@ -88,7 +101,7 @@ public static class TreinoEndpoints
                 .OrderByDescending(t => t.DataCriacao)
                 .ToListAsync();
 
-            return Results.Ok(treinos);
+            return Results.Ok(treinos.Select(FormatarPlanoResposta));
         });
 
         // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha usando os exercícios e máquinas ativos da conta do Personal
@@ -99,7 +112,7 @@ public static class TreinoEndpoints
                 return Results.BadRequest(new { mensagem = "Informe um ID de aluno válido para gerar o treino." });
             }
 
-            var aluno = await db.Alunos.FirstOrDefaultAsync(a => a.Id == alunoId && a.Ativo);
+            var aluno = await db.Alunos.AsNoTracking().FirstOrDefaultAsync(a => a.Id == alunoId && a.Ativo);
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou inativo no sistema." });
@@ -115,14 +128,16 @@ public static class TreinoEndpoints
                 await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, donoId.Value);
             }
 
-            var gruposMusculares = await db.GruposMusculares.ToListAsync();
+            var gruposMusculares = await db.GruposMusculares.AsNoTracking().ToListAsync();
 
             var exerciciosDisponiveis = await db.Exercicios
+                .AsNoTracking()
                 .Include(e => e.GrupoMuscular)
                 .Where(e => e.Ativo && (donoId == null || e.UsuarioId == donoId || e.UsuarioId == null))
                 .ToListAsync();
 
             var maquinasDisponiveis = await db.Maquinas
+                .AsNoTracking()
                 .Include(m => m.GrupoMuscular)
                 .Where(m => m.Ativo && (donoId == null || m.UsuarioId == donoId || m.UsuarioId == null))
                 .ToListAsync();
@@ -179,9 +194,11 @@ public static class TreinoEndpoints
             db.Treinos.Add(novoTreino);
             await db.SaveChangesAsync();
 
-            // Recarrega o treino com as navegações completas (Exercicio, Maquina e GrupoMuscular) para retornar ao cliente
+            // Recarrega o treino com as navegações completas (Aluno, Exercicio, Maquina e GrupoMuscular) para retornar ao cliente
             var treinoSalvo = await db.Treinos
-                .Include(t => t.Itens.OrderBy(i => i.DivisaoTreino).ThenBy(i => i.OrdemExercicio))
+                .AsNoTracking()
+                .Include(t => t.Aluno)
+                .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
                 .Include(t => t.Itens)
@@ -189,7 +206,41 @@ public static class TreinoEndpoints
                         .ThenInclude(m => m!.GrupoMuscular)
                 .FirstAsync(t => t.Id == novoTreino.Id);
 
-            return Results.Created($"/treinos/{treinoSalvo.Id}", treinoSalvo);
+            return Results.Created($"/treinos/{treinoSalvo.Id}", FormatarPlanoResposta(treinoSalvo));
+        });
+
+        // PATCH /treinos/{id}/status -> Atualiza o status do plano ("Rascunho", "Validado", "Exportado") no banco PostgreSQL
+        grupo.MapPatch("/{id:int}/status", async (int id, AtualizarStatusTreinoRequest? dados, AppDbContext db) =>
+        {
+            if (id <= 0)
+            {
+                return Results.BadRequest(new { mensagem = "O ID do treino deve ser um número inteiro positivo." });
+            }
+
+            var novoStatus = dados?.Status?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(novoStatus) || !StatusPermitidos.Contains(novoStatus))
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Status inválido. Os valores permitidos são: 'Rascunho', 'Validado' ou 'Exportado'."
+                });
+            }
+
+            var treino = await db.Treinos.FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
+
+            if (treino is null)
+            {
+                return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou desativada." });
+            }
+
+            treino.Status = novoStatus;
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                id = treino.Id,
+                status = treino.Status
+            });
         });
 
         // PUT /treinos/itens/{idItem} -> Permite ao Personal editar um item específico do treino gerado (séries, repetições, descanso, aeróbico ou trocar exercício/máquina)
@@ -316,6 +367,7 @@ public static class TreinoEndpoints
             NomePlano = nomePlano,
             Divisao = nomeDivisao,
             TempoAerobico = tempoAerobicoGeral,
+            Status = "Rascunho",
             DataCriacao = DateTime.UtcNow,
             Ativo = true,
             Itens = new List<ItemTreino>()
@@ -829,5 +881,67 @@ public static class TreinoEndpoints
 
         jaUsados.Add(seletorId(candidato));
         return candidato;
+    }
+
+    // Monta o objeto completo do plano já com dados do Aluno, Status e Dias agrupados/ordenados para o Front-end
+    private static object FormatarPlanoResposta(Treino treino)
+    {
+        var itensOrdenados = (treino.Itens ?? new List<ItemTreino>())
+            .OrderBy(i => i.Id)
+            .ToList();
+
+        var dias = itensOrdenados
+            .GroupBy(i => string.IsNullOrWhiteSpace(i.DivisaoTreino) ? "Treino" : i.DivisaoTreino)
+            .Select(grupoDia => new
+            {
+                nome = grupoDia.Key,
+                tempoAerobico = grupoDia.FirstOrDefault()?.TempoAerobico ?? string.Empty,
+                exercicios = grupoDia
+                    .OrderBy(i => i.OrdemExercicio)
+                    .ThenBy(i => i.Id)
+                    .Select(item =>
+                    {
+                        var nomeMovimento = item.Exercicio?.Nome ?? item.Maquina?.Nome ?? "Exercício";
+                        var grupoMuscular = item.Exercicio?.Grupo ?? item.Maquina?.Grupo ?? string.Empty;
+                        return new
+                        {
+                            id = item.Id,
+                            treinoId = item.TreinoId,
+                            divisaoTreino = item.DivisaoTreino,
+                            ordemExercicio = item.OrdemExercicio,
+                            exercicioId = item.ExercicioId,
+                            maquinaId = item.MaquinaId,
+                            tipo = item.MaquinaId.HasValue ? "Máquina" : "Exercício",
+                            grupo = grupoMuscular,
+                            nome = nomeMovimento,
+                            series = item.Series,
+                            repeticoes = item.Repeticao,
+                            descanso = item.TempoDescanso,
+                            tempoAerobico = item.TempoAerobico
+                        };
+                    })
+                    .ToList()
+            })
+            .ToList();
+
+        return new
+        {
+            id = treino.Id,
+            alunoId = treino.AlunoId,
+            usuarioId = treino.UsuarioId,
+            aluno = treino.Aluno?.Nome ?? $"Aluno #{treino.AlunoId}",
+            objetivo = treino.Aluno?.Objetivo ?? "-",
+            experiencia = treino.Aluno?.Experiencia ?? "-",
+            frequencia = treino.Aluno?.FrequenciaSemanal ?? dias.Count,
+            nomePlano = treino.NomePlano,
+            divisao = treino.Divisao,
+            tempoAerobico = treino.TempoAerobico,
+            status = string.IsNullOrWhiteSpace(treino.Status) ? "Rascunho" : treino.Status,
+            data = treino.DataCriacao,
+            dataCriacao = treino.DataCriacao,
+            ativo = treino.Ativo,
+            dias,
+            itens = itensOrdenados
+        };
     }
 }

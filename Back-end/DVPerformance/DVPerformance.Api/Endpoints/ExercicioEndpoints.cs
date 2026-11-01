@@ -12,6 +12,7 @@ public static class ExercicioEndpoints
         app.MapGet("/grupos-musculares", async (AppDbContext db) =>
         {
             var grupos = await db.GruposMusculares
+                .AsNoTracking()
                 .OrderBy(g => g.OrdemPrioridade)
                 .ThenBy(g => g.Nome)
                 .ToListAsync();
@@ -31,6 +32,7 @@ public static class ExercicioEndpoints
             }
 
             var query = db.Exercicios
+                .AsNoTracking()
                 .Include(e => e.GrupoMuscular)
                 .AsQueryable();
 
@@ -80,6 +82,7 @@ public static class ExercicioEndpoints
             }
 
             var exercicio = await db.Exercicios
+                .AsNoTracking()
                 .Include(e => e.GrupoMuscular)
                 .FirstOrDefaultAsync(e => e.Id == id && e.Ativo);
 

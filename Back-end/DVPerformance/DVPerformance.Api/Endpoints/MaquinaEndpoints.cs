@@ -20,6 +20,7 @@ public static class MaquinaEndpoints
             }
 
             var query = db.Maquinas
+                .AsNoTracking()
                 .Include(m => m.GrupoMuscular)
                 .AsQueryable();
 
@@ -69,6 +70,7 @@ public static class MaquinaEndpoints
             }
 
             var maquina = await db.Maquinas
+                .AsNoTracking()
                 .Include(m => m.GrupoMuscular)
                 .FirstOrDefaultAsync(m => m.Id == id && m.Ativo);
 

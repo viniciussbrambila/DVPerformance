@@ -7,6 +7,8 @@ public class Treino
     // FK obrigatória que vincula a ficha de treino ao Aluno
     public int AlunoId { get; set; }
 
+    public Aluno? Aluno { get; set; }
+
     // FK opcional que vincula ao Personal que gerou o treino
     public int? UsuarioId { get; set; }
 
@@ -18,6 +20,9 @@ public class Treino
 
     // Orientação geral de aeróbico do protocolo (ex: "25 min Esteira/Bike moderado pós-treino")
     public string TempoAerobico { get; set; } = string.Empty;
+
+    // Situação do plano conforme Dicionário de Dados e Diagrama de Estados ("Rascunho", "Validado", "Exportado")
+    public string Status { get; set; } = "Rascunho";
 
     // Data/hora de geração da ficha (em UTC)
     public DateTime DataCriacao { get; set; } = DateTime.UtcNow;

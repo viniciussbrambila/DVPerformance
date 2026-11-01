@@ -34,7 +34,7 @@ public static class AlunoEndpoints
         // GET /alunos?usuarioId=1 -> Lista os alunos ativos (ou todos se incluirInativos=true)
         grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
         {
-            var query = db.Alunos.AsQueryable();
+            var query = db.Alunos.AsNoTracking().AsQueryable();
 
             if (incluirInativos != true)
             {
@@ -58,7 +58,7 @@ public static class AlunoEndpoints
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
             }
 
-            var aluno = await db.Alunos.FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
+            var aluno = await db.Alunos.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id && a.Ativo);
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou desativado." });
@@ -160,6 +160,17 @@ public static class AlunoEndpoints
             }
 
             aluno.Ativo = false;
+
+            // RF01: A exclusão do aluno desativa automaticamente todos os planos de treino vinculados a ele
+            var treinosVinculados = await db.Treinos
+                .Where(t => t.AlunoId == id && t.Ativo)
+                .ToListAsync();
+
+            foreach (var treino in treinosVinculados)
+            {
+                treino.Ativo = false;
+            }
+
             await db.SaveChangesAsync();
 
             return Results.NoContent();

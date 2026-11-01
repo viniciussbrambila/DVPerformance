@@ -285,6 +285,12 @@ public class AppDbContext : DbContext
                   .HasMaxLength(120)
                   .IsRequired();
 
+            entity.Property(t => t.Status)
+                  .HasColumnName("status")
+                  .HasMaxLength(30)
+                  .HasDefaultValue("Rascunho")
+                  .IsRequired();
+
             entity.Property(t => t.DataCriacao)
                   .HasColumnName("data_criacao")
                   .IsRequired();
@@ -294,7 +300,7 @@ public class AppDbContext : DbContext
                   .HasDefaultValue(true)
                   .IsRequired();
 
-            entity.HasOne<Aluno>()
+            entity.HasOne(t => t.Aluno)
                   .WithMany()
                   .HasForeignKey(t => t.AlunoId)
                   .OnDelete(DeleteBehavior.Cascade);

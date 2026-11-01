@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DVPerformance.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,27 @@ namespace DVPerformance.Api.Data;
 /// </summary>
 public static class CatalogoPadraoService
 {
+    private static readonly ConcurrentDictionary<string, byte> UsuariosComCatalogoVerificado = new();
+
+    private static string ObterChaveCache(AppDbContext db, int usuarioId)
+    {
+        var conexao = db.Database.GetConnectionString() ?? string.Empty;
+        return $"{conexao}|{usuarioId}";
+    }
+
+    private static bool CatalogoJaVerificado(AppDbContext db, int usuarioId)
+    {
+        return usuarioId > 0 && UsuariosComCatalogoVerificado.ContainsKey(ObterChaveCache(db, usuarioId));
+    }
+
+    private static void MarcarCatalogoVerificado(AppDbContext db, int usuarioId)
+    {
+        if (usuarioId > 0)
+        {
+            UsuariosComCatalogoVerificado.TryAdd(ObterChaveCache(db, usuarioId), 1);
+        }
+    }
+
     public sealed record ItemCatalogoPadrao(int GrupoMuscularId, string Nome, string Descricao);
 
     // IDs fixos da tabela mestre grupos_musculares (definidos em AppDbContext):
@@ -269,17 +291,26 @@ public static class CatalogoPadraoService
             .Where(u => !u.CatalogoInicializado)
             .ToListAsync();
 
-        if (contasPendentes.Count == 0)
+        if (contasPendentes.Count > 0)
         {
-            return;
+            foreach (var conta in contasPendentes)
+            {
+                await PovoarItensFaltantesSemSalvarAsync(db, conta);
+            }
+
+            await db.SaveChangesAsync();
         }
 
-        foreach (var conta in contasPendentes)
-        {
-            await PovoarItensFaltantesSemSalvarAsync(db, conta);
-        }
+        var idsInicializados = await db.Usuarios
+            .AsNoTracking()
+            .Where(u => u.CatalogoInicializado)
+            .Select(u => u.Id)
+            .ToListAsync();
 
-        await db.SaveChangesAsync();
+        foreach (var id in idsInicializados)
+        {
+            MarcarCatalogoVerificado(db, id);
+        }
     }
 
     /// <summary>
@@ -291,11 +322,13 @@ public static class CatalogoPadraoService
     {
         if (conta.CatalogoInicializado)
         {
+            MarcarCatalogoVerificado(db, conta.Id);
             return;
         }
 
         await PovoarItensFaltantesSemSalvarAsync(db, conta);
         await db.SaveChangesAsync();
+        MarcarCatalogoVerificado(db, conta.Id);
     }
 
     /// <summary>
@@ -303,17 +336,30 @@ public static class CatalogoPadraoService
     /// </summary>
     public static async Task GarantirCatalogoPorUsuarioIdAsync(AppDbContext db, int usuarioId)
     {
-        if (usuarioId <= 0)
+        if (usuarioId <= 0 || CatalogoJaVerificado(db, usuarioId))
         {
             return;
         }
 
-        var contaPendente = await db.Usuarios
-            .FirstOrDefaultAsync(u => u.Id == usuarioId && !u.CatalogoInicializado);
+        var statusCatalogo = await db.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Id == usuarioId)
+            .Select(u => (bool?)u.CatalogoInicializado)
+            .FirstOrDefaultAsync();
 
-        if (contaPendente is not null)
+        if (statusCatalogo == true)
         {
-            await GarantirCatalogoDoPersonalAsync(db, contaPendente);
+            MarcarCatalogoVerificado(db, usuarioId);
+            return;
+        }
+
+        if (statusCatalogo == false)
+        {
+            var contaPendente = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId);
+            if (contaPendente is not null)
+            {
+                await GarantirCatalogoDoPersonalAsync(db, contaPendente);
+            }
         }
     }
 

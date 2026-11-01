@@ -400,6 +400,14 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("nome_plano");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Rascunho")
+                        .HasColumnName("status");
+
                     b.Property<string>("TempoAerobico")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -533,7 +541,7 @@ namespace DVPerformance.Api.Migrations
 
             modelBuilder.Entity("DVPerformance.Api.Models.Treino", b =>
                 {
-                    b.HasOne("DVPerformance.Api.Models.Aluno", null)
+                    b.HasOne("DVPerformance.Api.Models.Aluno", "Aluno")
                         .WithMany()
                         .HasForeignKey("AlunoId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -543,6 +551,8 @@ namespace DVPerformance.Api.Migrations
                         .WithMany()
                         .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Aluno");
                 });
 
             modelBuilder.Entity("DVPerformance.Api.Models.Treino", b =>
