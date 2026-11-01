@@ -1,0 +1,94 @@
+name: CI - DV Performance (Back-end & Front-end)
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================================
+  # JOB 1: BACK-END (.NET 10 + Entity Framework Core + PostgreSQL 16)
+  # ============================================================================
+  backend:
+    name: Back-end (.NET 10 & PostgreSQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Back-end/DVPerformance
+
+    # Sobe um container PostgreSQL temporario real para validar todas as Migrations
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: dvperformance_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d dvperformance_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: 1. Baixar codigo do repositorio
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar o .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 3. Restaurar pacotes NuGet
+        run: dotnet restore DVPerformance.sln
+
+      - name: 4. Compilar Back-end (Modo Release)
+        run: dotnet build DVPerformance.sln --configuration Release --no-restore
+
+      - name: 5. Verificar vulnerabilidades de seguranca nos pacotes NuGet
+        run: dotnet list DVPerformance.sln package --vulnerable
+
+      - name: 6. Restaurar ferramenta do Entity Framework (dotnet-ef)
+        run: dotnet tool restore
+
+      - name: 7. Verificar se alguem alterou Models sem criar Migration
+        run: dotnet ef migrations has-pending-model-changes --project DVPerformance.Api/DVPerformance.Api.csproj --no-build --configuration Release
+
+      - name: 8. Testar aplicacao de todas as Migrations no PostgreSQL do zero
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=dvperformance_ci;Username=postgres;Password=postgres_ci_password"
+        run: dotnet ef database update --project DVPerformance.Api/DVPerformance.Api.csproj --no-build --configuration Release
+
+      - name: 9. Executar testes automatizados (se existirem projetos de teste)
+        run: dotnet test DVPerformance.sln --configuration Release --no-build --verbosity normal
+
+  # ============================================================================
+  # JOB 2: FRONT-END (Node.js + Preact + Vite + Material UI)
+  # ============================================================================
+  frontend:
+    name: Front-end (Vite & Preact)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Front-end
+
+    steps:
+      - name: 1. Baixar codigo do repositorio
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar Node.js 22 LTS com cache do npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: Front-end/package-lock.json
+
+      - name: 3. Instalar dependencias limpas (npm ci)
+        run: npm ci
+
+      - name: 4. Compilar Front-end para Producao (vite build)
+        run: npm run build
