@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: 1. Baixar codigo do repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 2. Configurar o .NET 10 SDK
         uses: actions/setup-dotnet@v4
@@ -78,7 +78,7 @@ jobs:
 
     steps:
       - name: 1. Baixar codigo do repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 2. Configurar Node.js 22 LTS com cache do npm
         uses: actions/setup-node@v4
