@@ -67,10 +67,10 @@ jobs:
         run: dotnet test DVPerformance.sln --configuration Release --no-build --verbosity normal
 
   # ============================================================================
-  # JOB 2: FRONT-END (Node.js + Preact + Vite + Material UI)
+  # JOB 2: FRONT-END (Node.js + React + Vite + Material UI)
   # ============================================================================
   frontend:
-    name: Front-end (Vite & Preact)
+    name: Front-end (Vite & React)
     runs-on: ubuntu-latest
     defaults:
       run:
