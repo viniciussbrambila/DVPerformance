@@ -37,6 +37,22 @@ const API_URL = "http://localhost:5011/treinos";
 
 const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
+// Peso e altura ainda são mantidos somente no cache da sessão do front-end.
+const obterMedidasAluno = (alunoId) => {
+  try {
+    const usuario = JSON.parse(localStorage.getItem("usuarioLogado") || "null");
+    if (!usuario?.id) return {};
+    return lerCache(`medidas:alunos:${usuario.id}`)?.[alunoId] || {};
+  } catch {
+    return {};
+  }
+};
+
+const formatarMedida = (valor, unidade) =>
+  valor == null || valor === ""
+    ? "Não informado"
+    : `${Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unidade}`;
+
 const cabecalhoSx = {
   fontWeight: 700,
   textTransform: "uppercase",
@@ -266,8 +282,7 @@ export default function PlanoDetalhe({ glassStyle }) {
               ordemExercicio: Number(item.ordemExercicio),
               exercicioId:
                 item.exercicioId != null ? Number(item.exercicioId) : null,
-              maquinaId:
-                item.maquinaId != null ? Number(item.maquinaId) : null,
+              maquinaId: item.maquinaId != null ? Number(item.maquinaId) : null,
               series: Number(item.series),
               repeticao: String(item.repeticoes),
               tempoDescanso: String(item.descanso),
@@ -347,8 +362,11 @@ export default function PlanoDetalhe({ glassStyle }) {
     }, 300);
   };
 
+  const medidasAluno = obterMedidasAluno(plano.alunoId);
   const infos = [
     ["Aluno", plano.aluno],
+    ["Peso", formatarMedida(medidasAluno.peso, "kg")],
+    ["Altura", formatarMedida(medidasAluno.altura, "m")],
     ["Objetivo", plano.objetivo],
     ["Frequência", `${plano.frequencia} dias/semana`],
     ["Data", formatarData(plano.data)],
@@ -510,15 +528,6 @@ export default function PlanoDetalhe({ glassStyle }) {
           >
             PRESCRIÇÃO DE TREINAMENTO
           </Typography>
-          {plano.nomePlano && (
-            <Typography
-              variant="subtitle1"
-              color="text.secondary"
-              sx={{ mt: 1, fontWeight: 600 }}
-            >
-              {plano.nomePlano}
-            </Typography>
-          )}
         </Box>
 
         <Divider
@@ -531,11 +540,12 @@ export default function PlanoDetalhe({ glassStyle }) {
             display: "grid",
             gridTemplateColumns: {
               xs: "repeat(2, 1fr)",
-              md: "repeat(4, 1fr)",
+              md: "repeat(3, 1fr)",
+              lg: "repeat(6, 1fr)",
             },
             gap: 2,
             p: 2.5,
-            mb: plano.tempoAerobico ? 3 : 5,
+            mb: 5,
             borderRadius: 3,
             bgcolor: "action.hover",
           }}
@@ -555,29 +565,6 @@ export default function PlanoDetalhe({ glassStyle }) {
             </Box>
           ))}
         </Box>
-
-        {plano.tempoAerobico && (
-          <Box
-            className="info-faixa"
-            sx={{
-              p: 2,
-              mb: 5,
-              borderRadius: 3,
-              bgcolor: "action.hover",
-            }}
-          >
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontWeight: 700, textTransform: "uppercase" }}
-            >
-              Orientação de Cardio / Aeróbico
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-              {plano.tempoAerobico}
-            </Typography>
-          </Box>
-        )}
 
         {dias.map((dia, indiceDia) => (
           <Box
@@ -696,6 +683,29 @@ export default function PlanoDetalhe({ glassStyle }) {
                 </TableBody>
               </Table>
             </TableContainer>
+
+            {(dia.tempoAerobico || plano.tempoAerobico) && (
+              <Box
+                className="info-faixa"
+                sx={{
+                  p: 2,
+                  mt: 2,
+                  borderRadius: 3,
+                  bgcolor: "action.hover",
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 700, textTransform: "uppercase" }}
+                >
+                  Orientação de Cardio / Aeróbico
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  {dia.tempoAerobico || plano.tempoAerobico}
+                </Typography>
+              </Box>
+            )}
           </Box>
         ))}
       </Paper>

@@ -51,10 +51,39 @@ const obterChaveAlunos = () => {
   return usuario?.id ? `alunos:${usuario.id}` : null;
 };
 
+// Medidas mantidas apenas na sessão do front-end até a integração com a API.
+const aplicarMedidasLocais = (lista, chave) => {
+  const medidas = lerCache(`medidas:${chave}`) || {};
+  return lista.map((aluno) => ({ ...aluno, ...medidas[aluno.id] }));
+};
+
+const LIMITES_MEDIDAS = {
+  peso: { min: 30, max: 300 },
+  altura: { min: 1, max: 2.5 }, // Altura em metros: de 100 a 250 cm.
+};
+
+const medidaValida = (campo, valor) => {
+  const { min, max } = LIMITES_MEDIDAS[campo];
+  const numero = Number(String(valor).replace(",", "."));
+  return (
+    /^\d+([.,]\d{1,2})?$/.test(String(valor)) &&
+    numero >= min &&
+    numero <= max
+  );
+};
+
+const converterMedida = (valor) =>
+  valor === "" ? null : Number(String(valor).replace(",", "."));
+
+const formatarMedida = (valor) =>
+  valor == null || valor === ""
+    ? "—"
+    : Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
 export default function Alunos({ glassStyle }) {
   const [alunos, setAlunos] = useState(() => {
     const chave = obterChaveAlunos();
-    return (chave && lerCache(chave)) || [];
+    return chave ? aplicarMedidasLocais(lerCache(chave) || [], chave) : [];
   });
   const [carregando, setCarregando] = useState(() => {
     const chave = obterChaveAlunos();
@@ -68,6 +97,8 @@ export default function Alunos({ glassStyle }) {
   const [formData, setFormData] = useState({
     nome: "",
     idade: "",
+    peso: "",
+    altura: "",
     sexo: "",
     experiencia: "",
     frequenciaSemanal: "",
@@ -93,7 +124,7 @@ export default function Alunos({ glassStyle }) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       });
-      setAlunos(dados);
+      setAlunos(aplicarMedidasLocais(dados, chave));
     } catch (erro) {
       console.error("Erro ao conectar com a API:", erro);
     } finally {
@@ -118,6 +149,8 @@ export default function Alunos({ glassStyle }) {
     setFormData({
       nome: "",
       idade: "",
+      peso: "",
+      altura: "",
       sexo: "",
       experiencia: "",
       frequenciaSemanal: "",
@@ -135,6 +168,14 @@ export default function Alunos({ glassStyle }) {
       return;
     }
 
+    // Peso e altura aceitam decimais com vírgula ou ponto.
+    if (name === "peso" || name === "altura") {
+      if (/^\d*([.,]\d{0,2})?$/.test(value)) {
+        setFormData({ ...formData, [name]: value });
+      }
+      return;
+    }
+
     setFormData({ ...formData, [name]: value });
   };
 
@@ -146,6 +187,8 @@ export default function Alunos({ glassStyle }) {
     setFormData({
       nome: aluno.nome,
       idade: String(aluno.idade),
+      peso: aluno.peso == null ? "" : String(aluno.peso).replace(".", ","),
+      altura: aluno.altura == null ? "" : String(aluno.altura).replace(".", ","),
       sexo: aluno.sexo,
       experiencia: aluno.experiencia,
       frequenciaSemanal: aluno.frequenciaSemanal,
@@ -174,6 +217,11 @@ export default function Alunos({ glassStyle }) {
 
       if (response.ok) {
         const chave = obterChaveAlunos();
+        if (chave) {
+          const medidas = { ...lerCache(`medidas:${chave}`) };
+          delete medidas[idParaExcluir];
+          salvarCache(`medidas:${chave}`, medidas);
+        }
         setAlunos((lista) => {
           const novaLista = lista.filter((aluno) => aluno.id !== idParaExcluir);
           if (chave) salvarCache(chave, novaLista);
@@ -190,11 +238,13 @@ export default function Alunos({ glassStyle }) {
     }
   };
 
-  // Verifica se todos os 6 campos estão preenchidos corretamente
+  // Valida os campos obrigatórios e os limites de peso e altura
   const formularioValido =
     formData.nome.trim() !== "" &&
     String(formData.idade).trim() !== "" &&
     Number(formData.idade) > 0 &&
+    medidaValida("peso", formData.peso) &&
+    medidaValida("altura", formData.altura) &&
     formData.sexo !== "" &&
     formData.experiencia !== "" &&
     formData.frequenciaSemanal !== "" &&
@@ -249,12 +299,21 @@ export default function Alunos({ glassStyle }) {
       }
 
       const chave = `alunos:${usuarioLogado.id}`;
+      const medidas = {
+        peso: converterMedida(formData.peso),
+        altura: converterMedida(formData.altura),
+      };
+      const alunoSalvo = { ...dadosResposta, ...medidas };
+      salvarCache(`medidas:${chave}`, {
+        ...lerCache(`medidas:${chave}`),
+        [alunoSalvo.id]: medidas,
+      });
       setAlunos((lista) => {
         const novaLista = editingId
           ? lista.map((aluno) =>
-              aluno.id === editingId ? dadosResposta : aluno,
+              aluno.id === editingId ? alunoSalvo : aluno,
             )
-          : [...lista, dadosResposta];
+          : [...lista, alunoSalvo];
         salvarCache(chave, novaLista);
         return novaLista;
       });
@@ -298,6 +357,7 @@ export default function Alunos({ glassStyle }) {
         <Button
           variant="contained"
           color="primary"
+          size="large"
           startIcon={<AddIcon />}
           onClick={handleAbrirModal}
         >
@@ -325,6 +385,12 @@ export default function Alunos({ glassStyle }) {
                 Idade
               </TableCell>
               <TableCell align="center" sx={{ fontWeight: "bold" }}>
+                Peso (kg)
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold" }}>
+                Altura (m)
+              </TableCell>
+              <TableCell align="center" sx={{ fontWeight: "bold" }}>
                 Objetivo
               </TableCell>
               <TableCell align="center" sx={{ fontWeight: "bold" }}>
@@ -338,7 +404,7 @@ export default function Alunos({ glassStyle }) {
           <TableBody>
             {carregando && alunos.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
@@ -347,7 +413,7 @@ export default function Alunos({ glassStyle }) {
             {!carregando && alunos.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   align="center"
                   sx={{ py: 4, color: "text.secondary" }}
                 >
@@ -365,6 +431,8 @@ export default function Alunos({ glassStyle }) {
                   {aluno.nome}
                 </TableCell>
                 <TableCell align="center">{aluno.idade}</TableCell>
+                <TableCell align="center">{formatarMedida(aluno.peso)}</TableCell>
+                <TableCell align="center">{formatarMedida(aluno.altura)}</TableCell>
                 <TableCell align="center">{aluno.objetivo}</TableCell>
                 <TableCell align="center">{aluno.experiencia}</TableCell>
                 <TableCell align="center">
@@ -466,6 +534,40 @@ export default function Alunos({ glassStyle }) {
                 <MenuItem value="M">Masculino</MenuItem>
                 <MenuItem value="F">Feminino</MenuItem>
               </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                required
+                label="Peso (kg)"
+                name="peso"
+                value={formData.peso}
+                onChange={handleChange}
+                slotProps={{ htmlInput: { inputMode: "decimal" } }}
+                error={tentouGravar && !medidaValida("peso", formData.peso)}
+                helperText={
+                  tentouGravar && !medidaValida("peso", formData.peso)
+                    ? "Informe um peso entre 30 e 300 kg"
+                    : "De 30 a 300 kg. Ex.: 72,5"
+                }
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                required
+                label="Altura (m)"
+                name="altura"
+                value={formData.altura}
+                onChange={handleChange}
+                slotProps={{ htmlInput: { inputMode: "decimal" } }}
+                error={tentouGravar && !medidaValida("altura", formData.altura)}
+                helperText={
+                  tentouGravar && !medidaValida("altura", formData.altura)
+                    ? "Informe uma altura entre 1,00 e 2,50 m (100 a 250 cm)"
+                    : "De 1,00 a 2,50 m (100 a 250 cm). Ex.: 1,75"
+                }
+              />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField

@@ -5,7 +5,6 @@ import {
   Button,
   TextField,
   MenuItem,
-  IconButton,
   Chip,
   InputAdornment,
   Table,
@@ -98,6 +97,7 @@ export default function PlanosExportados({ glassStyle }) {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [planoParaExcluir, setPlanoParaExcluir] = useState(null);
+  const [planoParaValidar, setPlanoParaValidar] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
@@ -148,6 +148,11 @@ export default function PlanosExportados({ glassStyle }) {
   });
 
   const baixarTxt = async (plano) => {
+    if (plano.status !== "Validado" && plano.status !== "Exportado") {
+      setPlanoParaValidar(plano);
+      return;
+    }
+
     const blob = new Blob([montarTexto(plano)], {
       type: "text/plain;charset=utf-8",
     });
@@ -291,10 +296,8 @@ export default function PlanosExportados({ glassStyle }) {
               <TableRow>
                 <TableCell sx={cabecalhoSx}>Data</TableCell>
                 <TableCell sx={cabecalhoSx}>Aluno</TableCell>
-                <TableCell sx={cabecalhoSx}>Objetivo</TableCell>
-                <TableCell sx={cabecalhoSx}>Frequência</TableCell>
                 <TableCell sx={cabecalhoSx}>Status</TableCell>
-                <TableCell align="right" sx={cabecalhoSx}>
+                <TableCell align="center" sx={cabecalhoSx}>
                   Ações
                 </TableCell>
               </TableRow>
@@ -303,7 +306,7 @@ export default function PlanosExportados({ glassStyle }) {
             <TableBody>
               {carregando && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={32} />
                   </TableCell>
                 </TableRow>
@@ -312,7 +315,7 @@ export default function PlanosExportados({ glassStyle }) {
               {!carregando && planosFiltrados.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={4}
                     align="center"
                     sx={{ py: 4, color: "text.secondary" }}
                   >
@@ -331,17 +334,6 @@ export default function PlanosExportados({ glassStyle }) {
                       <Typography sx={{ fontWeight: 600 }}>
                         {p.aluno}
                       </Typography>
-                      {p.divisao && (
-                        <Typography variant="caption" color="text.secondary">
-                          {p.divisao}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell sx={{ color: "text.secondary" }}>
-                      {p.objetivo}
-                    </TableCell>
-                    <TableCell sx={{ color: "text.secondary" }}>
-                      {p.frequencia}x/semana
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -351,31 +343,44 @@ export default function PlanosExportados({ glassStyle }) {
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        aria-label="Visualizar plano"
-                        onClick={() => navigate(`/planos/${p.id}`)}
-                        sx={{ mr: 1, bgcolor: "action.hover" }}
+                    <TableCell align="center">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          gap: 2,
+                          flexWrap: "wrap",
+                        }}
                       >
-                        <VisibilityOutlinedIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        aria-label="Baixar plano"
-                        onClick={() => baixarTxt(p)}
-                        sx={{ mr: 1, bgcolor: "action.hover" }}
-                      >
-                        <FileDownloadOutlinedIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        aria-label="Excluir plano"
-                        onClick={() => setPlanoParaExcluir(p)}
-                        sx={{ bgcolor: "action.hover" }}
-                      >
-                        <DeleteOutlinedIcon fontSize="small" />
-                      </IconButton>
+                        <Button
+                          size="small"
+                          color="inherit"
+                          startIcon={<VisibilityOutlinedIcon fontSize="small" />}
+                          onClick={() => navigate(`/planos/${p.id}`)}
+                          sx={{ bgcolor: "action.hover" }}
+                        >
+                          Visualizar
+                        </Button>
+                        <Button
+                          size="small"
+                          color="inherit"
+                          startIcon={<FileDownloadOutlinedIcon fontSize="small" />}
+                          onClick={() => baixarTxt(p)}
+                          sx={{ bgcolor: "action.hover" }}
+                        >
+                          Baixar .txt
+                        </Button>
+                        <Button
+                          size="small"
+                          color="inherit"
+                          startIcon={<DeleteOutlinedIcon fontSize="small" />}
+                          onClick={() => setPlanoParaExcluir(p)}
+                          sx={{ bgcolor: "action.hover" }}
+                        >
+                          Excluir
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -383,6 +388,49 @@ export default function PlanosExportados({ glassStyle }) {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog
+        open={Boolean(planoParaValidar)}
+        onClose={() => setPlanoParaValidar(null)}
+        maxWidth="xs"
+        fullWidth
+        aria-labelledby="validar-plano-titulo"
+        aria-describedby="validar-plano-descricao"
+        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle
+          id="validar-plano-titulo"
+          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
+        >
+          Validação necessária
+        </DialogTitle>
+
+        <DialogContent>
+          <Typography id="validar-plano-descricao" color="text.secondary">
+            Para baixar o plano de treino em TXT você precisa visualizá-lo e
+            validá-lo antes.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions
+          sx={{ px: 3, pb: 2, pt: 1, gap: 1, justifyContent: "space-between" }}
+        >
+          <Button color="inherit" onClick={() => setPlanoParaValidar(null)}>
+            Voltar
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              navigate(`/planos/${planoParaValidar.id}`);
+              setPlanoParaValidar(null);
+            }}
+          >
+            Visualizar plano
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={Boolean(planoParaExcluir)}

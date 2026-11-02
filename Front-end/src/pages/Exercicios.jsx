@@ -5,6 +5,7 @@ import {
   Typography,
   Button,
   TextField,
+  InputAdornment,
   MenuItem,
   ListSubheader,
   Grid,
@@ -24,6 +25,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import CloseIcon from "@mui/icons-material/Close";
@@ -94,6 +96,8 @@ export default function Exercicios({ glassStyle }) {
   const [carregando, setCarregando] = useState(
     () => !temCache(obterChaveExercicios()),
   );
+  const [busca, setBusca] = useState("");
+  const [ordem, setOrdem] = useState("asc");
   const [formAberto, setFormAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [idParaExcluir, setIdParaExcluir] = useState(null);
@@ -125,6 +129,16 @@ export default function Exercicios({ glassStyle }) {
   useEffect(() => {
     carregarExercicios();
   }, []);
+
+  const exerciciosFiltrados = exercicios
+    .filter((ex) =>
+      ex.nome.toLowerCase().includes(busca.trim().toLowerCase()),
+    )
+    .sort((a, b) =>
+      ordem === "asc"
+        ? a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
+        : b.nome.localeCompare(a.nome, "pt-BR", { sensitivity: "base" }),
+    );
 
   const handleChange = (campo) => (e) =>
     setForm((anterior) => ({ ...anterior, [campo]: e.target.value }));
@@ -379,6 +393,35 @@ export default function Exercicios({ glassStyle }) {
         </Box>
       </Dialog>
 
+      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+        <TextField
+          placeholder="Pesquisar por nome do exercício"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          sx={{ flex: "1 1 300px" }}
+          slotProps={{
+            htmlInput: { "aria-label": "Pesquisar exercícios por nome" },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <TextField
+          select
+          label="Ordenar por"
+          value={ordem}
+          onChange={(e) => setOrdem(e.target.value)}
+          sx={{ minWidth: 160 }}
+        >
+          <MenuItem value="asc">A–Z</MenuItem>
+          <MenuItem value="desc">Z–A</MenuItem>
+        </TextField>
+      </Box>
+
       <Paper
         elevation={0}
         sx={{ ...glassStyle, borderRadius: 4, overflow: "hidden" }}
@@ -414,19 +457,21 @@ export default function Exercicios({ glassStyle }) {
                 </TableRow>
               )}
 
-              {!carregando && exercicios.length === 0 && (
+              {!carregando && exerciciosFiltrados.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={4}
                     align="center"
                     sx={{ py: 4, color: "text.secondary" }}
                   >
-                    Nenhum exercício cadastrado.
+                    {exercicios.length === 0
+                      ? "Nenhum exercício cadastrado."
+                      : "Nenhum exercício encontrado."}
                   </TableCell>
                 </TableRow>
               )}
 
-              {exercicios.map((ex) => (
+              {exerciciosFiltrados.map((ex) => (
                 <TableRow key={ex.id} hover>
                   <TableCell sx={{ fontWeight: 500 }}>{ex.nome}</TableCell>
                   <TableCell>
@@ -446,22 +491,31 @@ export default function Exercicios({ glassStyle }) {
                     {ex.descricao}
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      aria-label="Editar exercício"
-                      onClick={() => abrirEdicao(ex)}
-                      sx={{ mr: 1, bgcolor: "action.hover" }}
+                    <Box
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 1,
+                        flexWrap: "nowrap",
+                      }}
                     >
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      aria-label="Excluir exercício"
-                      onClick={() => excluir(ex.id)}
-                      sx={{ bgcolor: "action.hover" }}
-                    >
-                      <DeleteOutlinedIcon fontSize="small" />
-                    </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="Editar exercício"
+                        onClick={() => abrirEdicao(ex)}
+                        sx={{ bgcolor: "action.hover" }}
+                      >
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="Excluir exercício"
+                        onClick={() => excluir(ex.id)}
+                        sx={{ bgcolor: "action.hover" }}
+                      >
+                        <DeleteOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
