@@ -12,6 +12,11 @@ public class Treino
     // FK opcional que vincula ao Personal que gerou o treino
     public int? UsuarioId { get; set; }
 
+    // FK opcional que vincula à dica sorteada conforme o objetivo do aluno para exibição no PDF exportado
+    public int? DicaObjetivoId { get; set; }
+
+    public DicaObjetivo? DicaObjetivo { get; set; }
+
     // Título descritivo gerado pelo motor (ex: "Protocolo Emagrecimento Feminino - ABA (3x)")
     public string NomePlano { get; set; } = string.Empty;
 

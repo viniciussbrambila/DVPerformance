@@ -5,7 +5,6 @@ namespace DVPerformance.Api.Models;
 public class Maquina
 {
     private string _grupo = string.Empty;
-    private string _regiao = string.Empty;
 
     public int Id { get; set; }
 
@@ -19,11 +18,7 @@ public class Maquina
 
     // Propriedades calculadas/compatíveis com o JSON do Front-end (lidas direto de GrupoMuscular)
     [NotMapped]
-    public string Regiao
-    {
-        get => GrupoMuscular?.Regiao ?? _regiao;
-        set => _regiao = value ?? string.Empty;
-    }
+    public string Regiao => GrupoMuscular?.Regiao ?? string.Empty;
 
     [NotMapped]
     public string Grupo
@@ -35,7 +30,7 @@ public class Maquina
     // Dicionário de Dados (descricao): varchar(255), opcional (Nulo = Sim)
     public string Descricao { get; set; } = string.Empty;
 
-    // Chave estrangeira opcional para vincular ao Administrador/Personal que cadastrou (ou null se for padrão do sistema - RF03)
+    // Chave estrangeira que vincula ao Administrador/Personal que cadastrou (RF03)
     public int? UsuarioId { get; set; }
 
     // Exclusão lógica (Soft Delete): mantém o histórico no banco quando desativada (false)

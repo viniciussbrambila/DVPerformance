@@ -22,8 +22,9 @@ public static class DashboardEndpoints
                         totalAlunos = db.Alunos.Count(a => a.Ativo && a.UsuarioId == u.Id),
                         totalPlanos = db.Treinos.Count(t =>
                             t.Ativo &&
-                            (t.UsuarioId == u.Id || t.UsuarioId == null) &&
-                            (t.Aluno == null || t.Aluno.Ativo))
+                            t.UsuarioId == u.Id &&
+                            t.Aluno != null &&
+                            t.Aluno.Ativo)
                     })
                     .FirstOrDefaultAsync();
 
@@ -32,7 +33,7 @@ public static class DashboardEndpoints
 
             var totalAlunosAtivos = await db.Alunos.AsNoTracking().CountAsync(a => a.Ativo);
             var totalPlanosAtivos = await db.Treinos.AsNoTracking()
-                .CountAsync(t => t.Ativo && (t.Aluno == null || t.Aluno.Ativo));
+                .CountAsync(t => t.Ativo && t.Aluno != null && t.Aluno.Ativo);
 
             return Results.Ok(new
             {

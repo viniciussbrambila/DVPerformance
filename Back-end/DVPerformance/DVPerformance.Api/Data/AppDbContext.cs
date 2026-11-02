@@ -19,6 +19,8 @@ public class AppDbContext : DbContext
 
     public DbSet<Maquina> Maquinas { get; set; }
 
+    public DbSet<DicaObjetivo> DicasObjetivo { get; set; }
+
     public DbSet<Treino> Treinos { get; set; }
 
     public DbSet<ItemTreino> ItensTreino { get; set; }
@@ -253,7 +255,93 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // 6. Mapeamento da tabela 'treinos' (Cabeçalho da Ficha de Treino gerada para o Aluno)
+        // 6. Mapeamento da tabela mestre 'dicas_objetivo' (12 dicas contextualizadas para cada um dos 4 objetivos para exibição aleatória no PDF)
+        modelBuilder.Entity<DicaObjetivo>(entity =>
+        {
+            entity.ToTable("dicas_objetivo");
+
+            entity.HasKey(d => d.Id);
+
+            entity.Property(d => d.Id)
+                  .HasColumnName("id");
+
+            entity.Property(d => d.Objetivo)
+                  .HasColumnName("objetivo")
+                  .HasMaxLength(30)
+                  .IsRequired();
+
+            entity.Property(d => d.Texto)
+                  .HasColumnName("texto")
+                  .HasMaxLength(400)
+                  .IsRequired();
+
+            entity.Property(d => d.Ativo)
+                  .HasColumnName("ativo")
+                  .HasDefaultValue(true)
+                  .IsRequired();
+
+            entity.HasIndex(d => new { d.Objetivo, d.Ativo });
+
+            entity.HasData(
+                // ==================== HIPERTROFIA (12 dicas) ====================
+                new DicaObjetivo { Id = 1, Objetivo = "Hipertrofia", Ativo = true, Texto = "Priorize a execução controlada na fase excêntrica (descida do peso) em cada repetição, mantendo a tensão mecânica constante no músculo-alvo para maximizar o estímulo de hipertrofia." },
+                new DicaObjetivo { Id = 2, Objetivo = "Hipertrofia", Ativo = true, Texto = "Busque a progressão gradual de carga ou de repetições semana após semana, sempre preservando a amplitude completa do movimento antes de aumentar o peso." },
+                new DicaObjetivo { Id = 3, Objetivo = "Hipertrofia", Ativo = true, Texto = "Respeite os intervalos de descanso prescritos entre as séries para recuperar sua capacidade de contração e manter um alto volume de carga útil durante toda a sessão." },
+                new DicaObjetivo { Id = 4, Objetivo = "Hipertrofia", Ativo = true, Texto = "O crescimento muscular acontece durante a recuperação: priorize de 7 a 9 horas de sono reparador por noite para otimizar a síntese proteica e a regeneração das fibras." },
+                new DicaObjetivo { Id = 5, Objetivo = "Hipertrofia", Ativo = true, Texto = "Mantenha uma ingestão adequada de proteínas fracionada ao longo do dia e hidratação constante para fornecer os nutrientes necessários à construção de massa magra." },
+                new DicaObjetivo { Id = 6, Objetivo = "Hipertrofia", Ativo = true, Texto = "Leve as séries de trabalho próximas à falha concêntrica com segurança técnica, evitando compensações posturais ou impulsos que roubem o esforço do músculo principal." },
+                new DicaObjetivo { Id = 7, Objetivo = "Hipertrofia", Ativo = true, Texto = "Concentre-se na conexão mente-músculo durante cada série, sentindo o alongamento completo e o pico de contração antes de iniciar a próxima repetição." },
+                new DicaObjetivo { Id = 8, Objetivo = "Hipertrofia", Ativo = true, Texto = "Realize o cardio pós-treino na intensidade moderada indicada na ficha para melhorar a sensibilidade à insulina e o condicionamento sem comprometer a recuperação muscular." },
+                new DicaObjetivo { Id = 9, Objetivo = "Hipertrofia", Ativo = true, Texto = "Não pule as séries iniciais de aquecimento articular e específico: elas preparam tendões e sistema nervoso para suportar cargas mais produtivas nas séries principais." },
+                new DicaObjetivo { Id = 10, Objetivo = "Hipertrofia", Ativo = true, Texto = "A constância semanal supera treinos isolados extremos: cumprir todas as sessões planejadas garante a frequência ideal de estímulo para cada grupamento muscular." },
+                new DicaObjetivo { Id = 11, Objetivo = "Hipertrofia", Ativo = true, Texto = "Anote as cargas utilizadas nos exercícios base do seu protocolo para acompanhar sua evolução real e identificar o momento exato de progredir nos treinos seguintes." },
+                new DicaObjetivo { Id = 12, Objetivo = "Hipertrofia", Ativo = true, Texto = "Evite treinar o mesmo grupo muscular em dias consecutivos fora da divisão prescrita, garantindo a supercompensação necessária para o ganho sólido de volume muscular." },
+
+                // ==================== EMAGRECIMENTO (12 dicas) ====================
+                new DicaObjetivo { Id = 13, Objetivo = "Emagrecimento", Ativo = true, Texto = "Mantenha os intervalos de descanso curtos e rigorosos conforme prescrito na ficha para sustentar a frequência cardíaca elevada e ampliar o gasto calórico da sessão." },
+                new DicaObjetivo { Id = 14, Objetivo = "Emagrecimento", Ativo = true, Texto = "A musculação é essencial no emagrecimento: preservar e estimular sua massa magra mantém o metabolismo basal ativo e evita a flacidez durante a redução de gordura." },
+                new DicaObjetivo { Id = 15, Objetivo = "Emagrecimento", Ativo = true, Texto = "Combine o treino de força com o cardio pós-treino indicado no protocolo para potencializar a oxidação de gorduras aproveitando a depleção prévia de glicogênio." },
+                new DicaObjetivo { Id = 16, Objetivo = "Emagrecimento", Ativo = true, Texto = "Aumente seu nível de movimento fora da academia: caminhar mais no dia a dia, usar escadas e evitar longos períodos sentado acelera significativamente o gasto energético semanal." },
+                new DicaObjetivo { Id = 17, Objetivo = "Emagrecimento", Ativo = true, Texto = "Mantenha excelente hidratação antes, durante e após o treino; o consumo adequado de água otimiza o metabolismo energético, o desempenho físico e o controle da saciedade." },
+                new DicaObjetivo { Id = 18, Objetivo = "Emagrecimento", Ativo = true, Texto = "Não reduza drasticamente as cargas por estar em foco de perda de gordura: manter treinos intensos sinaliza ao organismo que a musculatura deve ser preservada." },
+                new DicaObjetivo { Id = 19, Objetivo = "Emagrecimento", Ativo = true, Texto = "Alinhe a regularidade dos treinos a uma alimentação equilibrada em déficit calórico sustentável, priorizando alimentos naturais, fibras e bom aporte de proteínas." },
+                new DicaObjetivo { Id = 20, Objetivo = "Emagrecimento", Ativo = true, Texto = "Cuide da qualidade do sono diariamente: noites mal dormidas desregulam hormônios ligados à fome e ao estresse, dificultando a queima de gordura e a disposição para treinar." },
+                new DicaObjetivo { Id = 21, Objetivo = "Emagrecimento", Ativo = true, Texto = "Evite compensar o gasto do treino com excessos alimentares: a consistência diária entre exercício e nutrição é o que constrói resultados duradouros na composição corporal." },
+                new DicaObjetivo { Id = 22, Objetivo = "Emagrecimento", Ativo = true, Texto = "Acompanhe sua evolução por medidas corporais, roupas e desempenho nos treinos, pois a balança isoladamente não diferencia perda de gordura de ganho de massa muscular." },
+                new DicaObjetivo { Id = 23, Objetivo = "Emagrecimento", Ativo = true, Texto = "Execute os exercícios multiarticulares com empenho e boa amplitude, pois movimentos que recrutam grandes grupos musculares demandam muito mais energia do organismo." },
+                new DicaObjetivo { Id = 24, Objetivo = "Emagrecimento", Ativo = true, Texto = "Mesmo nos dias de menor disposição, cumpra a sessão planejada: manter o hábito ativo é mais eficiente para o emagrecimento do que buscar perfeição apenas em alguns dias." },
+
+                // ==================== FORÇA (12 dicas) ====================
+                new DicaObjetivo { Id = 25, Objetivo = "Força", Ativo = true, Texto = "Respeite integralmente os tempos mais longos de descanso entre as séries: eles são indispensáveis para restaurar os estoques de ATP-CP e o sistema nervoso central." },
+                new DicaObjetivo { Id = 26, Objetivo = "Força", Ativo = true, Texto = "Ative firmemente o core e controle a respiração (estabilização intra-abdominal) antes de cada repetição pesada para proteger a coluna e transferir mais força ao movimento." },
+                new DicaObjetivo { Id = 27, Objetivo = "Força", Ativo = true, Texto = "Realize séries progressivas de aquecimento específico no primeiro exercício do dia antes de entrar na carga máxima de trabalho, preparando articulações e recrutamento neural." },
+                new DicaObjetivo { Id = 28, Objetivo = "Força", Ativo = true, Texto = "Imprima intenção de velocidade na fase concêntrica (subida da carga) mantendo controle total na descida, maximizando o recrutamento das fibras musculares de maior potência." },
+                new DicaObjetivo { Id = 29, Objetivo = "Força", Ativo = true, Texto = "No treino de força, a qualidade técnica vem sempre antes do ego: interrompa a série caso perceba perda do alinhamento articular ou compensações perigosas na postura." },
+                new DicaObjetivo { Id = 30, Objetivo = "Força", Ativo = true, Texto = "Garanta pés bem plantados no solo, escápulas estabilizadas e pegada firme na barra ou equipamento antes de iniciar cada repetição para evitar dissipação de força." },
+                new DicaObjetivo { Id = 31, Objetivo = "Força", Ativo = true, Texto = "Pequenos incrementos de carga ao longo das semanas geram grandes ganhos de força a médio prazo sem sobrecarregar tendões, ligamentos e articulações." },
+                new DicaObjetivo { Id = 32, Objetivo = "Força", Ativo = true, Texto = "Priorize os exercícios multiarticulares livres ou guiados do início da ficha enquanto o sistema nervoso está descansado, pois são eles que constroem sua base de força." },
+                new DicaObjetivo { Id = 33, Objetivo = "Força", Ativo = true, Texto = "Mantenha o cardio leve conforme prescrito na ficha apenas como suporte cardiovascular e aquecimento, preservando suas reservas energéticas para as séries pesadas." },
+                new DicaObjetivo { Id = 34, Objetivo = "Força", Ativo = true, Texto = "Cuide da mobilidade de tornozelos, quadris e ombros regularmente: articulações móveis e estáveis permitem alavancas mecânicas muito mais seguras e eficientes sob carga." },
+                new DicaObjetivo { Id = 35, Objetivo = "Força", Ativo = true, Texto = "Valorize os dias de descanso da sua divisão semanal, pois adaptações neurais e estruturais de força exigem recuperação completa entre sessões intensas." },
+                new DicaObjetivo { Id = 36, Objetivo = "Força", Ativo = true, Texto = "Mantenha um bom aporte energético e hidratação adequada antes de treinar; estoques plenos de glicogênio muscular são fundamentais para sustentar cargas elevadas." },
+
+                // ==================== RESISTÊNCIA (12 dicas) ====================
+                new DicaObjetivo { Id = 37, Objetivo = "Resistência", Ativo = true, Texto = "Mantenha um ritmo cadenciado e respiração fluida do início ao fim de cada série longa, evitando prender o ar para retardar a instalação precoce da fadiga periférica." },
+                new DicaObjetivo { Id = 38, Objetivo = "Resistência", Ativo = true, Texto = "Controle a escolha da carga para completar toda a faixa de repetições altas prescrita mantendo a postura impecável até a última repetição da série." },
+                new DicaObjetivo { Id = 39, Objetivo = "Resistência", Ativo = true, Texto = "Respeite os intervalos reduzidos de descanso entre as séries para estimular a capilarização muscular, a eficiência mitocondrial e a tolerância à acidose metabólica." },
+                new DicaObjetivo { Id = 40, Objetivo = "Resistência", Ativo = true, Texto = "Capriche na hidratação ao longo do dia e durante a sessão: a perda hídrica reduz rapidamente o rendimento em treinos de resistência muscular e aeróbica." },
+                new DicaObjetivo { Id = 41, Objetivo = "Resistência", Ativo = true, Texto = "Execute o cardio contínuo pós-treino na zona aeróbica orientada para fortalecer o sistema cardiorrespiratório e acelerar a remoção de metabólitos entre os esforços." },
+                new DicaObjetivo { Id = 42, Objetivo = "Resistência", Ativo = true, Texto = "Não encurte a amplitude das repetições quando a queimação muscular surgir: manter o movimento completo sob fadiga controlada é o que desenvolve resistência real." },
+                new DicaObjetivo { Id = 43, Objetivo = "Resistência", Ativo = true, Texto = "Garanta uma ingestão equilibrada de carboidratos de qualidade na rotina alimentar para manter os estoques de energia necessários às sessões de maior volume de repetições." },
+                new DicaObjetivo { Id = 44, Objetivo = "Resistência", Ativo = true, Texto = "Mantenha ombros, pescoço e musculaturas acessórias livres de tensão desnecessária durante o exercício para economizar energia e focar o esforço nos músculos-alvo." },
+                new DicaObjetivo { Id = 45, Objetivo = "Resistência", Ativo = true, Texto = "A evolução na resistência aparece quando o mesmo esforço passa a parecer mais leve e sua recuperação entre as séries se torna cada vez mais rápida." },
+                new DicaObjetivo { Id = 46, Objetivo = "Resistência", Ativo = true, Texto = "Alongamentos leves e exercícios de mobilidade após a sessão ajudam a aliviar a rigidez muscular e preservar a fluidez articular ao longo da semana de treinos." },
+                new DicaObjetivo { Id = 47, Objetivo = "Resistência", Ativo = true, Texto = "Mantenha regularidade absoluta na frequência semanal: adaptações aeróbicas e de resistência muscular respondem de forma excelente à continuidade dos estímulos." },
+                new DicaObjetivo { Id = 48, Objetivo = "Resistência", Ativo = true, Texto = "Preste atenção redobrada à estabilidade do core no final das séries longas, garantindo que a fadiga não comprometa o alinhamento da coluna lombar." }
+            );
+        });
+
+        // 7. Mapeamento da tabela 'treinos' (Cabeçalho da Ficha de Treino gerada para o Aluno)
         modelBuilder.Entity<Treino>(entity =>
         {
             entity.ToTable("treinos");
@@ -269,6 +357,9 @@ public class AppDbContext : DbContext
 
             entity.Property(t => t.UsuarioId)
                   .HasColumnName("usuario_id");
+
+            entity.Property(t => t.DicaObjetivoId)
+                  .HasColumnName("dica_objetivo_id");
 
             entity.Property(t => t.NomePlano)
                   .HasColumnName("nome_plano")
@@ -310,13 +401,18 @@ public class AppDbContext : DbContext
                   .HasForeignKey(t => t.UsuarioId)
                   .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasOne(t => t.DicaObjetivo)
+                  .WithMany()
+                  .HasForeignKey(t => t.DicaObjetivoId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasMany(t => t.Itens)
                   .WithOne(i => i.Treino)
                   .HasForeignKey(i => i.TreinoId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // 7. Mapeamento da tabela 'itens_treino' (ItemTreino: id_item, divisao_treino, ordem_exercicio, series, repeticao, tempo_descanso, tempo_aerobico + FKs para exercicios e maquinas)
+        // 8. Mapeamento da tabela 'itens_treino' (ItemTreino: id_item, divisao_treino, ordem_exercicio, series, repeticao, tempo_descanso, tempo_aerobico + FKs para exercicios e maquinas)
         modelBuilder.Entity<ItemTreino>(entity =>
         {
             entity.ToTable("itens_treino");

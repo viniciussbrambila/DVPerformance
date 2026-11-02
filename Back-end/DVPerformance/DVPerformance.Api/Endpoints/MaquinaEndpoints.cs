@@ -31,8 +31,8 @@ public static class MaquinaEndpoints
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
-                // RF03: Retorna as máquinas da conta deste Personal (e eventuais registros sem vínculo)
-                query = query.Where(m => m.UsuarioId == usuarioId.Value || m.UsuarioId == null);
+                // RF03: Retorna exclusivamente as máquinas da conta deste Personal
+                query = query.Where(m => m.UsuarioId == usuarioId.Value);
 
                 var maquinasPersonal = await query
                     .OrderBy(m => m.GrupoMuscular!.Regiao)
@@ -83,9 +83,14 @@ public static class MaquinaEndpoints
         });
 
         // POST /maquinas -> Cadastra uma nova máquina na conta do Personal vinculada a grupos_musculares (RF03 / RN18)
-        grupo.MapPost("/", async (Maquina? novaMaquina, AppDbContext db) =>
+        grupo.MapPost("/", async (int? usuarioId, Maquina? novaMaquina, AppDbContext db) =>
         {
-            var (erros, grupoMuscular) = await ValidarMaquinaAsync(novaMaquina, db);
+            if (novaMaquina is not null && (!novaMaquina.UsuarioId.HasValue || novaMaquina.UsuarioId.Value <= 0) && usuarioId.HasValue && usuarioId.Value > 0)
+            {
+                novaMaquina.UsuarioId = usuarioId.Value;
+            }
+
+            var (erros, grupoMuscular) = await ValidarMaquinaAsync(novaMaquina, db, exigirUsuarioId: true);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -97,58 +102,56 @@ public static class MaquinaEndpoints
 
             var nomeLimpo = novaMaquina!.Nome.Trim();
             var descricaoLimpa = novaMaquina.Descricao?.Trim() ?? string.Empty;
+            var donoId = novaMaquina.UsuarioId!.Value;
 
-            if (novaMaquina.UsuarioId.HasValue && novaMaquina.UsuarioId.Value > 0)
+            var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == donoId && u.Ativo);
+            if (usuario is null)
             {
-                var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == novaMaquina.UsuarioId.Value && u.Ativo);
-                if (usuario is null)
+                return Results.BadRequest(new
                 {
-                    return Results.BadRequest(new
+                    mensagem = "O usuário informado não foi encontrado.",
+                    erros = new[] { "A conta informada (usuarioId) não existe ou está desativada no banco de dados." }
+                });
+            }
+
+            // RN18: A atualização e manutenção do catálogo de máquinas deve ser restrita ao Administrador
+            if (!string.Equals(usuario.Perfil, "admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Json(new
+                {
+                    mensagem = "Acesso negado.",
+                    erros = new[] { "RN18: Apenas usuários com perfil de Administrador podem cadastrar ou manter máquinas no catálogo." }
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, usuario);
+
+            var mesmoNomeExistente = await db.Maquinas
+                .Include(m => m.GrupoMuscular)
+                .FirstOrDefaultAsync(m =>
+                    m.UsuarioId == donoId &&
+                    m.Nome.ToLower() == nomeLimpo.ToLower());
+
+            if (mesmoNomeExistente is not null)
+            {
+                if (mesmoNomeExistente.Ativo)
+                {
+                    return Results.Conflict(new
                     {
-                        mensagem = "O usuário informado não foi encontrado.",
-                        erros = new[] { "A conta informada (usuarioId) não existe ou está desativada no banco de dados." }
+                        mensagem = "Esta máquina já está cadastrada na sua conta.",
+                        erros = new[] { "Você já possui uma máquina ativa com este nome no seu catálogo." }
                     });
                 }
 
-                // RN18: A atualização e manutenção do catálogo de máquinas deve ser restrita ao Administrador
-                if (!string.Equals(usuario.Perfil, "admin", StringComparison.OrdinalIgnoreCase))
-                {
-                    return Results.Json(new
-                    {
-                        mensagem = "Acesso negado.",
-                        erros = new[] { "RN18: Apenas usuários com perfil de Administrador podem cadastrar ou manter máquinas no catálogo." }
-                    }, statusCode: StatusCodes.Status403Forbidden);
-                }
+                // Se estava removida (Soft Delete), reativa e atualiza com os dados informados pelo Personal
+                mesmoNomeExistente.Nome = nomeLimpo;
+                mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
+                mesmoNomeExistente.GrupoMuscular = grupoMuscular;
+                mesmoNomeExistente.Descricao = descricaoLimpa;
+                mesmoNomeExistente.Ativo = true;
 
-                await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, usuario);
-
-                var mesmoNomeExistente = await db.Maquinas
-                    .Include(m => m.GrupoMuscular)
-                    .FirstOrDefaultAsync(m =>
-                        m.UsuarioId == novaMaquina.UsuarioId.Value &&
-                        m.Nome.ToLower() == nomeLimpo.ToLower());
-
-                if (mesmoNomeExistente is not null)
-                {
-                    if (mesmoNomeExistente.Ativo)
-                    {
-                        return Results.Conflict(new
-                        {
-                            mensagem = "Esta máquina já está cadastrada na sua conta.",
-                            erros = new[] { "Você já possui uma máquina ativa com este nome no seu catálogo." }
-                        });
-                    }
-
-                    // Se estava removida (Soft Delete), reativa e atualiza com os dados informados pelo Personal
-                    mesmoNomeExistente.Nome = nomeLimpo;
-                    mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
-                    mesmoNomeExistente.GrupoMuscular = grupoMuscular;
-                    mesmoNomeExistente.Descricao = descricaoLimpa;
-                    mesmoNomeExistente.Ativo = true;
-
-                    await db.SaveChangesAsync();
-                    return Results.Created($"/maquinas/{mesmoNomeExistente.Id}", mesmoNomeExistente);
-                }
+                await db.SaveChangesAsync();
+                return Results.Created($"/maquinas/{mesmoNomeExistente.Id}", mesmoNomeExistente);
             }
 
             novaMaquina.Id = 0; // Garante geração automática de ID pelo PostgreSQL (SERIAL)
@@ -216,7 +219,7 @@ public static class MaquinaEndpoints
                 return Results.NotFound(new { mensagem = "Máquina não encontrada ou desativada." });
             }
 
-            var (erros, grupoMuscular) = await ValidarMaquinaAsync(dadosAtualizados, db);
+            var (erros, grupoMuscular) = await ValidarMaquinaAsync(dadosAtualizados, db, exigirUsuarioId: false);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -226,9 +229,13 @@ public static class MaquinaEndpoints
                 });
             }
 
-            if (dadosAtualizados!.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+            var donoVerificarId = (dadosAtualizados!.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+                ? dadosAtualizados.UsuarioId.Value
+                : maquinaExistente.UsuarioId;
+
+            if (donoVerificarId.HasValue && donoVerificarId.Value > 0)
             {
-                var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == dadosAtualizados.UsuarioId.Value && u.Ativo);
+                var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == donoVerificarId.Value && u.Ativo);
                 if (usuario is null)
                 {
                     return Results.BadRequest(new
@@ -248,7 +255,10 @@ public static class MaquinaEndpoints
                     }, statusCode: StatusCodes.Status403Forbidden);
                 }
 
-                maquinaExistente.UsuarioId = dadosAtualizados.UsuarioId;
+                if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+                {
+                    maquinaExistente.UsuarioId = dadosAtualizados.UsuarioId;
+                }
             }
 
             maquinaExistente.Nome = dadosAtualizados.Nome.Trim();
@@ -280,35 +290,13 @@ public static class MaquinaEndpoints
 
             return Results.NoContent();
         });
-
-        // PATCH /maquinas/{id}/reativar -> Reativa uma máquina desativada anteriormente
-        grupo.MapPatch("/{id:int}/reativar", async (int id, AppDbContext db) =>
-        {
-            if (id <= 0)
-            {
-                return Results.BadRequest(new { mensagem = "O ID da máquina deve ser um número inteiro positivo." });
-            }
-
-            var maquina = await db.Maquinas
-                .Include(m => m.GrupoMuscular)
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-            if (maquina is null)
-            {
-                return Results.NotFound(new { mensagem = "Máquina não encontrada." });
-            }
-
-            maquina.Ativo = true;
-            await db.SaveChangesAsync();
-
-            return Results.Ok(maquina);
-        });
     }
 
     // Valida os atributos da Máquina conforme a seção 8.1 (Dicionário de Dados - pág. 21) do Documento de Estágio
     private static async Task<(List<string> erros, GrupoMuscular? grupoMuscular)> ValidarMaquinaAsync(
         Maquina? maquina,
-        AppDbContext db)
+        AppDbContext db,
+        bool exigirUsuarioId)
     {
         var erros = new List<string>();
 
@@ -352,6 +340,12 @@ public static class MaquinaEndpoints
         if (descricao.Length > 255)
         {
             erros.Add("A descrição da máquina deve ter no máximo 255 caracteres.");
+        }
+
+        // 4. Vínculo obrigatório com o Personal/Administrador responsável no cadastro
+        if (exigirUsuarioId && (!maquina.UsuarioId.HasValue || maquina.UsuarioId.Value <= 0))
+        {
+            erros.Add("Informe o ID do usuário (usuarioId) responsável pelo cadastro da máquina.");
         }
 
         return (erros, grupoEncontrado);

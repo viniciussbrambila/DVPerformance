@@ -155,58 +155,6 @@ public static class AuthEndpoints
                 mensagem = "Senha alterada com sucesso! Você já pode entrar com a nova senha."
             });
         });
-
-        // DELETE /auth/usuarios/{id} -> Desativa a conta do Personal (Soft Delete) mantendo o histórico
-        grupo.MapDelete("/usuarios/{id:int}", async (int id, AppDbContext db) =>
-        {
-            if (id <= 0)
-            {
-                return Results.BadRequest(new { mensagem = "O ID do usuário deve ser um número inteiro positivo." });
-            }
-
-            var conta = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == id && u.Ativo);
-            if (conta is null)
-            {
-                return Results.NotFound(new { mensagem = "Usuário não encontrado ou já desativado." });
-            }
-
-            conta.Ativo = false;
-            await db.SaveChangesAsync();
-
-            return Results.NoContent();
-        });
-
-        // PATCH /auth/usuarios/{id}/reativar -> Reativa uma conta de Personal desativada anteriormente
-        grupo.MapPatch("/usuarios/{id:int}/reativar", async (int id, AppDbContext db) =>
-        {
-            if (id <= 0)
-            {
-                return Results.BadRequest(new { mensagem = "O ID do usuário deve ser um número inteiro positivo." });
-            }
-
-            var conta = await db.Usuarios.FindAsync(id);
-            if (conta is null)
-            {
-                return Results.NotFound(new { mensagem = "Usuário não encontrado." });
-            }
-
-            conta.Ativo = true;
-            await db.SaveChangesAsync();
-
-            if (!conta.CatalogoInicializado)
-            {
-                await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, conta);
-            }
-
-            return Results.Ok(new
-            {
-                id = conta.Id,
-                usuario = conta.NomeUsuario,
-                perfil = conta.Perfil,
-                ativo = conta.Ativo,
-                mensagem = "Conta reativada com sucesso."
-            });
-        });
     }
 
     private static List<string> ValidarCadastro(AuthRequest? dados)

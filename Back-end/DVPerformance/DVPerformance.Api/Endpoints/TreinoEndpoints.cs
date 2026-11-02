@@ -21,16 +21,22 @@ public static class TreinoEndpoints
         "Rascunho", "Validado", "Exportado"
     };
 
+    private static readonly HashSet<string> ObjetivosComDicas = new()
+    {
+        "Hipertrofia", "Emagrecimento", "Força", "Resistência"
+    };
+
     public static void MapTreinoEndpoints(this WebApplication app)
     {
         var grupo = app.MapGroup("/treinos");
 
-        // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos já enriquecidos com dados do aluno, status e dias agrupados
+        // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos já enriquecidos com dados do aluno, dica sorteada, status e dias agrupados
         grupo.MapGet("/", async (int? usuarioId, int? alunoId, bool? incluirInativos, AppDbContext db) =>
         {
             var query = db.Treinos
                 .AsNoTracking()
                 .Include(t => t.Aluno)
+                .Include(t => t.DicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -46,7 +52,7 @@ public static class TreinoEndpoints
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
-                query = query.Where(t => t.UsuarioId == usuarioId.Value || t.UsuarioId == null);
+                query = query.Where(t => t.UsuarioId == usuarioId.Value);
             }
 
             if (alunoId.HasValue && alunoId.Value > 0)
@@ -61,7 +67,7 @@ public static class TreinoEndpoints
             return Results.Ok(lista.Select(FormatarPlanoResposta));
         });
 
-        // GET /treinos/{id} -> Busca uma ficha de treino específica pelo ID com todos os itens e dias estruturados
+        // GET /treinos/{id} -> Busca uma ficha de treino específica pelo ID com todos os itens, dica do objetivo e dias estruturados
         grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
         {
             if (id <= 0)
@@ -72,6 +78,7 @@ public static class TreinoEndpoints
             var treino = await db.Treinos
                 .AsNoTracking()
                 .Include(t => t.Aluno)
+                .Include(t => t.DicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -100,6 +107,7 @@ public static class TreinoEndpoints
                 .AsNoTracking()
                 .Where(t => t.AlunoId == alunoId && t.Ativo)
                 .Include(t => t.Aluno)
+                .Include(t => t.DicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -141,13 +149,13 @@ public static class TreinoEndpoints
             var exerciciosDisponiveis = await db.Exercicios
                 .AsNoTracking()
                 .Include(e => e.GrupoMuscular)
-                .Where(e => e.Ativo && (donoId == null || e.UsuarioId == donoId || e.UsuarioId == null))
+                .Where(e => e.Ativo && (donoId == null || e.UsuarioId == donoId))
                 .ToListAsync();
 
             var maquinasDisponiveis = await db.Maquinas
                 .AsNoTracking()
                 .Include(m => m.GrupoMuscular)
-                .Where(m => m.Ativo && (donoId == null || m.UsuarioId == donoId || m.UsuarioId == null))
+                .Where(m => m.Ativo && (donoId == null || m.UsuarioId == donoId))
                 .ToListAsync();
 
             if (donoId is null)
@@ -172,6 +180,16 @@ public static class TreinoEndpoints
                 });
             }
 
+            // Busca todo o histórico cronológico de dicas já recebidas por este aluno (ativos e inativos)
+            // para garantir que nenhuma dica se repita até que todas as dicas do objetivo tenham aparecido
+            var historicoDicasAluno = await db.Treinos
+                .AsNoTracking()
+                .Where(t => t.AlunoId == aluno.Id && t.DicaObjetivoId != null)
+                .OrderBy(t => t.DataCriacao)
+                .ThenBy(t => t.Id)
+                .Select(t => t.DicaObjetivoId!.Value)
+                .ToListAsync();
+
             // Desativa treinos anteriores ativos desse aluno para que o novo seja o principal (mantendo histórico)
             var treinosAnteriores = await db.Treinos
                 .Where(t => t.AlunoId == aluno.Id && t.Ativo)
@@ -182,10 +200,20 @@ public static class TreinoEndpoints
                 antigo.Ativo = false;
             }
 
-            // Executa o Motor de Prescrição Inteligente usando a tabela unificada grupos_musculares e sua OrdemPrioridade (1 a 4)
+            // Sorteia 1 nova dica contextualizada conforme o objetivo do aluno sem repetir no ciclo atual
+            var objetivoParaDica = NormalizarObjetivoParaDica(aluno.Objetivo);
+            var dicasDoObjetivo = await db.DicasObjetivo
+                .AsNoTracking()
+                .Where(d => d.Ativo && d.Objetivo == objetivoParaDica)
+                .ToListAsync();
+
+            var dicaSorteada = SortearDicaSemRepetirCiclo(dicasDoObjetivo, historicoDicasAluno);
+
+            // Executa o Motor de Prescrição Inteligente baseado exclusivamente em Experiência, Sexo, Frequência Semanal e Idade
             var novoTreino = GerarTreinoPersonalizado(
                 aluno,
                 donoId,
+                dicaSorteada?.Id,
                 gruposMusculares,
                 exerciciosDisponiveis,
                 maquinasDisponiveis);
@@ -202,10 +230,11 @@ public static class TreinoEndpoints
             db.Treinos.Add(novoTreino);
             await db.SaveChangesAsync();
 
-            // Recarrega o treino com as navegações completas (Aluno, Exercicio, Maquina e GrupoMuscular) para retornar ao cliente
+            // Recarrega o treino com as navegações completas (Aluno, DicaObjetivo, Exercicio, Maquina e GrupoMuscular) para retornar ao cliente
             var treinoSalvo = await db.Treinos
                 .AsNoTracking()
                 .Include(t => t.Aluno)
+                .Include(t => t.DicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -356,6 +385,72 @@ public static class TreinoEndpoints
         });
     }
 
+    public static string NormalizarObjetivoParaDica(string? objetivo)
+    {
+        var valor = objetivo?.Trim() ?? string.Empty;
+        return ObjetivosComDicas.Contains(valor) ? valor : "Hipertrofia";
+    }
+
+    /// <summary>
+    /// Sorteia 1 dica aleatória para o aluno garantindo que nenhuma dica se repita
+    /// enquanto todas as outras dicas daquele objetivo ainda não tiverem saído para ele.
+    /// Quando o aluno já tiver recebido todas as dicas do objetivo, inicia-se um novo ciclo completo.
+    /// </summary>
+    public static DicaObjetivo? SortearDicaSemRepetirCiclo(
+        List<DicaObjetivo> opcoes,
+        IReadOnlyList<int> historicoDicasAluno)
+    {
+        if (opcoes.Count == 0)
+        {
+            return null;
+        }
+
+        if (opcoes.Count == 1)
+        {
+            return opcoes[0];
+        }
+
+        var idsValidos = opcoes.Select(d => d.Id).ToHashSet();
+        var vistasNoCicloAtual = new HashSet<int>();
+        int? ultimaDicaDoObjetivo = null;
+
+        foreach (var dicaId in historicoDicasAluno)
+        {
+            if (!idsValidos.Contains(dicaId))
+            {
+                continue;
+            }
+
+            ultimaDicaDoObjetivo = dicaId;
+            vistasNoCicloAtual.Add(dicaId);
+
+            // Ao completar todas as dicas disponíveis daquele objetivo, reinicia o ciclo de dicas para o aluno
+            if (vistasNoCicloAtual.Count >= idsValidos.Count)
+            {
+                vistasNoCicloAtual.Clear();
+            }
+        }
+
+        var disponiveisNesteCiclo = opcoes
+            .Where(d => !vistasNoCicloAtual.Contains(d.Id))
+            .ToList();
+
+        // Na virada de um ciclo completo para o próximo, evita repetir seguida exatamente a última dica que acabou de sair
+        if (vistasNoCicloAtual.Count == 0 && ultimaDicaDoObjetivo.HasValue && disponiveisNesteCiclo.Count > 1)
+        {
+            var semRepetirUltimaDaVirada = disponiveisNesteCiclo
+                .Where(d => d.Id != ultimaDicaDoObjetivo.Value)
+                .ToList();
+
+            if (semRepetirUltimaDaVirada.Count > 0)
+            {
+                disponiveisNesteCiclo = semRepetirUltimaDaVirada;
+            }
+        }
+
+        return disponiveisNesteCiclo[Random.Shared.Next(disponiveisNesteCiclo.Count)];
+    }
+
     private static bool TentarNormalizarRepeticoes(string valorBruto, out string repeticaoNormalizada)
     {
         repeticaoNormalizada = string.Empty;
@@ -417,17 +512,19 @@ public static class TreinoEndpoints
 
     // =========================================================================
     // MOTOR DE PRESCRIÇÃO INTELIGENTE DV PERFORMANCE
+    // (Baseado exclusivamente em Experiência, Sexo, Frequência Semanal e Idade)
     // =========================================================================
     private static Treino GerarTreinoPersonalizado(
         Aluno aluno,
         int? usuarioId,
+        int? dicaObjetivoId,
         List<GrupoMuscular> gruposMusculares,
         List<Exercicio> exercicios,
         List<Maquina> maquinas)
     {
         var mapaGrupos = gruposMusculares.ToDictionary(g => g.Nome, g => g);
 
-        // 1. Parâmetros base de Séries, Repetições, Descanso e Aeróbico conforme OBJETIVO, EXPERIÊNCIA e IDADE
+        // 1. Parâmetros base de Séries, Repetições, Descanso e Aeróbico conforme EXPERIÊNCIA e IDADE (sem influência do Objetivo)
         var (seriesBase, repeticoes, descansoBase, tempoAerobicoGeral, tempoAerobicoDia) =
             CalcularParametrosFisiologicos(aluno);
 
@@ -440,21 +537,22 @@ public static class TreinoEndpoints
             _ => 0.50
         };
 
-        if (aluno.Idade >= 60)
+        if (aluno.Idade > 65)
         {
             proporcaoMaquinas = Math.Max(proporcaoMaquinas, 0.80);
         }
 
-        // 3. Monta a Matriz de Divisão Semanal (Dias e grupos musculares do dia)
+        // 3. Monta a Matriz de Divisão Semanal conforme Sexo, Frequência Semanal, Experiência e Idade
         var (nomeDivisao, diasPlanejados) = ObterDivisaoSemanal(aluno);
 
         var sufixoSexo = aluno.Sexo == "F" ? "Feminino" : "Masculino";
-        var nomePlano = $"Protocolo {aluno.Objetivo} {sufixoSexo} ({aluno.Experiencia}) - {nomeDivisao}";
+        var nomePlano = $"Protocolo {sufixoSexo} ({aluno.Experiencia}) - {nomeDivisao}";
 
         var treino = new Treino
         {
             AlunoId = aluno.Id,
             UsuarioId = usuarioId,
+            DicaObjetivoId = dicaObjetivoId,
             NomePlano = nomePlano,
             Divisao = nomeDivisao,
             TempoAerobico = tempoAerobicoGeral,
@@ -477,7 +575,7 @@ public static class TreinoEndpoints
                 .OrderBy(g => g.OrdemPrioridade)
                 .ToList();
 
-            var selecionadosDoDia = new List<(int prioridade, string nomeGrupo, Exercicio? ex, Maquina? maq)>();
+            var selecionadosDoDia = new List<(int prioridade, Exercicio? ex, Maquina? maq)>();
             int totalSlotsDia = gruposOrdenadosPorPrioridade.Count;
             int metaMaquinasDia = (int)Math.Round(totalSlotsDia * proporcaoMaquinas);
             int maquinasEscolhidasNoDia = 0;
@@ -510,11 +608,7 @@ public static class TreinoEndpoints
                     ?? maquinaEscolhida?.GrupoMuscular?.OrdemPrioridade
                     ?? grupoMuscular.OrdemPrioridade;
 
-                string nomeGrupoReal = exercicioEscolhido?.GrupoMuscular?.Nome
-                    ?? maquinaEscolhida?.GrupoMuscular?.Nome
-                    ?? grupoMuscular.Nome;
-
-                selecionadosDoDia.Add((prioridadeReal, nomeGrupoReal, exercicioEscolhido, maquinaEscolhida));
+                selecionadosDoDia.Add((prioridadeReal, exercicioEscolhido, maquinaEscolhida));
             }
 
             // Garante que mesmo em caso de substituição por outro exercício da região, a ordem final respeite estritamente 1 -> 2 -> 3 -> 4
@@ -527,12 +621,6 @@ public static class TreinoEndpoints
                     seriesItem = seriesBase - 1;
                 }
 
-                string repeticaoItem = repeticoes;
-                if (itemSelecionado.nomeGrupo is "Abdômen" or "Panturrilha" or "Lombar" && aluno.Objetivo == "Força")
-                {
-                    repeticaoItem = "12-15";
-                }
-
                 treino.Itens.Add(new ItemTreino
                 {
                     DivisaoTreino = tituloDia,
@@ -540,7 +628,7 @@ public static class TreinoEndpoints
                     ExercicioId = itemSelecionado.ex?.Id,
                     MaquinaId = itemSelecionado.maq?.Id,
                     Series = seriesItem,
-                    Repeticao = repeticaoItem,
+                    Repeticao = repeticoes,
                     TempoDescanso = descansoBase,
                     TempoAerobico = tempoAerobicoDia
                 });
@@ -553,64 +641,46 @@ public static class TreinoEndpoints
     private static (int series, string repeticoes, string descanso, string aerobicoGeral, string aerobicoDia)
         CalcularParametrosFisiologicos(Aluno aluno)
     {
-        int series = aluno.Experiencia switch
-        {
-            "Iniciante" => 3,
-            "Intermediário" => 3,
-            "Avançado" => 4,
-            _ => 3
-        };
-
+        int series;
         string repeticoes;
         int descansoSegundos;
         string aerobicoGeral;
         string aerobicoDia;
 
-        switch (aluno.Objetivo)
+        switch (aluno.Experiencia)
         {
-            case "Emagrecimento":
+            case "Iniciante":
+                series = 3;
                 repeticoes = "12-15";
-                descansoSegundos = aluno.Experiencia == "Avançado" ? 40 : 45;
-                aerobicoGeral = "25 a 30 min de cardio moderado/HIIT pós-treino em todas as sessões";
-                aerobicoDia = "25 min Esteira/Bike ou Escada (pós-treino)";
+                descansoSegundos = 60;
+                aerobicoGeral = "15 a 20 min de cardio leve a moderado pós-treino";
+                aerobicoDia = "15 min Esteira ou Bike leve/moderada";
                 break;
 
-            case "Força":
-                series = aluno.Experiencia == "Iniciante" ? 3 : 4;
-                repeticoes = "6-8";
-                descansoSegundos = 120;
-                aerobicoGeral = "10 min de mobilidade e cardio leve apenas para aquecimento";
-                aerobicoDia = "10 min Bike/Esteira leve (aquecimento)";
-                break;
-
-            case "Resistência":
-                repeticoes = "15-20";
-                descansoSegundos = 40;
-                aerobicoGeral = "20 min de cardio contínuo (zona aeróbica) pós-treino";
-                aerobicoDia = "20 min Esteira/Elíptico contínuo";
-                break;
-
-            case "Condicionamento":
-                repeticoes = "12-15";
-                descansoSegundos = 50;
-                aerobicoGeral = "20 min de cardio intervalado pós-treino";
-                aerobicoDia = "20 min Cardio intervalado (Esteira/Remo)";
-                break;
-
-            case "Hipertrofia":
-            default:
-                if (aluno.Experiencia == "Intermediário") series = 4;
+            case "Avançado":
+                series = 4;
                 repeticoes = "8-12";
-                descansoSegundos = aluno.Experiencia == "Avançado" ? 75 : 60;
-                aerobicoGeral = "15 min de cardio moderado pós-treino (sem comprometer a recuperação muscular)";
-                aerobicoDia = "15 min Caminhada inclinada / Bike leve";
+                descansoSegundos = 75;
+                aerobicoGeral = "20 a 25 min de cardio moderado ou intervalado pós-treino";
+                aerobicoDia = "20 min Cardio moderado/intervalado pós-treino";
+                break;
+
+            case "Intermediário":
+            default:
+                series = 4;
+                repeticoes = "10-12";
+                descansoSegundos = 60;
+                aerobicoGeral = "20 min de cardio moderado pós-treino";
+                aerobicoDia = "20 min Esteira, Bike ou Elíptico moderado";
                 break;
         }
 
-        if (aluno.Idade >= 60)
+        if (aluno.Idade > 65)
         {
-            descansoSegundos += 15;
             series = Math.Min(series, 3);
+            descansoSegundos += 15;
+            aerobicoGeral = "15 min de caminhada ou bicicleta ergométrica leve pós-treino";
+            aerobicoDia = "15 min Bike ergométrica / Caminhada leve";
         }
 
         return (series, repeticoes, $"{descansoSegundos}s", aerobicoGeral, aerobicoDia);
@@ -630,7 +700,7 @@ public static class TreinoEndpoints
             _ => 5
         };
 
-        if (aluno.Idade >= 60)
+        if (aluno.Idade > 65)
         {
             volumeDia = Math.Min(volumeDia, 5);
         }
@@ -670,9 +740,7 @@ public static class TreinoEndpoints
         {
             if (feminino)
             {
-                nomeDivisao = aluno.Objetivo is "Emagrecimento" or "Condicionamento"
-                    ? "ABA Metabólico Feminino (3x)"
-                    : "ABA Ênfase Inferiores (3x)";
+                nomeDivisao = "ABA Ênfase Inferiores (3x)";
 
                 dias.Add(("Treino A - Inferiores (Foco Quadríceps, Glúteos e Core)", AjustarVolume(new[]
                 {
@@ -974,7 +1042,7 @@ public static class TreinoEndpoints
         return candidato;
     }
 
-    // Monta o objeto completo do plano já com dados do Aluno, Status e Dias agrupados/ordenados para o Front-end
+    // Monta o objeto completo do plano já com dados do Aluno, Dica do Objetivo, Status e Dias agrupados/ordenados para o Front-end
     private static object FormatarPlanoResposta(Treino treino)
     {
         var itensOrdenados = (treino.Itens ?? new List<ItemTreino>())
@@ -1027,6 +1095,14 @@ public static class TreinoEndpoints
             nomePlano = treino.NomePlano,
             divisao = treino.Divisao,
             tempoAerobico = treino.TempoAerobico,
+            dicaObjetivoId = treino.DicaObjetivoId,
+            dica = treino.DicaObjetivo?.Texto ?? string.Empty,
+            dicaObjetivo = treino.DicaObjetivo is null ? null : new
+            {
+                id = treino.DicaObjetivo.Id,
+                objetivo = treino.DicaObjetivo.Objetivo,
+                texto = treino.DicaObjetivo.Texto
+            },
             status = string.IsNullOrWhiteSpace(treino.Status) ? "Rascunho" : treino.Status,
             data = treino.DataCriacao,
             dataCriacao = treino.DataCriacao,

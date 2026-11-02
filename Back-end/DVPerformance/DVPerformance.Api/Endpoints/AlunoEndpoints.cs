@@ -20,7 +20,7 @@ public static class AlunoEndpoints
 
     private static readonly HashSet<string> ObjetivosPermitidos = new()
     {
-        "Hipertrofia", "Emagrecimento", "Força", "Condicionamento", "Resistência"
+        "Hipertrofia", "Emagrecimento", "Força", "Resistência"
     };
 
     // Expressão regular que aceita apenas letras (incluindo acentuadas) e espaços
@@ -68,9 +68,14 @@ public static class AlunoEndpoints
         });
 
         // POST /alunos -> Cadastra um novo aluno no banco PostgreSQL vinculado ao Personal
-        grupo.MapPost("/", async (Aluno novoAluno, AppDbContext db) =>
+        grupo.MapPost("/", async (int? usuarioId, Aluno? novoAluno, AppDbContext db) =>
         {
-            var erros = ValidarAluno(novoAluno);
+            if (novoAluno is not null && (!novoAluno.UsuarioId.HasValue || novoAluno.UsuarioId.Value <= 0) && usuarioId.HasValue && usuarioId.Value > 0)
+            {
+                novoAluno.UsuarioId = usuarioId.Value;
+            }
+
+            var erros = ValidarAluno(novoAluno, exigirUsuarioId: true);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -80,18 +85,15 @@ public static class AlunoEndpoints
                 });
             }
 
-            // Se o Front-end enviou o UsuarioId do Personal logado, verifica se esse Personal existe e está ativo no banco
-            if (novoAluno.UsuarioId.HasValue && novoAluno.UsuarioId.Value > 0)
+            var donoId = novoAluno!.UsuarioId!.Value;
+            var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == donoId && u.Ativo);
+            if (!personalExiste)
             {
-                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoAluno.UsuarioId.Value && u.Ativo);
-                if (!personalExiste)
+                return Results.BadRequest(new
                 {
-                    return Results.BadRequest(new
-                    {
-                        mensagem = "O Personal informado não foi encontrado.",
-                        erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
-                    });
-                }
+                    mensagem = "O Personal informado não foi encontrado.",
+                    erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
+                });
             }
 
             novoAluno.Id = 0; // Garante que o PostgreSQL gere o ID automaticamente (SERIAL)
@@ -105,7 +107,7 @@ public static class AlunoEndpoints
         });
 
         // PUT /alunos/{id} -> Atualiza os dados de um aluno ativo existente no banco
-        grupo.MapPut("/{id:int}", async (int id, Aluno dadosAtualizados, AppDbContext db) =>
+        grupo.MapPut("/{id:int}", async (int id, Aluno? dadosAtualizados, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -118,7 +120,7 @@ public static class AlunoEndpoints
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou desativado." });
             }
 
-            var erros = ValidarAluno(dadosAtualizados);
+            var erros = ValidarAluno(dadosAtualizados, exigirUsuarioId: false);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -127,6 +129,8 @@ public static class AlunoEndpoints
                     erros
                 });
             }
+
+            var objetivoMudou = !string.Equals(alunoExistente.Objetivo, dadosAtualizados!.Objetivo, StringComparison.Ordinal);
 
             alunoExistente.Nome = dadosAtualizados.Nome.Trim();
             alunoExistente.Idade = dadosAtualizados.Idade;
@@ -138,6 +142,41 @@ public static class AlunoEndpoints
             if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
             {
                 alunoExistente.UsuarioId = dadosAtualizados.UsuarioId;
+            }
+
+            // Se o objetivo do aluno foi alterado, atualiza a dica dos planos ativos ainda não exportados respeitando o ciclo sem repetição
+            if (objetivoMudou)
+            {
+                var objetivoParaDica = TreinoEndpoints.NormalizarObjetivoParaDica(alunoExistente.Objetivo);
+                var dicasNovoObjetivo = await db.DicasObjetivo
+                    .AsNoTracking()
+                    .Where(d => d.Ativo && d.Objetivo == objetivoParaDica)
+                    .ToListAsync();
+
+                if (dicasNovoObjetivo.Count > 0)
+                {
+                    var historicoDicasAluno = await db.Treinos
+                        .AsNoTracking()
+                        .Where(t => t.AlunoId == alunoExistente.Id && t.DicaObjetivoId != null)
+                        .OrderBy(t => t.DataCriacao)
+                        .ThenBy(t => t.Id)
+                        .Select(t => t.DicaObjetivoId!.Value)
+                        .ToListAsync();
+
+                    var treinosNaoExportados = await db.Treinos
+                        .Where(t => t.AlunoId == alunoExistente.Id && t.Ativo && t.Status != "Exportado")
+                        .ToListAsync();
+
+                    foreach (var treino in treinosNaoExportados)
+                    {
+                        var dicaSorteada = TreinoEndpoints.SortearDicaSemRepetirCiclo(dicasNovoObjetivo, historicoDicasAluno);
+                        if (dicaSorteada is not null)
+                        {
+                            treino.DicaObjetivoId = dicaSorteada.Id;
+                            historicoDicasAluno.Add(dicaSorteada.Id);
+                        }
+                    }
+                }
             }
 
             await db.SaveChangesAsync();
@@ -175,30 +214,10 @@ public static class AlunoEndpoints
 
             return Results.NoContent();
         });
-
-        // PATCH /alunos/{id}/reativar -> Reativa um aluno que havia sido desativado anteriormente
-        grupo.MapPatch("/{id:int}/reativar", async (int id, AppDbContext db) =>
-        {
-            if (id <= 0)
-            {
-                return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
-            }
-
-            var aluno = await db.Alunos.FindAsync(id);
-            if (aluno is null)
-            {
-                return Results.NotFound(new { mensagem = "Aluno não encontrado." });
-            }
-
-            aluno.Ativo = true;
-            await db.SaveChangesAsync();
-
-            return Results.Ok(aluno);
-        });
     }
 
     // Valida todos os campos do Aluno segundo o Dicionário de Dados e as Regras de Negócio (RNs)
-    private static List<string> ValidarAluno(Aluno? aluno)
+    private static List<string> ValidarAluno(Aluno? aluno, bool exigirUsuarioId)
     {
         var erros = new List<string>();
 
@@ -227,14 +246,14 @@ public static class AlunoEndpoints
             }
         }
 
-        // 2. Validação da Idade (inteiro 3 dígitos, faixa segura de treino)
+        // 2. Validação da Idade (inteiro 3 dígitos, faixa segura de treino: 13 a 120 anos)
         if (aluno.Idade <= 0)
         {
             erros.Add("A idade é obrigatória e deve ser um número inteiro maior que zero.");
         }
-        else if (aluno.Idade < 10 || aluno.Idade > 120)
+        else if (aluno.Idade < 13 || aluno.Idade > 120)
         {
-            erros.Add("A idade do aluno deve estar entre 10 e 120 anos.");
+            erros.Add("A idade do aluno deve estar entre 13 e 120 anos.");
         }
 
         // 3. Validação do Sexo (Select: "M" ou "F")
@@ -264,10 +283,16 @@ public static class AlunoEndpoints
             erros.Add("Alunos com mais de 65 anos devem ter no mínimo 2 dias de descanso semanal (frequência máxima de 5 dias).");
         }
 
-        // 6. Validação do Objetivo (Select: "Hipertrofia", "Emagrecimento", "Força", "Resistência")
+        // 6. Validação do Objetivo (Select: "Hipertrofia", "Emagrecimento", "Força", "Resistência" - usado para as dicas no PDF)
         if (string.IsNullOrWhiteSpace(aluno.Objetivo) || !ObjetivosPermitidos.Contains(aluno.Objetivo))
         {
-            erros.Add("Selecione um objetivo válido ('Hipertrofia', 'Emagrecimento', 'Força', ou 'Resistência').");
+            erros.Add("Selecione um objetivo válido ('Hipertrofia', 'Emagrecimento', 'Força' ou 'Resistência').");
+        }
+
+        // 7. Vínculo obrigatório com o Personal responsável no cadastro
+        if (exigirUsuarioId && (!aluno.UsuarioId.HasValue || aluno.UsuarioId.Value <= 0))
+        {
+            erros.Add("Informe o ID do Personal (usuarioId) responsável pelo cadastro do aluno.");
         }
 
         return erros;
