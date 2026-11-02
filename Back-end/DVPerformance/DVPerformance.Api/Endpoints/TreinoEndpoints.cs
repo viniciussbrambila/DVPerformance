@@ -1,3 +1,4 @@
+using System.Globalization;
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,13 @@ public record AtualizarStatusTreinoRequest(string Status);
 
 public static class TreinoEndpoints
 {
+    private const int MinSeries = 1;
+    private const int MaxSeries = 10;
+    private const int MinRepeticoes = 6;
+    private const int MaxRepeticoes = 30;
+    private const int MinDescansoSegundos = 30;
+    private const int MaxDescansoSegundos = 300;
+
     private static readonly HashSet<string> StatusPermitidos = new()
     {
         "Rascunho", "Validado", "Exportado"
@@ -257,9 +265,33 @@ public static class TreinoEndpoints
                 return Results.NotFound(new { mensagem = "Item de treino não encontrado." });
             }
 
-            if (dadosAtualizados.Series <= 0 || dadosAtualizados.Series > 10)
+            if (dadosAtualizados.Series < MinSeries || dadosAtualizados.Series > MaxSeries)
             {
-                return Results.BadRequest(new { mensagem = "O número de séries deve ser entre 1 e 10." });
+                return Results.BadRequest(new { mensagem = $"O número de séries deve ser entre {MinSeries} e {MaxSeries}." });
+            }
+
+            string? repeticaoNormalizada = null;
+            if (!string.IsNullOrWhiteSpace(dadosAtualizados.Repeticao))
+            {
+                if (!TentarNormalizarRepeticoes(dadosAtualizados.Repeticao, out repeticaoNormalizada))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = $"O número de repetições deve ser entre {MinRepeticoes} e {MaxRepeticoes} (ex.: 10 ou 8-12)."
+                    });
+                }
+            }
+
+            string? descansoNormalizado = null;
+            if (!string.IsNullOrWhiteSpace(dadosAtualizados.TempoDescanso))
+            {
+                if (!TentarNormalizarDescanso(dadosAtualizados.TempoDescanso, out descansoNormalizado))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = $"O tempo de descanso deve ser entre {MinDescansoSegundos} e {MaxDescansoSegundos} segundos."
+                    });
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(dadosAtualizados.DivisaoTreino))
@@ -276,14 +308,14 @@ public static class TreinoEndpoints
             item.MaquinaId = dadosAtualizados.MaquinaId;
             item.Series = dadosAtualizados.Series;
 
-            if (!string.IsNullOrWhiteSpace(dadosAtualizados.Repeticao))
+            if (repeticaoNormalizada is not null)
             {
-                item.Repeticao = dadosAtualizados.Repeticao.Trim();
+                item.Repeticao = repeticaoNormalizada;
             }
 
-            if (!string.IsNullOrWhiteSpace(dadosAtualizados.TempoDescanso))
+            if (descansoNormalizado is not null)
             {
-                item.TempoDescanso = dadosAtualizados.TempoDescanso.Trim();
+                item.TempoDescanso = descansoNormalizado;
             }
 
             if (dadosAtualizados.TempoAerobico is not null)
@@ -322,6 +354,65 @@ public static class TreinoEndpoints
 
             return Results.NoContent();
         });
+    }
+
+    private static bool TentarNormalizarRepeticoes(string valorBruto, out string repeticaoNormalizada)
+    {
+        repeticaoNormalizada = string.Empty;
+        var texto = valorBruto.Trim();
+
+        if (int.TryParse(texto, NumberStyles.None, CultureInfo.InvariantCulture, out var unico))
+        {
+            if (unico < MinRepeticoes || unico > MaxRepeticoes)
+            {
+                return false;
+            }
+
+            repeticaoNormalizada = unico.ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        var separadores = new[] { '-', '–' };
+        var partes = texto.Split(separadores, StringSplitOptions.TrimEntries);
+        if (partes.Length == 2
+            && int.TryParse(partes[0], NumberStyles.None, CultureInfo.InvariantCulture, out var minimo)
+            && int.TryParse(partes[1], NumberStyles.None, CultureInfo.InvariantCulture, out var maximo)
+            && minimo >= MinRepeticoes
+            && maximo <= MaxRepeticoes
+            && minimo <= maximo)
+        {
+            repeticaoNormalizada = minimo == maximo
+                ? minimo.ToString(CultureInfo.InvariantCulture)
+                : $"{minimo}-{maximo}";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TentarNormalizarDescanso(string valorBruto, out string descansoNormalizado)
+    {
+        descansoNormalizado = string.Empty;
+        var texto = valorBruto.Trim();
+
+        foreach (var sufixo in new[] { "segundos", "segundo", "segs", "seg", "s" })
+        {
+            if (texto.EndsWith(sufixo, StringComparison.OrdinalIgnoreCase))
+            {
+                texto = texto[..^sufixo.Length].Trim();
+                break;
+            }
+        }
+
+        if (!int.TryParse(texto, NumberStyles.None, CultureInfo.InvariantCulture, out var segundos)
+            || segundos < MinDescansoSegundos
+            || segundos > MaxDescansoSegundos)
+        {
+            return false;
+        }
+
+        descansoNormalizado = $"{segundos}s";
+        return true;
     }
 
     // =========================================================================
@@ -486,7 +577,7 @@ public static class TreinoEndpoints
 
             case "Força":
                 series = aluno.Experiencia == "Iniciante" ? 3 : 4;
-                repeticoes = aluno.Experiencia == "Iniciante" ? "6-8" : "4-6";
+                repeticoes = "6-8";
                 descansoSegundos = 120;
                 aerobicoGeral = "10 min de mobilidade e cardio leve apenas para aquecimento";
                 aerobicoDia = "10 min Bike/Esteira leve (aquecimento)";

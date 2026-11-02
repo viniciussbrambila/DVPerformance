@@ -47,8 +47,8 @@ const CAMPOS = ["series", "repeticoes", "descanso"];
 
 const LIMITES = {
   series: { min: 1, max: 10 },
-  repeticoes: { min: 1, max: 30 },
-  descanso: { min: 15, max: 300 },
+  repeticoes: { min: 6, max: 30 },
+  descanso: { min: 30, max: 300 },
 };
 
 function validarCampo(campo, valor) {
@@ -465,8 +465,8 @@ export default function PlanoDetalhe({ glassStyle }) {
 
       {editando && (
         <Alert severity="info" className="no-print" sx={{ mb: 3 }}>
-          Limites: séries de 1 a 10 · repetições de 1 a 30 (ex.: 8-12) ·
-          descanso de 15 a 300 segundos.
+          Limites: séries de 1 a 10 · repetições de 6 a 30 (ex.: 8-12) ·
+          descanso de 30 a 300 segundos.
         </Alert>
       )}
 

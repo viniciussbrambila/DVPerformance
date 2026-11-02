@@ -32,7 +32,7 @@ public class ItemTreino
     // series: quantidade de séries prescritas (ex: 3, 4)
     public int Series { get; set; }
 
-    // repeticao: faixa de repetições conforme o objetivo (ex: "12-15", "8-12", "4-6")
+    // repeticao: faixa de repetições conforme o objetivo (ex: "12-15", "8-12", "6-8")
     public string Repeticao { get; set; } = string.Empty;
 
     // tempoDescanso: intervalo entre séries (ex: "45s", "60s", "120s")
