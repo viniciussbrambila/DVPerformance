@@ -5,7 +5,6 @@ namespace DVPerformance.Api.Models;
 public class Exercicio
 {
     private string _grupo = string.Empty;
-    private string _regiao = string.Empty;
 
     public int Id { get; set; }
 
@@ -18,11 +17,7 @@ public class Exercicio
 
     // Propriedades calculadas/compatíveis com o JSON do Front-end (lidas direto de GrupoMuscular)
     [NotMapped]
-    public string Regiao
-    {
-        get => GrupoMuscular?.Regiao ?? _regiao;
-        set => _regiao = value ?? string.Empty;
-    }
+    public string Regiao => GrupoMuscular?.Regiao ?? string.Empty;
 
     [NotMapped]
     public string Grupo
@@ -33,7 +28,7 @@ public class Exercicio
 
     public string Descricao { get; set; } = string.Empty;
 
-    // Chave estrangeira opcional para vincular ao Personal que cadastrou (ou null se for padrão do sistema)
+    // Chave estrangeira que vincula ao Personal que cadastrou
     public int? UsuarioId { get; set; }
 
     // Exclusão lógica (Soft Delete): mantém o histórico no banco quando desativado (false)

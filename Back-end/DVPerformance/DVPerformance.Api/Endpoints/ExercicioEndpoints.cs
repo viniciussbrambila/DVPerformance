@@ -43,8 +43,8 @@ public static class ExercicioEndpoints
 
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
-                // Retorna os exercícios da conta deste Personal (e eventuais registros sem vínculo)
-                query = query.Where(e => e.UsuarioId == usuarioId.Value || e.UsuarioId == null);
+                // Retorna exclusivamente os exercícios da conta deste Personal
+                query = query.Where(e => e.UsuarioId == usuarioId.Value);
 
                 var exerciciosPersonal = await query
                     .OrderBy(e => e.GrupoMuscular!.Regiao)
@@ -95,9 +95,14 @@ public static class ExercicioEndpoints
         });
 
         // POST /exercicios -> Cadastra um novo exercício personalizado na conta do Personal
-        grupo.MapPost("/", async (Exercicio? novoExercicio, AppDbContext db) =>
+        grupo.MapPost("/", async (int? usuarioId, Exercicio? novoExercicio, AppDbContext db) =>
         {
-            var (erros, grupoMuscular) = await ValidarExercicioAsync(novoExercicio, db);
+            if (novoExercicio is not null && (!novoExercicio.UsuarioId.HasValue || novoExercicio.UsuarioId.Value <= 0) && usuarioId.HasValue && usuarioId.Value > 0)
+            {
+                novoExercicio.UsuarioId = usuarioId.Value;
+            }
+
+            var (erros, grupoMuscular) = await ValidarExercicioAsync(novoExercicio, db, exigirUsuarioId: true);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -109,48 +114,46 @@ public static class ExercicioEndpoints
 
             var nomeLimpo = novoExercicio!.Nome.Trim();
             var descricaoLimpa = novoExercicio.Descricao?.Trim() ?? string.Empty;
+            var donoId = novoExercicio.UsuarioId!.Value;
 
-            if (novoExercicio.UsuarioId.HasValue && novoExercicio.UsuarioId.Value > 0)
+            var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == donoId && u.Ativo);
+            if (!personalExiste)
             {
-                var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == novoExercicio.UsuarioId.Value && u.Ativo);
-                if (!personalExiste)
+                return Results.BadRequest(new
                 {
-                    return Results.BadRequest(new
+                    mensagem = "O Personal informado não foi encontrado.",
+                    erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
+                });
+            }
+
+            await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, donoId);
+
+            var mesmoNomeExistente = await db.Exercicios
+                .Include(e => e.GrupoMuscular)
+                .FirstOrDefaultAsync(e =>
+                    e.UsuarioId == donoId &&
+                    e.Nome.ToLower() == nomeLimpo.ToLower());
+
+            if (mesmoNomeExistente is not null)
+            {
+                if (mesmoNomeExistente.Ativo)
+                {
+                    return Results.Conflict(new
                     {
-                        mensagem = "O Personal informado não foi encontrado.",
-                        erros = new[] { "A conta do Personal (usuarioId) não existe ou está desativada no banco de dados." }
+                        mensagem = "Este exercício já está cadastrado na sua conta.",
+                        erros = new[] { "Você já possui um exercício ativo com este nome no seu catálogo." }
                     });
                 }
 
-                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, novoExercicio.UsuarioId.Value);
+                // Se estava removido (Soft Delete), reativa e atualiza com os dados informados pelo Personal
+                mesmoNomeExistente.Nome = nomeLimpo;
+                mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
+                mesmoNomeExistente.GrupoMuscular = grupoMuscular;
+                mesmoNomeExistente.Descricao = descricaoLimpa;
+                mesmoNomeExistente.Ativo = true;
 
-                var mesmoNomeExistente = await db.Exercicios
-                    .Include(e => e.GrupoMuscular)
-                    .FirstOrDefaultAsync(e =>
-                        e.UsuarioId == novoExercicio.UsuarioId.Value &&
-                        e.Nome.ToLower() == nomeLimpo.ToLower());
-
-                if (mesmoNomeExistente is not null)
-                {
-                    if (mesmoNomeExistente.Ativo)
-                    {
-                        return Results.Conflict(new
-                        {
-                            mensagem = "Este exercício já está cadastrado na sua conta.",
-                            erros = new[] { "Você já possui um exercício ativo com este nome no seu catálogo." }
-                        });
-                    }
-
-                    // Se estava removido (Soft Delete), reativa e atualiza com os dados informados pelo Personal
-                    mesmoNomeExistente.Nome = nomeLimpo;
-                    mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
-                    mesmoNomeExistente.GrupoMuscular = grupoMuscular;
-                    mesmoNomeExistente.Descricao = descricaoLimpa;
-                    mesmoNomeExistente.Ativo = true;
-
-                    await db.SaveChangesAsync();
-                    return Results.Created($"/exercicios/{mesmoNomeExistente.Id}", mesmoNomeExistente);
-                }
+                await db.SaveChangesAsync();
+                return Results.Created($"/exercicios/{mesmoNomeExistente.Id}", mesmoNomeExistente);
             }
 
             novoExercicio.Id = 0; // Garante geração automática de ID pelo PostgreSQL (SERIAL)
@@ -209,7 +212,7 @@ public static class ExercicioEndpoints
                 return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
             }
 
-            var (erros, grupoMuscular) = await ValidarExercicioAsync(dadosAtualizados, db);
+            var (erros, grupoMuscular) = await ValidarExercicioAsync(dadosAtualizados, db, exigirUsuarioId: false);
             if (erros.Count > 0)
             {
                 return Results.BadRequest(new
@@ -253,34 +256,12 @@ public static class ExercicioEndpoints
 
             return Results.NoContent();
         });
-
-        // PATCH /exercicios/{id}/reativar -> Reativa um exercício desativado anteriormente
-        grupo.MapPatch("/{id:int}/reativar", async (int id, AppDbContext db) =>
-        {
-            if (id <= 0)
-            {
-                return Results.BadRequest(new { mensagem = "O ID do exercício deve ser um número inteiro positivo." });
-            }
-
-            var exercicio = await db.Exercicios
-                .Include(e => e.GrupoMuscular)
-                .FirstOrDefaultAsync(e => e.Id == id);
-
-            if (exercicio is null)
-            {
-                return Results.NotFound(new { mensagem = "Exercício não encontrado." });
-            }
-
-            exercicio.Ativo = true;
-            await db.SaveChangesAsync();
-
-            return Results.Ok(exercicio);
-        });
     }
 
     private static async Task<(List<string> erros, GrupoMuscular? grupoMuscular)> ValidarExercicioAsync(
         Exercicio? exercicio,
-        AppDbContext db)
+        AppDbContext db,
+        bool exigirUsuarioId)
     {
         var erros = new List<string>();
 
@@ -324,6 +305,12 @@ public static class ExercicioEndpoints
         if (descricao.Length > 255)
         {
             erros.Add("A descrição do exercício deve ter no máximo 255 caracteres.");
+        }
+
+        // 4. Vínculo obrigatório com o Personal responsável no cadastro
+        if (exigirUsuarioId && (!exercicio.UsuarioId.HasValue || exercicio.UsuarioId.Value <= 0))
+        {
+            erros.Add("Informe o ID do Personal (usuarioId) responsável pelo cadastro do exercício.");
         }
 
         return (erros, grupoEncontrado);

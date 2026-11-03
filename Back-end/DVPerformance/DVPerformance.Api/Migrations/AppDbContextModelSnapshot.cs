@@ -80,6 +80,378 @@ namespace DVPerformance.Api.Migrations
                     b.ToTable("alunos", (string)null);
                 });
 
+            modelBuilder.Entity("DVPerformance.Api.Models.DicaObjetivo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
+                    b.Property<string>("Objetivo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("objetivo");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("texto");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Objetivo", "Ativo");
+
+                    b.ToTable("dicas_objetivo", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Priorize a execução controlada na fase excêntrica (descida do peso) em cada repetição, mantendo a tensão mecânica constante no músculo-alvo para maximizar o estímulo de hipertrofia."
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Busque a progressão gradual de carga ou de repetições semana após semana, sempre preservando a amplitude completa do movimento antes de aumentar o peso."
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Respeite os intervalos de descanso prescritos entre as séries para recuperar sua capacidade de contração e manter um alto volume de carga útil durante toda a sessão."
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "O crescimento muscular acontece durante a recuperação: priorize de 7 a 9 horas de sono reparador por noite para otimizar a síntese proteica e a regeneração das fibras."
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Mantenha uma ingestão adequada de proteínas fracionada ao longo do dia e hidratação constante para fornecer os nutrientes necessários à construção de massa magra."
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Leve as séries de trabalho próximas à falha concêntrica com segurança técnica, evitando compensações posturais ou impulsos que roubem o esforço do músculo principal."
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Concentre-se na conexão mente-músculo durante cada série, sentindo o alongamento completo e o pico de contração antes de iniciar a próxima repetição."
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Realize o cardio pós-treino na intensidade moderada indicada na ficha para melhorar a sensibilidade à insulina e o condicionamento sem comprometer a recuperação muscular."
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Não pule as séries iniciais de aquecimento articular e específico: elas preparam tendões e sistema nervoso para suportar cargas mais produtivas nas séries principais."
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "A constância semanal supera treinos isolados extremos: cumprir todas as sessões planejadas garante a frequência ideal de estímulo para cada grupamento muscular."
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Anote as cargas utilizadas nos exercícios base do seu protocolo para acompanhar sua evolução real e identificar o momento exato de progredir nos treinos seguintes."
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Ativo = true,
+                            Objetivo = "Hipertrofia",
+                            Texto = "Evite treinar o mesmo grupo muscular em dias consecutivos fora da divisão prescrita, garantindo a supercompensação necessária para o ganho sólido de volume muscular."
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Mantenha os intervalos de descanso curtos e rigorosos conforme prescrito na ficha para sustentar a frequência cardíaca elevada e ampliar o gasto calórico da sessão."
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "A musculação é essencial no emagrecimento: preservar e estimular sua massa magra mantém o metabolismo basal ativo e evita a flacidez durante a redução de gordura."
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Combine o treino de força com o cardio pós-treino indicado no protocolo para potencializar a oxidação de gorduras aproveitando a depleção prévia de glicogênio."
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Aumente seu nível de movimento fora da academia: caminhar mais no dia a dia, usar escadas e evitar longos períodos sentado acelera significativamente o gasto energético semanal."
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Mantenha excelente hidratação antes, durante e após o treino; o consumo adequado de água otimiza o metabolismo energético, o desempenho físico e o controle da saciedade."
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Não reduza drasticamente as cargas por estar em foco de perda de gordura: manter treinos intensos sinaliza ao organismo que a musculatura deve ser preservada."
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Alinhe a regularidade dos treinos a uma alimentação equilibrada em déficit calórico sustentável, priorizando alimentos naturais, fibras e bom aporte de proteínas."
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Cuide da qualidade do sono diariamente: noites mal dormidas desregulam hormônios ligados à fome e ao estresse, dificultando a queima de gordura e a disposição para treinar."
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Evite compensar o gasto do treino com excessos alimentares: a consistência diária entre exercício e nutrição é o que constrói resultados duradouros na composição corporal."
+                        },
+                        new
+                        {
+                            Id = 22,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Acompanhe sua evolução por medidas corporais, roupas e desempenho nos treinos, pois a balança isoladamente não diferencia perda de gordura de ganho de massa muscular."
+                        },
+                        new
+                        {
+                            Id = 23,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Execute os exercícios multiarticulares com empenho e boa amplitude, pois movimentos que recrutam grandes grupos musculares demandam muito mais energia do organismo."
+                        },
+                        new
+                        {
+                            Id = 24,
+                            Ativo = true,
+                            Objetivo = "Emagrecimento",
+                            Texto = "Mesmo nos dias de menor disposição, cumpra a sessão planejada: manter o hábito ativo é mais eficiente para o emagrecimento do que buscar perfeição apenas em alguns dias."
+                        },
+                        new
+                        {
+                            Id = 25,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Respeite integralmente os tempos mais longos de descanso entre as séries: eles são indispensáveis para restaurar os estoques de ATP-CP e o sistema nervoso central."
+                        },
+                        new
+                        {
+                            Id = 26,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Ative firmemente o core e controle a respiração (estabilização intra-abdominal) antes de cada repetição pesada para proteger a coluna e transferir mais força ao movimento."
+                        },
+                        new
+                        {
+                            Id = 27,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Realize séries progressivas de aquecimento específico no primeiro exercício do dia antes de entrar na carga máxima de trabalho, preparando articulações e recrutamento neural."
+                        },
+                        new
+                        {
+                            Id = 28,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Imprima intenção de velocidade na fase concêntrica (subida da carga) mantendo controle total na descida, maximizando o recrutamento das fibras musculares de maior potência."
+                        },
+                        new
+                        {
+                            Id = 29,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "No treino de força, a qualidade técnica vem sempre antes do ego: interrompa a série caso perceba perda do alinhamento articular ou compensações perigosas na postura."
+                        },
+                        new
+                        {
+                            Id = 30,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Garanta pés bem plantados no solo, escápulas estabilizadas e pegada firme na barra ou equipamento antes de iniciar cada repetição para evitar dissipação de força."
+                        },
+                        new
+                        {
+                            Id = 31,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Pequenos incrementos de carga ao longo das semanas geram grandes ganhos de força a médio prazo sem sobrecarregar tendões, ligamentos e articulações."
+                        },
+                        new
+                        {
+                            Id = 32,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Priorize os exercícios multiarticulares livres ou guiados do início da ficha enquanto o sistema nervoso está descansado, pois são eles que constroem sua base de força."
+                        },
+                        new
+                        {
+                            Id = 33,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Mantenha o cardio leve conforme prescrito na ficha apenas como suporte cardiovascular e aquecimento, preservando suas reservas energéticas para as séries pesadas."
+                        },
+                        new
+                        {
+                            Id = 34,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Cuide da mobilidade de tornozelos, quadris e ombros regularmente: articulações móveis e estáveis permitem alavancas mecânicas muito mais seguras e eficientes sob carga."
+                        },
+                        new
+                        {
+                            Id = 35,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Valorize os dias de descanso da sua divisão semanal, pois adaptações neurais e estruturais de força exigem recuperação completa entre sessões intensas."
+                        },
+                        new
+                        {
+                            Id = 36,
+                            Ativo = true,
+                            Objetivo = "Força",
+                            Texto = "Mantenha um bom aporte energético e hidratação adequada antes de treinar; estoques plenos de glicogênio muscular são fundamentais para sustentar cargas elevadas."
+                        },
+                        new
+                        {
+                            Id = 37,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Mantenha um ritmo cadenciado e respiração fluida do início ao fim de cada série longa, evitando prender o ar para retardar a instalação precoce da fadiga periférica."
+                        },
+                        new
+                        {
+                            Id = 38,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Controle a escolha da carga para completar toda a faixa de repetições altas prescrita mantendo a postura impecável até a última repetição da série."
+                        },
+                        new
+                        {
+                            Id = 39,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Respeite os intervalos reduzidos de descanso entre as séries para estimular a capilarização muscular, a eficiência mitocondrial e a tolerância à acidose metabólica."
+                        },
+                        new
+                        {
+                            Id = 40,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Capriche na hidratação ao longo do dia e durante a sessão: a perda hídrica reduz rapidamente o rendimento em treinos de resistência muscular e aeróbica."
+                        },
+                        new
+                        {
+                            Id = 41,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Execute o cardio contínuo pós-treino na zona aeróbica orientada para fortalecer o sistema cardiorrespiratório e acelerar a remoção de metabólitos entre os esforços."
+                        },
+                        new
+                        {
+                            Id = 42,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Não encurte a amplitude das repetições quando a queimação muscular surgir: manter o movimento completo sob fadiga controlada é o que desenvolve resistência real."
+                        },
+                        new
+                        {
+                            Id = 43,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Garanta uma ingestão equilibrada de carboidratos de qualidade na rotina alimentar para manter os estoques de energia necessários às sessões de maior volume de repetições."
+                        },
+                        new
+                        {
+                            Id = 44,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Mantenha ombros, pescoço e musculaturas acessórias livres de tensão desnecessária durante o exercício para economizar energia e focar o esforço nos músculos-alvo."
+                        },
+                        new
+                        {
+                            Id = 45,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "A evolução na resistência aparece quando o mesmo esforço passa a parecer mais leve e sua recuperação entre as séries se torna cada vez mais rápida."
+                        },
+                        new
+                        {
+                            Id = 46,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Alongamentos leves e exercícios de mobilidade após a sessão ajudam a aliviar a rigidez muscular e preservar a fluidez articular ao longo da semana de treinos."
+                        },
+                        new
+                        {
+                            Id = 47,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Mantenha regularidade absoluta na frequência semanal: adaptações aeróbicas e de resistência muscular respondem de forma excelente à continuidade dos estímulos."
+                        },
+                        new
+                        {
+                            Id = 48,
+                            Ativo = true,
+                            Objetivo = "Resistência",
+                            Texto = "Preste atenção redobrada à estabilidade do core no final das séries longas, garantindo que a fadiga não comprometa o alinhamento da coluna lombar."
+                        });
+                });
+
             modelBuilder.Entity("DVPerformance.Api.Models.Exercicio", b =>
                 {
                     b.Property<int>("Id")
@@ -388,6 +760,10 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("data_criacao");
 
+                    b.Property<int?>("DicaObjetivoId")
+                        .HasColumnType("integer")
+                        .HasColumnName("dica_objetivo_id");
+
                     b.Property<string>("Divisao")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -421,6 +797,8 @@ namespace DVPerformance.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AlunoId");
+
+                    b.HasIndex("DicaObjetivoId");
 
                     b.HasIndex("UsuarioId");
 
@@ -547,12 +925,19 @@ namespace DVPerformance.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("DVPerformance.Api.Models.DicaObjetivo", "DicaObjetivo")
+                        .WithMany()
+                        .HasForeignKey("DicaObjetivoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("DVPerformance.Api.Models.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Aluno");
+
+                    b.Navigation("DicaObjetivo");
                 });
 
             modelBuilder.Entity("DVPerformance.Api.Models.Treino", b =>
