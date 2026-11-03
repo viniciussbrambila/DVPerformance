@@ -26,6 +26,10 @@ import Exercicios from "./pages/Exercicios.jsx";
 import Maquinas from "./pages/Maquinas";
 import PlanosExportados from "./pages/PlanosExportados";
 import PlanoDetalhe from "./pages/PlanoDetalhe";
+import Relatorios from "./pages/Relatorios";
+import RelatorioCaracteristicas from "./pages/RelatorioCaracteristicas";
+import RelatorioAluno from "./pages/RelatorioAluno";
+import RelatorioAlunosCadastrados from "./pages/RelatorioAlunosCadastrados";
 
 const drawerWidth = 240;
 
@@ -226,6 +230,26 @@ export default function App() {
                 <Route
                   path="/alunos"
                   element={<Alunos glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/relatorios"
+                  element={<Relatorios glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/relatorios/caracteristicas"
+                  element={<RelatorioCaracteristicas glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/relatorios/caracteristicas/:id"
+                  element={<RelatorioAluno glassStyle={glassStyle} />}
+                />
+                <Route
+                  path="/relatorios/planos"
+                  element={<PlanosExportados glassStyle={glassStyle} modoRelatorio />}
+                />
+                <Route
+                  path="/relatorios/alunos"
+                  element={<RelatorioAlunosCadastrados glassStyle={glassStyle} />}
                 />
               </Routes>
             </Box>

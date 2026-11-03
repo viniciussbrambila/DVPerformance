@@ -23,6 +23,9 @@ import {
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@mui/icons-material/Search";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
+import { exportarPdfRelatorio } from "../utils/relatorios";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
@@ -85,7 +88,10 @@ const obterChavePlanos = () => {
   return `planos:${usuarioLogado?.id || "geral"}`;
 };
 
-export default function PlanosExportados({ glassStyle }) {
+export default function PlanosExportados({
+  glassStyle,
+  modoRelatorio = false,
+}) {
   const navigate = useNavigate();
   const [planos, setPlanos] = useState(
     () => lerCache(obterChavePlanos()) || [],
@@ -228,7 +234,8 @@ export default function PlanosExportados({ glassStyle }) {
   const cabecalhoSx = { fontWeight: 600, color: "text.primary" };
 
   return (
-    <Box>
+    <Box className={modoRelatorio ? "relatorio-impressao" : undefined}>
+      {modoRelatorio && <ImpressaoRelatorio />}
       <Box
         sx={{
           display: "flex",
@@ -238,25 +245,41 @@ export default function PlanosExportados({ glassStyle }) {
         }}
       >
         <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-          Planos de Treino
+          {modoRelatorio ? "Relatório de Planos de Treino" : "Planos de Treino"}
         </Typography>
 
-        <Button
-          variant="contained"
-          size="large"
-          onClick={() => navigate("/treinos")}
-        >
-          Novo Treino
-        </Button>
+        {modoRelatorio ? (
+          <Button
+            className="no-print"
+            variant="contained"
+            size="large"
+            startIcon={<PrintOutlinedIcon />}
+            onClick={() => exportarPdfRelatorio("relatorio-planos-de-treino")}
+            disabled={carregando || planosFiltrados.length === 0}
+          >
+            Exportar PDF
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => navigate("/treinos")}
+          >
+            Novo Treino
+          </Button>
+        )}
       </Box>
 
       {erro && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" className="no-print" sx={{ mb: 3 }}>
           {erro}
         </Alert>
       )}
 
-      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+      <Box
+        className="no-print"
+        sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}
+      >
         <TextField
           placeholder="Pesquisar por nome do aluno"
           value={busca}
@@ -297,7 +320,7 @@ export default function PlanosExportados({ glassStyle }) {
                 <TableCell sx={cabecalhoSx}>Data</TableCell>
                 <TableCell sx={cabecalhoSx}>Aluno</TableCell>
                 <TableCell sx={cabecalhoSx}>Status</TableCell>
-                <TableCell align="center" sx={cabecalhoSx}>
+                <TableCell className="no-print" align="center" sx={cabecalhoSx}>
                   Ações
                 </TableCell>
               </TableRow>
@@ -343,7 +366,7 @@ export default function PlanosExportados({ glassStyle }) {
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell align="center">
+                    <TableCell className="no-print" align="center">
                       <Box
                         sx={{
                           display: "flex",
@@ -356,7 +379,9 @@ export default function PlanosExportados({ glassStyle }) {
                         <Button
                           size="small"
                           color="inherit"
-                          startIcon={<VisibilityOutlinedIcon fontSize="small" />}
+                          startIcon={
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          }
                           onClick={() => navigate(`/planos/${p.id}`)}
                           sx={{ bgcolor: "action.hover" }}
                         >
@@ -365,7 +390,9 @@ export default function PlanosExportados({ glassStyle }) {
                         <Button
                           size="small"
                           color="inherit"
-                          startIcon={<FileDownloadOutlinedIcon fontSize="small" />}
+                          startIcon={
+                            <FileDownloadOutlinedIcon fontSize="small" />
+                          }
                           onClick={() => baixarTxt(p)}
                           sx={{ bgcolor: "action.hover" }}
                         >

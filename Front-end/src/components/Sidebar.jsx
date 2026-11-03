@@ -5,7 +5,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  ListSubheader,
   Box,
   Typography,
 } from "@mui/material";
@@ -15,6 +14,7 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import AddTaskIcon from "@mui/icons-material/AddTask";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
 
@@ -135,16 +135,6 @@ export default function Sidebar({
           <ListItemText primary="Máquinas" />
         </ListItemButton>
 
-        <Divider sx={{ my: 1 }} />
-
-        <ListSubheader
-          component="div"
-          inset
-          sx={{ backgroundColor: "transparent" }}
-        >
-          Relatórios
-        </ListSubheader>
-
         <ListItemButton
           component={Link}
           to="/planos"
@@ -154,7 +144,19 @@ export default function Sidebar({
           <ListItemIcon sx={iconSx}>
             <AssignmentIcon />
           </ListItemIcon>
-          <ListItemText primary="Planos Exportados" />
+          <ListItemText primary="Planos de Treino" />
+        </ListItemButton>
+
+        <ListItemButton
+          component={Link}
+          to="/relatorios"
+          selected={estaAtivo("/relatorios")}
+          sx={itemSx}
+        >
+          <ListItemIcon sx={iconSx}>
+            <AssessmentOutlinedIcon />
+          </ListItemIcon>
+          <ListItemText primary="Relatórios" />
         </ListItemButton>
       </List>
 
