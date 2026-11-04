@@ -16,6 +16,14 @@ public class Aluno
 
     public string Objetivo { get; set; } = string.Empty;
 
+    // Medidas corporais adicionadas para relatórios e acompanhamento
+    public decimal? Peso { get; set; }
+
+    public decimal? Altura { get; set; }
+
+    // Data de cadastro do aluno no sistema
+    public DateTime DataCadastro { get; set; } = DateTime.UtcNow;
+
     // Chave estrangeira (FK) que vincula o aluno ao Personal que o cadastrou
     public int? UsuarioId { get; set; }
 

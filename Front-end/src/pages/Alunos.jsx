@@ -51,10 +51,14 @@ const obterChaveAlunos = () => {
   return usuario?.id ? `alunos:${usuario.id}` : null;
 };
 
-// Medidas mantidas apenas na sessão do front-end até a integração com a API.
+// Medidas integradas com a API e banco, com fallback local de sessão se necessário.
 const aplicarMedidasLocais = (lista, chave) => {
   const medidas = lerCache(`medidas:${chave}`) || {};
-  return lista.map((aluno) => ({ ...aluno, ...medidas[aluno.id] }));
+  return lista.map((aluno) => ({
+    ...aluno,
+    peso: aluno.peso ?? medidas[aluno.id]?.peso,
+    altura: aluno.altura ?? medidas[aluno.id]?.altura,
+  }));
 };
 
 const LIMITES_MEDIDAS = {
@@ -230,6 +234,7 @@ export default function Alunos({ glassStyle }) {
         expirarCachePorPrefixo("dashboard:");
         expirarCachePorPrefixo("planos:");
         expirarCachePorPrefixo("planoDetalhe:");
+        expirarCachePorPrefixo("alunosSemTreino:");
       }
     } catch (erro) {
       console.error("Erro ao excluir aluno:", erro);
@@ -268,6 +273,8 @@ export default function Alunos({ glassStyle }) {
     const payload = {
       nome: formData.nome,
       idade: Number(formData.idade),
+      peso: converterMedida(formData.peso),
+      altura: converterMedida(formData.altura),
       sexo: formData.sexo,
       experiencia: formData.experiencia,
       frequenciaSemanal: Number(formData.frequenciaSemanal),
@@ -303,7 +310,11 @@ export default function Alunos({ glassStyle }) {
         peso: converterMedida(formData.peso),
         altura: converterMedida(formData.altura),
       };
-      const alunoSalvo = { ...dadosResposta, ...medidas };
+      const alunoSalvo = {
+        ...dadosResposta,
+        peso: dadosResposta?.peso ?? medidas.peso,
+        altura: dadosResposta?.altura ?? medidas.altura,
+      };
       salvarCache(`medidas:${chave}`, {
         ...lerCache(`medidas:${chave}`),
         [alunoSalvo.id]: medidas,
@@ -317,6 +328,9 @@ export default function Alunos({ glassStyle }) {
         salvarCache(chave, novaLista);
         return novaLista;
       });
+
+      expirarCachePorPrefixo("alunos:");
+      expirarCachePorPrefixo("alunosSemTreino:");
 
       if (editingId) {
         expirarCachePorPrefixo("planos:");

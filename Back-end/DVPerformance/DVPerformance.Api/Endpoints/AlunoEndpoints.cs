@@ -98,6 +98,7 @@ public static class AlunoEndpoints
 
             novoAluno.Id = 0; // Garante que o PostgreSQL gere o ID automaticamente (SERIAL)
             novoAluno.Nome = novoAluno.Nome.Trim();
+            novoAluno.DataCadastro = DateTime.UtcNow;
             novoAluno.Ativo = true;
 
             db.Alunos.Add(novoAluno);
@@ -138,6 +139,8 @@ public static class AlunoEndpoints
             alunoExistente.Experiencia = dadosAtualizados.Experiencia;
             alunoExistente.FrequenciaSemanal = dadosAtualizados.FrequenciaSemanal;
             alunoExistente.Objetivo = dadosAtualizados.Objetivo;
+            alunoExistente.Peso = dadosAtualizados.Peso;
+            alunoExistente.Altura = dadosAtualizados.Altura;
 
             if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
             {
@@ -150,7 +153,7 @@ public static class AlunoEndpoints
                 var objetivoParaDica = TreinoEndpoints.NormalizarObjetivoParaDica(alunoExistente.Objetivo);
                 var dicasNovoObjetivo = await db.DicasObjetivo
                     .AsNoTracking()
-                    .Where(d => d.Ativo && d.Objetivo == objetivoParaDica)
+                    .Where(d => d.Objetivo == objetivoParaDica)
                     .ToListAsync();
 
                 if (dicasNovoObjetivo.Count > 0)
@@ -289,7 +292,27 @@ public static class AlunoEndpoints
             erros.Add("Selecione um objetivo válido ('Hipertrofia', 'Emagrecimento', 'Força' ou 'Resistência').");
         }
 
-        // 7. Vínculo obrigatório com o Personal responsável no cadastro
+        // 7. Validação do Peso (em kg: de 30 a 300 kg)
+        if (!aluno.Peso.HasValue)
+        {
+            erros.Add("O peso do aluno é obrigatório.");
+        }
+        else if (aluno.Peso.Value < 30m || aluno.Peso.Value > 300m)
+        {
+            erros.Add("O peso do aluno deve estar entre 30 e 300 kg.");
+        }
+
+        // 8. Validação da Altura (em metros: de 1,00 a 2,50 m)
+        if (!aluno.Altura.HasValue)
+        {
+            erros.Add("A altura do aluno é obrigatória.");
+        }
+        else if (aluno.Altura.Value < 1.00m || aluno.Altura.Value > 2.50m)
+        {
+            erros.Add("A altura do aluno deve estar entre 1,00 e 2,50 m (100 a 250 cm).");
+        }
+
+        // 9. Vínculo obrigatório com o Personal responsável no cadastro
         if (exigirUsuarioId && (!aluno.UsuarioId.HasValue || aluno.UsuarioId.Value <= 0))
         {
             erros.Add("Informe o ID do Personal (usuarioId) responsável pelo cadastro do aluno.");

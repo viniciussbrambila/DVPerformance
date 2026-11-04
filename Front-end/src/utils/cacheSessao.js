@@ -110,6 +110,10 @@ export function preCarregarSessao(usuarioId) {
     buscarJson(`${base}/alunos?usuarioId=${usuarioId}`),
   ).catch(() => {});
 
+  buscarComCache(`alunosSemTreino:${usuarioId}`, () =>
+    buscarJson(`${base}/alunos/sem-treino?usuarioId=${usuarioId}`),
+  ).catch(() => {});
+
   buscarComCache(`planos:${usuarioId}`, async () => {
     const planos = await buscarJson(`${base}/treinos?usuarioId=${usuarioId}`);
     if (Array.isArray(planos)) {

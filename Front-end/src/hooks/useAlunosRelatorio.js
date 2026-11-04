@@ -53,7 +53,8 @@ export default function useAlunosRelatorio() {
   const alunos = usuarioId
     ? prepararAlunosRelatorio(lista, usuarioId).map((aluno) => ({
         ...aluno,
-        ...medidas[aluno.id],
+        peso: aluno.peso ?? medidas[aluno.id]?.peso,
+        altura: aluno.altura ?? medidas[aluno.id]?.altura,
       }))
     : [];
   return { alunos, carregando, erro };

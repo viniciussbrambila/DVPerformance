@@ -41,8 +41,11 @@ export default function Treinos({ glassStyle }) {
   const [gerando, setGerando] = useState(false);
   const [alunos, setAlunos] = useState(
     () =>
-      (usuarioInicial?.id && lerCache(`alunos:${usuarioInicial.id}`)) || [],
+      (usuarioInicial?.id &&
+        lerCache(`alunosSemTreino:${usuarioInicial.id}`)) ||
+      [],
   );
+  const [carregando, setCarregando] = useState(false);
   const [erros, setErros] = useState([]);
 
   useEffect(() => {
@@ -53,15 +56,16 @@ export default function Treinos({ glassStyle }) {
         return;
       }
 
-      const chave = `alunos:${usuarioLogado.id}`;
+      const chave = `alunosSemTreino:${usuarioLogado.id}`;
+      setCarregando(true);
 
       try {
         const dados = await buscarComCache(chave, async () => {
           const response = await fetch(
-            `${ALUNOS_API_URL}?usuarioId=${usuarioLogado.id}`,
+            `${ALUNOS_API_URL}/sem-treino?usuarioId=${usuarioLogado.id}`,
           );
           if (!response.ok) {
-            throw new Error("Não foi possível carregar os alunos.");
+            throw new Error("Não foi possível carregar os alunos sem treino.");
           }
           return response.json();
         });
@@ -71,6 +75,8 @@ export default function Treinos({ glassStyle }) {
         if (!lerCache(chave)) {
           setErros(["Não foi possível conectar ao servidor."]);
         }
+      } finally {
+        setCarregando(false);
       }
     };
 
@@ -109,6 +115,7 @@ export default function Treinos({ glassStyle }) {
       }
       expirarCachePorPrefixo("planos:");
       expirarCachePorPrefixo("dashboard:");
+      expirarCachePorPrefixo("alunosSemTreino:");
 
       navigate(`/planos/${dados.id}`);
     } catch (erro) {
@@ -178,13 +185,31 @@ export default function Treinos({ glassStyle }) {
             </Alert>
           )}
 
-          <FormControl fullWidth disabled={gerando}>
-            <InputLabel id="aluno-label">Selecione um aluno...</InputLabel>
+          {!carregando && alunos.length === 0 && (
+            <Alert severity="info" sx={{ textAlign: "left" }}>
+              Todos os alunos ativos já possuem treino gerado. Para criar um novo treino para um aluno, exclua o plano atual dele em <b>Planos de Treino</b>.
+            </Alert>
+          )}
+
+          <FormControl fullWidth disabled={gerando || carregando || alunos.length === 0}>
+            <InputLabel id="aluno-label">
+              {carregando
+                ? "Carregando alunos..."
+                : alunos.length === 0
+                  ? "Nenhum aluno sem treino disponível"
+                  : "Selecione um aluno..."}
+            </InputLabel>
             <Select
               labelId="aluno-label"
               id="aluno"
               value={alunoId}
-              label="Selecione um aluno..."
+              label={
+                carregando
+                  ? "Carregando alunos..."
+                  : alunos.length === 0
+                    ? "Nenhum aluno sem treino disponível"
+                    : "Selecione um aluno..."
+              }
               onChange={(e) => {
                 setAlunoId(e.target.value);
                 setErros([]);
@@ -193,7 +218,9 @@ export default function Treinos({ glassStyle }) {
             >
               {alunos.length === 0 && (
                 <MenuItem disabled value="">
-                  Nenhum aluno cadastrado
+                  {carregando
+                    ? "Carregando alunos..."
+                    : "Nenhum aluno sem treino ativo"}
                 </MenuItem>
               )}
               {alunos.map((a) => (

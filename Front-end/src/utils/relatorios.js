@@ -31,9 +31,12 @@ export function formatarDataCadastro(aluno) {
 }
 
 export function formatarMedidaRelatorio(valor, unidade) {
-  return valor == null || valor === ""
-    ? "Não informado"
-    : `${Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unidade}`;
+  if (valor == null || valor === "") return "Não informado";
+  const minDig = unidade === "m" ? 2 : 0;
+  return `${Number(valor).toLocaleString("pt-BR", {
+    minimumFractionDigits: minDig,
+    maximumFractionDigits: 2,
+  })} ${unidade}`;
 }
 
 export function filtrarAlunosCadastrados(

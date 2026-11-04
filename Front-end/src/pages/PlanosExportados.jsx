@@ -221,6 +221,7 @@ export default function PlanosExportados({
       });
       removerCache(`planoDetalhe:${planoParaExcluir.id}`);
       expirarCachePorPrefixo("dashboard:");
+      expirarCachePorPrefixo("alunosSemTreino:");
       setPlanoParaExcluir(null);
     } catch (err) {
       console.error("Erro ao excluir plano:", err);

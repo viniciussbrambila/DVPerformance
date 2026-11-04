@@ -365,8 +365,8 @@ export default function PlanoDetalhe({ glassStyle }) {
   const medidasAluno = obterMedidasAluno(plano.alunoId);
   const infos = [
     ["Aluno", plano.aluno],
-    ["Peso", formatarMedida(medidasAluno.peso, "kg")],
-    ["Altura", formatarMedida(medidasAluno.altura, "m")],
+    ["Peso", formatarMedida(plano.peso ?? medidasAluno.peso, "kg")],
+    ["Altura", formatarMedida(plano.altura ?? medidasAluno.altura, "m")],
     ["Objetivo", plano.objetivo],
     ["Frequência", `${plano.frequencia} dias/semana`],
     ["Data", formatarData(plano.data)],

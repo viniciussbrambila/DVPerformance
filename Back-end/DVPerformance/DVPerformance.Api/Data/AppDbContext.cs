@@ -106,6 +106,19 @@ public class AppDbContext : DbContext
                   .HasMaxLength(30)
                   .IsRequired();
 
+            entity.Property(a => a.Peso)
+                  .HasColumnName("peso")
+                  .HasPrecision(5, 2);
+
+            entity.Property(a => a.Altura)
+                  .HasColumnName("altura")
+                  .HasPrecision(4, 2);
+
+            entity.Property(a => a.DataCadastro)
+                  .HasColumnName("data_cadastro")
+                  .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                  .IsRequired();
+
             entity.Property(a => a.UsuarioId)
                   .HasColumnName("usuario_id");
 
