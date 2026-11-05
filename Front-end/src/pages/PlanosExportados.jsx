@@ -23,7 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@mui/icons-material/Search";
-import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import CabecalhoRelatorio from "../components/CabecalhoRelatorio";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import { exportarPdfRelatorio } from "../utils/relatorios";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -237,30 +237,24 @@ export default function PlanosExportados({
   return (
     <Box className={modoRelatorio ? "relatorio-impressao" : undefined}>
       {modoRelatorio && <ImpressaoRelatorio />}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-          {modoRelatorio ? "Relatório de Planos de Treino" : "Planos de Treino"}
-        </Typography>
-
-        {modoRelatorio ? (
-          <Button
-            className="no-print"
-            variant="contained"
-            size="large"
-            startIcon={<PrintOutlinedIcon />}
-            onClick={() => exportarPdfRelatorio("relatorio-planos-de-treino")}
-            disabled={carregando || planosFiltrados.length === 0}
-          >
-            Exportar PDF
-          </Button>
-        ) : (
+      {modoRelatorio ? (
+        <CabecalhoRelatorio
+          titulo="Relatório de Planos de Treino"
+          onExportar={() => exportarPdfRelatorio("relatorio-planos-de-treino")}
+          desabilitado={carregando || planosFiltrados.length === 0}
+        />
+      ) : (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
+          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+            Planos de Treino
+          </Typography>
           <Button
             variant="contained"
             size="large"
@@ -268,8 +262,8 @@ export default function PlanosExportados({
           >
             Novo Treino
           </Button>
-        )}
-      </Box>
+        </Box>
+      )}
 
       {erro && (
         <Alert severity="error" className="no-print" sx={{ mb: 3 }}>

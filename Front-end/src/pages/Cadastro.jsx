@@ -61,14 +61,7 @@ export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
         return;
       }
 
-      const dadosUsuario = {
-        ...data,
-        usuario: data?.usuario || usuarioTrim,
-        nome: data?.nome || data?.usuario || usuarioTrim,
-      };
-
-      localStorage.setItem("usuarioLogado", JSON.stringify(dadosUsuario));
-      onCadastro(dadosUsuario);
+      onCadastro();
     } catch (erro) {
       setErroApi(
         "Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em http://localhost:5011.",

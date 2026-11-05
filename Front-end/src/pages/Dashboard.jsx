@@ -9,8 +9,6 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import { buscarComCache, lerCache } from "../utils/cacheSessao";
 
 const DASHBOARD_RESUMO_URL = "http://localhost:5011/dashboard/resumo";
-const ALUNOS_API_URL = "http://localhost:5011/alunos";
-const TREINOS_API_URL = "http://localhost:5011/treinos";
 
 const obterUsuarioLogado = () => {
   try {
@@ -110,24 +108,8 @@ export default function Dashboard({ glassStyle }) {
             `${DASHBOARD_RESUMO_URL}?usuarioId=${usuarioLogado.id}`,
           );
 
-          if (resp.ok) {
-            return resp.json();
-          }
-
-          if (resp.status === 404) {
-            const [respAlunos, respTreinos] = await Promise.all([
-              fetch(`${ALUNOS_API_URL}?usuarioId=${usuarioLogado.id}`),
-              fetch(`${TREINOS_API_URL}?usuarioId=${usuarioLogado.id}`),
-            ]);
-            const alunos = respAlunos.ok ? await respAlunos.json() : [];
-            const treinos = respTreinos.ok ? await respTreinos.json() : [];
-            return {
-              totalAlunos: alunos.length,
-              totalPlanos: treinos.length,
-            };
-          }
-
-          throw new Error(`HTTP ${resp.status}`);
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          return resp.json();
         });
 
         setTotalAlunos(resumo.totalAlunos ?? 0);

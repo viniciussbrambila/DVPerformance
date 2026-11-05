@@ -51,16 +51,6 @@ const obterChaveAlunos = () => {
   return usuario?.id ? `alunos:${usuario.id}` : null;
 };
 
-// Medidas integradas com a API e banco, com fallback local de sessão se necessário.
-const aplicarMedidasLocais = (lista, chave) => {
-  const medidas = lerCache(`medidas:${chave}`) || {};
-  return lista.map((aluno) => ({
-    ...aluno,
-    peso: aluno.peso ?? medidas[aluno.id]?.peso,
-    altura: aluno.altura ?? medidas[aluno.id]?.altura,
-  }));
-};
-
 const LIMITES_MEDIDAS = {
   peso: { min: 30, max: 300 },
   altura: { min: 1, max: 2.5 }, // Altura em metros: de 100 a 250 cm.
@@ -87,7 +77,7 @@ const formatarMedida = (valor) =>
 export default function Alunos({ glassStyle }) {
   const [alunos, setAlunos] = useState(() => {
     const chave = obterChaveAlunos();
-    return chave ? aplicarMedidasLocais(lerCache(chave) || [], chave) : [];
+    return chave ? lerCache(chave) || [] : [];
   });
   const [carregando, setCarregando] = useState(() => {
     const chave = obterChaveAlunos();
@@ -128,7 +118,7 @@ export default function Alunos({ glassStyle }) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       });
-      setAlunos(aplicarMedidasLocais(dados, chave));
+      setAlunos(dados);
     } catch (erro) {
       console.error("Erro ao conectar com a API:", erro);
     } finally {
@@ -221,11 +211,6 @@ export default function Alunos({ glassStyle }) {
 
       if (response.ok) {
         const chave = obterChaveAlunos();
-        if (chave) {
-          const medidas = { ...lerCache(`medidas:${chave}`) };
-          delete medidas[idParaExcluir];
-          salvarCache(`medidas:${chave}`, medidas);
-        }
         setAlunos((lista) => {
           const novaLista = lista.filter((aluno) => aluno.id !== idParaExcluir);
           if (chave) salvarCache(chave, novaLista);
@@ -306,19 +291,7 @@ export default function Alunos({ glassStyle }) {
       }
 
       const chave = `alunos:${usuarioLogado.id}`;
-      const medidas = {
-        peso: converterMedida(formData.peso),
-        altura: converterMedida(formData.altura),
-      };
-      const alunoSalvo = {
-        ...dadosResposta,
-        peso: dadosResposta?.peso ?? medidas.peso,
-        altura: dadosResposta?.altura ?? medidas.altura,
-      };
-      salvarCache(`medidas:${chave}`, {
-        ...lerCache(`medidas:${chave}`),
-        [alunoSalvo.id]: medidas,
-      });
+      const alunoSalvo = dadosResposta;
       setAlunos((lista) => {
         const novaLista = editingId
           ? lista.map((aluno) =>
@@ -336,14 +309,6 @@ export default function Alunos({ glassStyle }) {
         expirarCachePorPrefixo("planos:");
         expirarCachePorPrefixo("planoDetalhe:");
       } else {
-        const chaveDash = `dashboard:${usuarioLogado.id}`;
-        const dashAtual = lerCache(chaveDash);
-        if (dashAtual) {
-          salvarCache(chaveDash, {
-            ...dashAtual,
-            totalAlunos: (dashAtual.totalAlunos ?? 0) + 1,
-          });
-        }
         expirarCachePorPrefixo("dashboard:");
       }
 

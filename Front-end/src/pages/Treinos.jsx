@@ -65,7 +65,7 @@ export default function Treinos({ glassStyle }) {
             `${ALUNOS_API_URL}/sem-treino?usuarioId=${usuarioLogado.id}`,
           );
           if (!response.ok) {
-            throw new Error("Não foi possível carregar os alunos sem treino.");
+            throw new Error(`Não foi possível carregar os alunos sem treino (HTTP ${response.status}).`);
           }
           return response.json();
         });
@@ -73,7 +73,11 @@ export default function Treinos({ glassStyle }) {
       } catch (erro) {
         console.error("Erro ao conectar com a API:", erro);
         if (!lerCache(chave)) {
-          setErros(["Não foi possível conectar ao servidor."]);
+          setErros([
+            erro instanceof TypeError
+              ? "Não foi possível conectar ao servidor. Verifique se a API está rodando em http://localhost:5011."
+              : erro.message || "Não foi possível carregar os alunos sem treino.",
+          ]);
         }
       } finally {
         setCarregando(false);

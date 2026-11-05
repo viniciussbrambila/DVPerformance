@@ -15,7 +15,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 const API_RECUPERAR_SENHA_URL = "http://localhost:5011/auth/recuperar-senha";
 
-export default function EsqueciSenha({ glassStyle, onEnviar, onVoltarLogin }) {
+export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
   const [usuario, setUsuario] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -54,9 +54,7 @@ export default function EsqueciSenha({ glassStyle, onEnviar, onVoltarLogin }) {
 
       if (!response.ok) {
         setErroApi(
-          data?.erros?.[0] ||
-            data?.mensagem ||
-            "Usuário não encontrado.",
+          data?.erros?.[0] || data?.mensagem || "Usuário não encontrado.",
         );
         return;
       }
@@ -66,7 +64,6 @@ export default function EsqueciSenha({ glassStyle, onEnviar, onVoltarLogin }) {
           "Senha alterada com sucesso! Você já pode entrar com a nova senha.",
       );
       setEnviado(true);
-      onEnviar?.({ usuario: usuario.trim(), novaSenha });
     } catch (erro) {
       setErroApi(
         "Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em http://localhost:5011.",

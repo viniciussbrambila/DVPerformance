@@ -50,6 +50,22 @@ public static class AlunoEndpoints
             return Results.Ok(alunos);
         });
 
+        // GET /alunos/sem-treino?usuarioId=1 -> Lista alunos ativos sem plano ativo
+        grupo.MapGet("/sem-treino", async (int? usuarioId, AppDbContext db) =>
+        {
+            var query = db.Alunos
+                .AsNoTracking()
+                .Where(a => a.Ativo && !db.Treinos.Any(t => t.AlunoId == a.Id && t.Ativo));
+
+            if (usuarioId.HasValue && usuarioId.Value > 0)
+            {
+                query = query.Where(a => a.UsuarioId == usuarioId.Value);
+            }
+
+            var alunos = await query.OrderBy(a => a.Id).ToListAsync();
+            return Results.Ok(alunos);
+        });
+
         // GET /alunos/{id} -> Busca um aluno ativo específico pelo Id no banco
         grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
         {

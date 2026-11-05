@@ -49,13 +49,6 @@ export default function useAlunosRelatorio() {
     };
   }, [chave, usuarioId]);
 
-  const medidas = chave ? lerCache(`medidas:${chave}`) || {} : {};
-  const alunos = usuarioId
-    ? prepararAlunosRelatorio(lista, usuarioId).map((aluno) => ({
-        ...aluno,
-        peso: aluno.peso ?? medidas[aluno.id]?.peso,
-        altura: aluno.altura ?? medidas[aluno.id]?.altura,
-      }))
-    : [];
+  const alunos = usuarioId ? prepararAlunosRelatorio(lista, usuarioId) : [];
   return { alunos, carregando, erro };
 }

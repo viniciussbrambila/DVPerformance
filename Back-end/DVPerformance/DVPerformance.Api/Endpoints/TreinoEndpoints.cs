@@ -204,7 +204,7 @@ public static class TreinoEndpoints
             var objetivoParaDica = NormalizarObjetivoParaDica(aluno.Objetivo);
             var dicasDoObjetivo = await db.DicasObjetivo
                 .AsNoTracking()
-                .Where(d => d.Ativo && d.Objetivo == objetivoParaDica)
+                .Where(d => d.Objetivo == objetivoParaDica)
                 .ToListAsync();
 
             var dicaSorteada = SortearDicaSemRepetirCiclo(dicasDoObjetivo, historicoDicasAluno);
@@ -278,6 +278,139 @@ public static class TreinoEndpoints
                 id = treino.Id,
                 status = treino.Status
             });
+        });
+
+        // Salva a edição completa; os itens omitidos são removidos somente deste plano.
+        grupo.MapPut("/{id:int}/itens", async (int id, AtualizarItensTreinoRequest? dados, AppDbContext db) =>
+        {
+            if (id <= 0 || dados?.Itens is not { Count: > 0 } entradas)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Informe um plano válido e mantenha pelo menos um exercício ou máquina."
+                });
+            }
+
+            var treino = await db.Treinos
+                .Include(t => t.Aluno)
+                .Include(t => t.DicaObjetivo)
+                .Include(t => t.Itens).ThenInclude(i => i.Exercicio).ThenInclude(e => e!.GrupoMuscular)
+                .Include(t => t.Itens).ThenInclude(i => i.Maquina).ThenInclude(m => m!.GrupoMuscular)
+                .FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
+
+            if (treino is null)
+            {
+                return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou desativada." });
+            }
+
+            var originais = treino.Itens.ToDictionary(i => i.Id);
+            if (entradas.Any(i => i is null || !originais.ContainsKey(i.Id))
+                || entradas.Select(i => i!.Id).Distinct().Count() != entradas.Count)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Os itens devem pertencer a este plano e não podem estar repetidos."
+                });
+            }
+
+            var idsExercicios = entradas.Where(i => i!.ExercicioId.HasValue).Select(i => i!.ExercicioId!.Value).Distinct().ToList();
+            var idsMaquinas = entradas.Where(i => i!.MaquinaId.HasValue).Select(i => i!.MaquinaId!.Value).Distinct().ToList();
+            var exercicios = await db.Exercicios.Include(e => e.GrupoMuscular)
+                .Where(e => idsExercicios.Contains(e.Id)).ToDictionaryAsync(e => e.Id);
+            var maquinas = await db.Maquinas.Include(m => m.GrupoMuscular)
+                .Where(m => idsMaquinas.Contains(m.Id)).ToDictionaryAsync(m => m.Id);
+            var donoId = treino.UsuarioId ?? treino.Aluno?.UsuarioId;
+            var alteracoes = new List<(ItemTreino Item, AtualizarItemTreinoRequest Dados, string Repeticao, string Descanso)>();
+
+            foreach (var entrada in entradas)
+            {
+                var atualizacao = entrada!;
+                var item = originais[atualizacao.Id];
+                if (atualizacao.ExercicioId.HasValue == atualizacao.MaquinaId.HasValue
+                    || item.MaquinaId.HasValue != atualizacao.MaquinaId.HasValue)
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Substitua exercícios por exercícios e máquinas por máquinas, informando apenas um vínculo."
+                    });
+                }
+
+                if (atualizacao.Series < MinSeries || atualizacao.Series > MaxSeries
+                    || !TentarNormalizarRepeticoes(atualizacao.Repeticao ?? "", out var repeticao)
+                    || !TentarNormalizarDescanso(atualizacao.TempoDescanso ?? "", out var descanso))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = $"Informe séries entre {MinSeries} e {MaxSeries}, repetições entre {MinRepeticoes} e {MaxRepeticoes} e descanso entre {MinDescansoSegundos} e {MaxDescansoSegundos} segundos."
+                    });
+                }
+
+                if (atualizacao.ExercicioId != item.ExercicioId
+                    && (!exercicios.TryGetValue(atualizacao.ExercicioId ?? 0, out var exercicio)
+                        || !exercicio.Ativo || exercicio.UsuarioId != donoId))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Selecione um exercício ativo do catálogo da conta responsável pelo plano."
+                    });
+                }
+
+                if (atualizacao.MaquinaId != item.MaquinaId
+                    && (!maquinas.TryGetValue(atualizacao.MaquinaId ?? 0, out var maquina)
+                        || !maquina.Ativo || maquina.UsuarioId != donoId))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Selecione uma máquina ativa do catálogo da conta responsável pelo plano."
+                    });
+                }
+
+                alteracoes.Add((item, atualizacao, repeticao, descanso));
+            }
+
+            // Só altera entidades após validar toda a edição. SaveChanges grava em uma transação.
+            var idsMantidos = entradas.Select(i => i!.Id).ToHashSet();
+            var removidos = treino.Itens.Where(i => !idsMantidos.Contains(i.Id)).ToList();
+            var houveAlteracao = removidos.Count > 0;
+            foreach (var (item, atualizacao, repeticao, descanso) in alteracoes)
+            {
+                houveAlteracao |= item.ExercicioId != atualizacao.ExercicioId
+                    || item.MaquinaId != atualizacao.MaquinaId
+                    || item.Series != atualizacao.Series
+                    || item.Repeticao != repeticao
+                    || item.TempoDescanso != descanso;
+
+                if (item.ExercicioId != atualizacao.ExercicioId)
+                {
+                    item.ExercicioId = atualizacao.ExercicioId;
+                    item.Exercicio = atualizacao.ExercicioId.HasValue ? exercicios[atualizacao.ExercicioId.Value] : null;
+                }
+                if (item.MaquinaId != atualizacao.MaquinaId)
+                {
+                    item.MaquinaId = atualizacao.MaquinaId;
+                    item.Maquina = atualizacao.MaquinaId.HasValue ? maquinas[atualizacao.MaquinaId.Value] : null;
+                }
+                item.Series = atualizacao.Series;
+                item.Repeticao = repeticao;
+                item.TempoDescanso = descanso;
+            }
+
+            db.ItensTreino.RemoveRange(removidos);
+            treino.Itens.RemoveAll(i => !idsMantidos.Contains(i.Id));
+            foreach (var dia in treino.Itens.GroupBy(i => i.DivisaoTreino))
+            {
+                var ordem = 1;
+                foreach (var item in dia.OrderBy(i => i.OrdemExercicio).ThenBy(i => i.Id))
+                {
+                    item.OrdemExercicio = ordem++;
+                }
+            }
+            if (houveAlteracao)
+            {
+                treino.Status = "Rascunho";
+            }
+            await db.SaveChangesAsync();
+            return Results.Ok(FormatarPlanoResposta(treino));
         });
 
         // PUT /treinos/itens/{idItem} -> Permite ao Personal editar um item específico do treino gerado (séries, repetições, descanso, aeróbico ou trocar exercício/máquina)

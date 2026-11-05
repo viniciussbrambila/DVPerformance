@@ -66,7 +66,6 @@ export default function Login({
         nome: data?.nome || data?.usuario || usuario.trim(),
       };
 
-      localStorage.setItem("usuarioLogado", JSON.stringify(dadosUsuario));
       onLogin(dadosUsuario);
     } catch (erro) {
       setErroApi(

@@ -9,7 +9,4 @@ public class DicaObjetivo
 
     // Texto da dica/orientação exibida no PDF em Planos Exportados
     public string Texto { get; set; } = string.Empty;
-
-    // Permite ativar/desativar dicas mantendo integridade dos planos já gerados
-    public bool Ativo { get; set; } = true;
 }

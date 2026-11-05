@@ -25,6 +25,8 @@ import {
   CircularProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
@@ -89,7 +91,12 @@ const obterChaveExercicios = () => {
   return `exercicios:${usuarioLogado?.id || "geral"}`;
 };
 
-export default function Exercicios({ glassStyle }) {
+export default function Exercicios({
+  glassStyle,
+  onSelecionar,
+  onVoltar,
+  itemAtualId,
+}) {
   const [exercicios, setExercicios] = useState(
     () => lerCache(obterChaveExercicios()) || [],
   );
@@ -104,6 +111,7 @@ export default function Exercicios({ glassStyle }) {
   const [form, setForm] = useState(formVazio);
   const [tentouSalvar, setTentouSalvar] = useState(false);
   const [errosApi, setErrosApi] = useState([]);
+  const [erroCarregamento, setErroCarregamento] = useState("");
 
   const carregarExercicios = async () => {
     const usuarioLogado = obterUsuarioLogado();
@@ -112,6 +120,7 @@ export default function Exercicios({ glassStyle }) {
       ? `${API_URL}?usuarioId=${usuarioLogado.id}`
       : API_URL;
 
+    setErroCarregamento("");
     try {
       const dados = await buscarComCache(chave, async () => {
         const response = await fetch(url);
@@ -121,6 +130,7 @@ export default function Exercicios({ glassStyle }) {
       setExercicios(dados);
     } catch (erro) {
       console.error("Erro ao carregar exercícios da API:", erro);
+      setErroCarregamento("Não foi possível carregar o catálogo. Tente novamente.");
     } finally {
       setCarregando(false);
     }
@@ -269,6 +279,27 @@ export default function Exercicios({ glassStyle }) {
 
   return (
     <Box>
+      {onSelecionar && (
+        <Button
+          color="inherit"
+          startIcon={<ArrowBackIcon />}
+          onClick={onVoltar}
+          sx={{ color: "text.secondary", mb: 2 }}
+        >
+          Voltar ao plano
+        </Button>
+      )}
+      {erroCarregamento && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {erroCarregamento}
+        </Alert>
+      )}
+      {onSelecionar && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Escolha um exercício para substituir o item do plano.
+          A alteração será gravada ao salvar o plano.
+        </Alert>
+      )}
       <Box
         sx={{
           display: "flex",
@@ -281,14 +312,16 @@ export default function Exercicios({ glassStyle }) {
           Catálogo de Exercícios
         </Typography>
 
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<AddIcon />}
-          onClick={abrirNovo}
-        >
-          Novo Exercício
-        </Button>
+        {!onSelecionar && (
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<AddIcon />}
+            onClick={abrirNovo}
+          >
+            Novo Exercício
+          </Button>
+        )}
       </Box>
 
       <Dialog
@@ -491,31 +524,44 @@ export default function Exercicios({ glassStyle }) {
                     {ex.descricao}
                   </TableCell>
                   <TableCell align="right">
-                    <Box
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 1,
-                        flexWrap: "nowrap",
-                      }}
-                    >
-                      <IconButton
+                    {onSelecionar ? (
+                      <Button
+                        variant="contained"
                         size="small"
-                        aria-label="Editar exercício"
-                        onClick={() => abrirEdicao(ex)}
-                        sx={{ bgcolor: "action.hover" }}
+                        startIcon={<CheckCircleOutlinedIcon />}
+                        disabled={ex.id === itemAtualId}
+                        onClick={() => onSelecionar(ex)}
+                        aria-label={"Selecionar " + ex.nome}
                       >
-                        <EditOutlinedIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        aria-label="Excluir exercício"
-                        onClick={() => excluir(ex.id)}
-                        sx={{ bgcolor: "action.hover" }}
+                        {ex.id === itemAtualId ? "Atual" : "Selecionar"}
+                      </Button>
+                    ) : (
+                      <Box
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 1,
+                          flexWrap: "nowrap",
+                        }}
                       >
-                        <DeleteOutlinedIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
+                        <IconButton
+                          size="small"
+                          aria-label="Editar exercício"
+                          onClick={() => abrirEdicao(ex)}
+                          sx={{ bgcolor: "action.hover" }}
+                        >
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          aria-label="Excluir exercício"
+                          onClick={() => excluir(ex.id)}
+                          sx={{ bgcolor: "action.hover" }}
+                        >
+                          <DeleteOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

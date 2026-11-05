@@ -143,7 +143,6 @@ export default function App() {
           ) : (
             <EsqueciSenha
               glassStyle={glassStyle}
-              onEnviar={() => {}}
               onVoltarLogin={() => setTelaAuth("login")}
             />
           )

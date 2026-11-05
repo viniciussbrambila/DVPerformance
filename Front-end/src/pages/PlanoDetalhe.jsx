@@ -15,6 +15,10 @@ import {
   TableHead,
   TableRow,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -24,6 +28,16 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
+import Exercicios from "./Exercicios";
+import Maquinas from "./Maquinas";
+import {
+  prepararEdicao,
+  removerItemDoPlano,
+  substituirItemDoPlano,
+  montarItensEdicao,
+} from "../utils/edicaoTreino";
 import {
   buscarComCache,
   lerCache,
@@ -36,17 +50,6 @@ import {
 const API_URL = "http://localhost:5011/treinos";
 
 const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
-
-// Peso e altura ainda são mantidos somente no cache da sessão do front-end.
-const obterMedidasAluno = (alunoId) => {
-  try {
-    const usuario = JSON.parse(localStorage.getItem("usuarioLogado") || "null");
-    if (!usuario?.id) return {};
-    return lerCache(`medidas:alunos:${usuario.id}`)?.[alunoId] || {};
-  } catch {
-    return {};
-  }
-};
 
 const formatarMedida = (valor, unidade) =>
   valor == null || valor === ""
@@ -89,11 +92,6 @@ function validarCampo(campo, valor) {
   return numero < min || numero > max ? `${min} a ${max}` : "";
 }
 
-const normalizarRepeticoes = (valor) =>
-  String(valor)
-    .trim()
-    .replace(/\s*-\s*/, "-");
-
 export default function PlanoDetalhe({ glassStyle }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -106,9 +104,11 @@ export default function PlanoDetalhe({ glassStyle }) {
   );
   const [erroApi, setErroApi] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [avisoValidacaoAberto, setAvisoValidacaoAberto] = useState(false);
 
   const [editando, setEditando] = useState(false);
   const [diasEdicao, setDiasEdicao] = useState([]);
+  const [itemParaSubstituir, setItemParaSubstituir] = useState(null);
 
   useEffect(() => {
     const chave = `planoDetalhe:${id}`;
@@ -202,20 +202,13 @@ export default function PlanoDetalhe({ glassStyle }) {
       });
     });
   }
-  const temErros = Object.keys(erros).length > 0;
+  const planoVazio =
+    editando && diasEdicao.every((dia) => dia.exercicios.length === 0);
+  const temErros = Object.keys(erros).length > 0 || planoVazio;
 
   const iniciarEdicao = () => {
     setErroApi("");
-    setDiasEdicao(
-      (plano.dias || []).map((dia) => ({
-        ...dia,
-        exercicios: (dia.exercicios || []).map((ex) => ({
-          ...ex,
-          series: String(ex.series),
-          descanso: String(parseInt(ex.descanso, 10) || 60),
-        })),
-      })),
-    );
+    setDiasEdicao(prepararEdicao(plano.dias || []));
     setEditando(true);
   };
 
@@ -234,77 +227,39 @@ export default function PlanoDetalhe({ glassStyle }) {
     );
   };
 
+  const removerItem = (itemId) => {
+    setDiasEdicao((lista) => removerItemDoPlano(lista, itemId));
+  };
+
+  const selecionarSubstituto = (substituto) => {
+    setDiasEdicao((lista) =>
+      substituirItemDoPlano(lista, itemParaSubstituir.id, substituto),
+    );
+    setItemParaSubstituir(null);
+  };
+
   const salvarEdicao = async () => {
-    if (temErros) return;
+    if (temErros || salvando) return;
     setSalvando(true);
     setErroApi("");
 
-    const diasFinal = diasEdicao.map((dia) => ({
-      ...dia,
-      exercicios: dia.exercicios.map((ex) => ({
-        ...ex,
-        series: Number(ex.series),
-        repeticoes: normalizarRepeticoes(ex.repeticoes),
-        descanso: `${Number(ex.descanso)}s`,
-      })),
-    }));
-
-    const originaisPorId = new Map();
-    (plano.dias || []).forEach((d) =>
-      (d.exercicios || []).forEach((ex) => originaisPorId.set(ex.id, ex)),
-    );
-
-    const itensModificados = [];
-    diasFinal.forEach((d) =>
-      d.exercicios.forEach((ex) => {
-        const orig = originaisPorId.get(ex.id);
-        if (
-          !orig ||
-          orig.series !== ex.series ||
-          orig.repeticoes !== ex.repeticoes ||
-          orig.descanso !== ex.descanso
-        ) {
-          itensModificados.push(ex);
-        }
-      }),
-    );
-
     try {
-      await Promise.all(
-        itensModificados.map(async (item) => {
-          const response = await fetch(`${API_URL}/itens/${item.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: Number(item.id),
-              treinoId: Number(item.treinoId),
-              divisaoTreino: String(item.divisaoTreino),
-              ordemExercicio: Number(item.ordemExercicio),
-              exercicioId:
-                item.exercicioId != null ? Number(item.exercicioId) : null,
-              maquinaId: item.maquinaId != null ? Number(item.maquinaId) : null,
-              series: Number(item.series),
-              repeticao: String(item.repeticoes),
-              tempoDescanso: String(item.descanso),
-              tempoAerobico: String(item.tempoAerobico || ""),
-            }),
-          });
-
-          if (!response.ok) {
-            const dados = await response.json().catch(() => null);
-            throw new Error(
-              dados?.mensagem || "Não foi possível salvar o item do treino.",
-            );
-          }
-        }),
-      );
-
-      setPlano((atual) => {
-        const atualizado = { ...atual, dias: diasFinal };
-        salvarCache(`planoDetalhe:${atual.id}`, atualizado);
-        return atualizado;
+      const response = await fetch(API_URL + "/" + plano.id + "/itens", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itens: montarItensEdicao(diasEdicao) }),
       });
-      atualizarItemEmListasCache("planos:", plano.id, { dias: diasFinal });
+
+      const dados = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          dados?.mensagem || "Não foi possível salvar as alterações do plano.",
+        );
+      }
+
+      setPlano(dados);
+      salvarCache("planoDetalhe:" + plano.id, dados);
+      atualizarItemEmListasCache("planos:", plano.id, dados);
       setEditando(false);
     } catch (err) {
       console.error("Erro ao salvar itens do treino:", err);
@@ -351,6 +306,11 @@ export default function PlanoDetalhe({ glassStyle }) {
   };
 
   const exportarPdf = async () => {
+    if (plano.status !== "Validado" && plano.status !== "Exportado") {
+      setAvisoValidacaoAberto(true);
+      return;
+    }
+
     const ok = await atualizarStatusNoBanco("Exportado");
     if (!ok) return;
 
@@ -362,11 +322,10 @@ export default function PlanoDetalhe({ glassStyle }) {
     }, 300);
   };
 
-  const medidasAluno = obterMedidasAluno(plano.alunoId);
   const infos = [
     ["Aluno", plano.aluno],
-    ["Peso", formatarMedida(plano.peso ?? medidasAluno.peso, "kg")],
-    ["Altura", formatarMedida(plano.altura ?? medidasAluno.altura, "m")],
+    ["Peso", formatarMedida(plano.peso, "kg")],
+    ["Altura", formatarMedida(plano.altura, "m")],
     ["Objetivo", plano.objetivo],
     ["Frequência", `${plano.frequencia} dias/semana`],
     ["Data", formatarData(plano.data)],
@@ -376,10 +335,15 @@ export default function PlanoDetalhe({ glassStyle }) {
     <Box>
       <GlobalStyles
         styles={{
+          "@page": { size: "A4", margin: 0 },
           "@media print": {
             ".MuiDrawer-root, .no-print": { display: "none !important" },
             "html, body": { background: "#fff !important" },
-            main: { padding: "0 !important", overflow: "visible !important" },
+            main: {
+              padding: "0 !important",
+              overflow: "visible !important",
+              minHeight: "auto !important",
+            },
           },
         }}
       />
@@ -488,6 +452,12 @@ export default function PlanoDetalhe({ glassStyle }) {
         </Alert>
       )}
 
+      {planoVazio && (
+        <Alert severity="warning" className="no-print" sx={{ mb: 3 }}>
+          O plano precisa manter pelo menos um exercício ou máquina.
+        </Alert>
+      )}
+
       <Paper
         elevation={0}
         sx={{
@@ -500,6 +470,10 @@ export default function PlanoDetalhe({ glassStyle }) {
             boxShadow: "none !important",
             border: "none !important",
             backdropFilter: "none !important",
+            padding: "12mm 15mm !important",
+            borderRadius: 0,
+            boxDecorationBreak: "clone",
+            WebkitBoxDecorationBreak: "clone",
             "& .MuiTypography-root, & .MuiTableCell-root": {
               color: "#000 !important",
             },
@@ -601,10 +575,27 @@ export default function PlanoDetalhe({ glassStyle }) {
                     <TableCell align="center" sx={cabecalhoSx}>
                       Descanso
                     </TableCell>
+                    {editando && (
+                      <TableCell
+                        className="no-print"
+                        align="center"
+                        sx={cabecalhoSx}
+                      >
+                        Ações
+                      </TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
 
                 <TableBody>
+                  {editando && dia.exercicios.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                        Nenhum item neste dia. Ao salvar, ele será removido do
+                        plano.
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {(dia.exercicios || []).map((ex, indiceEx) => (
                     <TableRow key={ex.id ?? `${ex.nome}-${indiceEx}`}>
                       <TableCell>
@@ -640,6 +631,7 @@ export default function PlanoDetalhe({ glassStyle }) {
                                   campo === "repeticoes" ? "text" : "number"
                                 }
                                 value={ex[campo]}
+                                disabled={salvando}
                                 onChange={(e) =>
                                   alterarCampo(
                                     indiceDia,
@@ -678,6 +670,38 @@ export default function PlanoDetalhe({ glassStyle }) {
                           </TableCell>
                         );
                       })}
+                      {editando && (
+                        <TableCell className="no-print" align="center">
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 1,
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Button
+                              size="small"
+                              color="inherit"
+                              startIcon={<SwapHorizOutlinedIcon />}
+                              disabled={salvando}
+                              onClick={() => setItemParaSubstituir(ex)}
+                              sx={{ bgcolor: "action.hover" }}
+                            >
+                              Substituir
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              startIcon={<DeleteOutlinedIcon />}
+                              disabled={salvando}
+                              onClick={() => removerItem(ex.id)}
+                              sx={{ bgcolor: "action.hover" }}
+                            >
+                              Remover
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -709,6 +733,61 @@ export default function PlanoDetalhe({ glassStyle }) {
           </Box>
         ))}
       </Paper>
+
+      <Dialog
+        fullScreen
+        open={Boolean(itemParaSubstituir)}
+        onClose={() => setItemParaSubstituir(null)}
+        aria-label="Selecionar substituto para o plano de treino"
+      >
+        <Box sx={{ p: { xs: 2, md: 4 } }}>
+          {itemParaSubstituir?.maquinaId != null ? (
+            <Maquinas
+              glassStyle={glassStyle}
+              onSelecionar={selecionarSubstituto}
+              onVoltar={() => setItemParaSubstituir(null)}
+              itemAtualId={itemParaSubstituir.maquinaId}
+            />
+          ) : itemParaSubstituir ? (
+            <Exercicios
+              glassStyle={glassStyle}
+              onSelecionar={selecionarSubstituto}
+              onVoltar={() => setItemParaSubstituir(null)}
+              itemAtualId={itemParaSubstituir.exercicioId}
+            />
+          ) : null}
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={avisoValidacaoAberto}
+        onClose={() => setAvisoValidacaoAberto(false)}
+        maxWidth="xs"
+        fullWidth
+        aria-labelledby="validar-plano-titulo"
+        aria-describedby="validar-plano-descricao"
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle
+          id="validar-plano-titulo"
+          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
+        >
+          Validação necessária
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="validar-plano-descricao" color="text.secondary">
+            Você precisa validar esse plano antes de exportá-lo!
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button
+            color="inherit"
+            onClick={() => setAvisoValidacaoAberto(false)}
+          >
+            Voltar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
