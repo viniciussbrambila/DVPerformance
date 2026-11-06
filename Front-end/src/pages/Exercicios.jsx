@@ -96,6 +96,7 @@ export default function Exercicios({
   onSelecionar,
   onVoltar,
   itemAtualId,
+  modoSelecao = "substituir",
 }) {
   const [exercicios, setExercicios] = useState(
     () => lerCache(obterChaveExercicios()) || [],
@@ -296,7 +297,9 @@ export default function Exercicios({
       )}
       {onSelecionar && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Escolha um exercício para substituir o item do plano.
+          {modoSelecao === "adicionar"
+            ? "Escolha um exercício para adicionar ao plano."
+            : "Escolha um exercício para substituir o item do plano."}{" "}
           A alteração será gravada ao salvar o plano.
         </Alert>
       )}
@@ -531,9 +534,15 @@ export default function Exercicios({
                         startIcon={<CheckCircleOutlinedIcon />}
                         disabled={ex.id === itemAtualId}
                         onClick={() => onSelecionar(ex)}
-                        aria-label={"Selecionar " + ex.nome}
+                        aria-label={
+                          (modoSelecao === "adicionar" ? "Adicionar " : "Substituir por ") + ex.nome
+                        }
                       >
-                        {ex.id === itemAtualId ? "Atual" : "Selecionar"}
+                        {ex.id === itemAtualId
+                          ? "Atual"
+                          : modoSelecao === "adicionar"
+                            ? "Adicionar"
+                            : "Substituir"}
                       </Button>
                     ) : (
                       <Box

@@ -6,6 +6,7 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import AddTaskIcon from "@mui/icons-material/AddTask";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import { buscarComCache, lerCache } from "../utils/cacheSessao";
 
 const DASHBOARD_RESUMO_URL = "http://localhost:5011/dashboard/resumo";
@@ -59,12 +60,13 @@ function BotaoAcesso({ glassStyle, icone, texto, onClick }) {
   return (
     <Paper
       elevation={0}
-      sx={{ ...glassStyle, borderRadius: 3, flex: "1 1 220px" }}
+      sx={{ ...glassStyle, borderRadius: 3, minWidth: 0 }}
     >
       <ButtonBase
         onClick={onClick}
         sx={{
           width: "100%",
+          height: "100%",
           justifyContent: "flex-start",
           gap: 2,
           px: 3,
@@ -147,7 +149,18 @@ export default function Dashboard({ glassStyle }) {
         Acesso Rápido
       </Typography>
 
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(3, minmax(0, 1fr))",
+          },
+          gridAutoRows: "1fr",
+          gap: 2,
+        }}
+      >
         <BotaoAcesso
           glassStyle={glassStyle}
           icone={<PeopleOutlinedIcon />}
@@ -165,6 +178,12 @@ export default function Dashboard({ glassStyle }) {
           icone={<DescriptionOutlinedIcon />}
           texto="Ver Planos"
           onClick={() => navigate("/planos")}
+        />
+        <BotaoAcesso
+          glassStyle={glassStyle}
+          icone={<AssessmentOutlinedIcon />}
+          texto="Relatórios"
+          onClick={() => navigate("/relatorios")}
         />
         <BotaoAcesso
           glassStyle={glassStyle}

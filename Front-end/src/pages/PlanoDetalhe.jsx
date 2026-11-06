@@ -3,6 +3,7 @@ import {
   Paper,
   Typography,
   Button,
+  ButtonBase,
   Divider,
   TextField,
   Alert,
@@ -30,10 +31,14 @@ import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
+import AddIcon from "@mui/icons-material/Add";
+import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import Exercicios from "./Exercicios";
 import Maquinas from "./Maquinas";
 import {
   prepararEdicao,
+  adicionarItemAoPlano,
   removerItemDoPlano,
   substituirItemDoPlano,
   montarItensEdicao,
@@ -63,6 +68,21 @@ const cabecalhoSx = {
 };
 
 const CAMPOS = ["series", "repeticoes", "descanso"];
+
+const CATALOGOS = [
+  {
+    tipo: "maquina",
+    titulo: "Máquinas",
+    descricao: "Abrir catálogo de máquinas",
+    Icone: FitnessCenterIcon,
+  },
+  {
+    tipo: "exercicio",
+    titulo: "Exercícios",
+    descricao: "Abrir biblioteca de exercícios",
+    Icone: DirectionsRunIcon,
+  },
+];
 
 const LIMITES = {
   series: { min: 1, max: 10 },
@@ -108,7 +128,9 @@ export default function PlanoDetalhe({ glassStyle }) {
 
   const [editando, setEditando] = useState(false);
   const [diasEdicao, setDiasEdicao] = useState([]);
-  const [itemParaSubstituir, setItemParaSubstituir] = useState(null);
+  const [selecaoItem, setSelecaoItem] = useState(null);
+  const [substitutoSelecionado, setSubstitutoSelecionado] = useState(null);
+  const [itemParaExcluir, setItemParaExcluir] = useState(null);
 
   useEffect(() => {
     const chave = `planoDetalhe:${id}`;
@@ -227,15 +249,50 @@ export default function PlanoDetalhe({ glassStyle }) {
     );
   };
 
-  const removerItem = (itemId) => {
-    setDiasEdicao((lista) => removerItemDoPlano(lista, itemId));
+  const fecharSelecao = () => {
+    setSelecaoItem(null);
+    setSubstitutoSelecionado(null);
   };
 
-  const selecionarSubstituto = (substituto) => {
+  const abrirAdicao = (indiceDia) => {
+    if (!editando) iniciarEdicao();
+    setSelecaoItem({ indiceDia, itemAtual: null, tipoCatalogo: null });
+  };
+
+  const selecionarItem = (selecionado) => {
+    if (selecaoItem.itemAtual) {
+      setSubstitutoSelecionado(selecionado);
+      return;
+    }
+
     setDiasEdicao((lista) =>
-      substituirItemDoPlano(lista, itemParaSubstituir.id, substituto),
+      adicionarItemAoPlano(
+        lista,
+        selecaoItem.indiceDia,
+        selecionado,
+        selecaoItem.tipoCatalogo,
+      ),
     );
-    setItemParaSubstituir(null);
+    fecharSelecao();
+  };
+
+  const confirmarSubstituicao = () => {
+    if (!selecaoItem?.itemAtual || !substitutoSelecionado) return;
+    setDiasEdicao((lista) =>
+      substituirItemDoPlano(
+        lista,
+        selecaoItem.itemAtual.id,
+        substitutoSelecionado,
+        selecaoItem.tipoCatalogo,
+      ),
+    );
+    fecharSelecao();
+  };
+
+  const confirmarExclusao = () => {
+    if (!itemParaExcluir) return;
+    setDiasEdicao((lista) => removerItemDoPlano(lista, itemParaExcluir.id));
+    setItemParaExcluir(null);
   };
 
   const salvarEdicao = async () => {
@@ -383,6 +440,8 @@ export default function PlanoDetalhe({ glassStyle }) {
                 startIcon={<CloseIcon />}
                 onClick={() => {
                   setErroApi("");
+                  fecharSelecao();
+                  setItemParaExcluir(null);
                   setEditando(false);
                 }}
               >
@@ -684,7 +743,13 @@ export default function PlanoDetalhe({ glassStyle }) {
                               color="inherit"
                               startIcon={<SwapHorizOutlinedIcon />}
                               disabled={salvando}
-                              onClick={() => setItemParaSubstituir(ex)}
+                              onClick={() =>
+                                setSelecaoItem({
+                                  indiceDia,
+                                  itemAtual: ex,
+                                  tipoCatalogo: null,
+                                })
+                              }
                               sx={{ bgcolor: "action.hover" }}
                             >
                               Substituir
@@ -694,16 +759,31 @@ export default function PlanoDetalhe({ glassStyle }) {
                               color="error"
                               startIcon={<DeleteOutlinedIcon />}
                               disabled={salvando}
-                              onClick={() => removerItem(ex.id)}
+                              onClick={() => setItemParaExcluir(ex)}
                               sx={{ bgcolor: "action.hover" }}
                             >
-                              Remover
+                              Excluir
                             </Button>
                           </Box>
                         </TableCell>
                       )}
                     </TableRow>
                   ))}
+                  <TableRow className="no-print">
+                    <TableCell align="center" sx={{ py: 3 }}>
+                      <Button
+                        color="inherit"
+                        startIcon={<AddIcon />}
+                        disabled={salvando}
+                        onClick={() => abrirAdicao(indiceDia)}
+                        aria-label={`Adicionar exercício ou máquina em ${dia.nome}`}
+                        sx={{ bgcolor: "action.hover", whiteSpace: "nowrap" }}
+                      >
+                        Adicionar exercício/máquina
+                      </Button>
+                    </TableCell>
+                    <TableCell colSpan={editando ? 4 : 3} />
+                  </TableRow>
                 </TableBody>
               </Table>
             </TableContainer>
@@ -735,28 +815,198 @@ export default function PlanoDetalhe({ glassStyle }) {
       </Paper>
 
       <Dialog
+        open={Boolean(selecaoItem && !selecaoItem.tipoCatalogo)}
+        onClose={fecharSelecao}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="escolher-catalogo-titulo"
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle
+          id="escolher-catalogo-titulo"
+          sx={{ fontWeight: "bold", fontSize: "1.35rem", textAlign: "center" }}
+        >
+          {selecaoItem?.itemAtual
+            ? "Como deseja substituir este item?"
+            : "O que deseja adicionar ao plano?"}
+        </DialogTitle>
+        <DialogContent>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+              gap: 2,
+              mt: 1,
+            }}
+          >
+            {CATALOGOS.map(({ tipo, titulo, descricao, Icone }) => (
+              <ButtonBase
+                key={tipo}
+                onClick={() =>
+                  setSelecaoItem((atual) => ({ ...atual, tipoCatalogo: tipo }))
+                }
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                  p: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                  color: "text.primary",
+                  bgcolor: "action.hover",
+                  "&:hover": { borderColor: "primary.main" },
+                  "&.Mui-focusVisible": {
+                    outline: "2px solid",
+                    outlineColor: "primary.main",
+                    outlineOffset: 2,
+                  },
+                }}
+              >
+                <Icone sx={{ fontSize: 32, color: "primary.main" }} />
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {titulo}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {descricao}
+                </Typography>
+              </ButtonBase>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button color="inherit" onClick={fecharSelecao}>
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
         fullScreen
-        open={Boolean(itemParaSubstituir)}
-        onClose={() => setItemParaSubstituir(null)}
-        aria-label="Selecionar substituto para o plano de treino"
+        open={Boolean(selecaoItem?.tipoCatalogo)}
+        onClose={fecharSelecao}
+        aria-label="Selecionar exercício ou máquina para o plano de treino"
       >
         <Box sx={{ p: { xs: 2, md: 4 } }}>
-          {itemParaSubstituir?.maquinaId != null ? (
+          {selecaoItem?.tipoCatalogo === "maquina" ? (
             <Maquinas
               glassStyle={glassStyle}
-              onSelecionar={selecionarSubstituto}
-              onVoltar={() => setItemParaSubstituir(null)}
-              itemAtualId={itemParaSubstituir.maquinaId}
+              onSelecionar={selecionarItem}
+              onVoltar={fecharSelecao}
+              itemAtualId={selecaoItem.itemAtual?.maquinaId}
+              modoSelecao={selecaoItem.itemAtual ? "substituir" : "adicionar"}
             />
-          ) : itemParaSubstituir ? (
+          ) : selecaoItem?.tipoCatalogo === "exercicio" ? (
             <Exercicios
               glassStyle={glassStyle}
-              onSelecionar={selecionarSubstituto}
-              onVoltar={() => setItemParaSubstituir(null)}
-              itemAtualId={itemParaSubstituir.exercicioId}
+              onSelecionar={selecionarItem}
+              onVoltar={fecharSelecao}
+              itemAtualId={selecaoItem.itemAtual?.exercicioId}
+              modoSelecao={selecaoItem.itemAtual ? "substituir" : "adicionar"}
             />
           ) : null}
         </Box>
+
+        <Dialog
+          open={Boolean(substitutoSelecionado)}
+          onClose={() => setSubstitutoSelecionado(null)}
+          maxWidth="xs"
+          fullWidth
+          aria-labelledby="substituir-item-titulo"
+          aria-describedby="substituir-item-descricao"
+          slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+        >
+          <DialogTitle
+            id="substituir-item-titulo"
+            sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
+          >
+            Confirmar substituição
+          </DialogTitle>
+          <DialogContent>
+            <Typography id="substituir-item-descricao" color="text.secondary">
+              Confirmar a substituição{" "}
+              {selecaoItem?.itemAtual?.maquinaId != null
+                ? "da máquina"
+                : "do exercício"}{" "}
+              <Box
+                component="span"
+                sx={{ fontWeight: 700, color: "text.primary" }}
+              >
+                {selecaoItem?.itemAtual?.nome}
+              </Box>{" "}
+              {selecaoItem?.tipoCatalogo === "maquina"
+                ? "pela máquina"
+                : "pelo exercício"}{" "}
+              <Box
+                component="span"
+                sx={{ fontWeight: 700, color: "text.primary" }}
+              >
+                {substitutoSelecionado?.nome}
+              </Box>
+              ?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+            <Button
+              color="inherit"
+              onClick={() => setSubstitutoSelecionado(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<CheckCircleOutlinedIcon />}
+              onClick={confirmarSubstituicao}
+            >
+              Confirmar
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(itemParaExcluir)}
+        onClose={() => setItemParaExcluir(null)}
+        maxWidth="xs"
+        fullWidth
+        aria-labelledby="excluir-item-titulo"
+        aria-describedby="excluir-item-descricao"
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle
+          id="excluir-item-titulo"
+          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
+        >
+          Confirmar exclusão
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="excluir-item-descricao" color="text.secondary">
+            Tem certeza de que deseja excluir{" "}
+            {itemParaExcluir?.maquinaId != null
+              ? "esta máquina"
+              : "este exercício"}{" "}
+            <Box
+              component="span"
+              sx={{ fontWeight: 700, color: "text.primary" }}
+            >
+              {itemParaExcluir?.nome}
+            </Box>{" "}
+            do plano?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button color="inherit" onClick={() => setItemParaExcluir(null)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteOutlinedIcon />}
+            onClick={confirmarExclusao}
+          >
+            Excluir
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog

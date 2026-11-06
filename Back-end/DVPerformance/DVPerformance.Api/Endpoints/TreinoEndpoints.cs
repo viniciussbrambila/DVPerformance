@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -304,15 +305,19 @@ public static class TreinoEndpoints
             }
 
             var originais = treino.Itens.ToDictionary(i => i.Id);
-            if (entradas.Any(i => i is null || !originais.ContainsKey(i.Id))
-                || entradas.Select(i => i!.Id).Distinct().Count() != entradas.Count)
+            if (entradas.Any(i => i is null || i.Id < 0 || (i.Id > 0 && !originais.ContainsKey(i.Id)))
+                || entradas.Where(i => i!.Id > 0).Select(i => i!.Id).Distinct().Count()
+                    != entradas.Count(i => i!.Id > 0))
             {
                 return Results.BadRequest(new
                 {
-                    mensagem = "Os itens devem pertencer a este plano e não podem estar repetidos."
+                    mensagem = "Os itens existentes devem pertencer a este plano e não podem estar repetidos. Informe zero como ID dos novos itens."
                 });
             }
 
+            var diasOriginais = treino.Itens
+                .GroupBy(i => i.DivisaoTreino)
+                .ToDictionary(g => g.Key, g => g.OrderBy(i => i.OrdemExercicio).ThenBy(i => i.Id).First().TempoAerobico);
             var idsExercicios = entradas.Where(i => i!.ExercicioId.HasValue).Select(i => i!.ExercicioId!.Value).Distinct().ToList();
             var idsMaquinas = entradas.Where(i => i!.MaquinaId.HasValue).Select(i => i!.MaquinaId!.Value).Distinct().ToList();
             var exercicios = await db.Exercicios.Include(e => e.GrupoMuscular)
@@ -320,18 +325,29 @@ public static class TreinoEndpoints
             var maquinas = await db.Maquinas.Include(m => m.GrupoMuscular)
                 .Where(m => idsMaquinas.Contains(m.Id)).ToDictionaryAsync(m => m.Id);
             var donoId = treino.UsuarioId ?? treino.Aluno?.UsuarioId;
-            var alteracoes = new List<(ItemTreino Item, AtualizarItemTreinoRequest Dados, string Repeticao, string Descanso)>();
+            var ordensPorDia = new Dictionary<string, int>();
+            var alteracoes = new List<(ItemTreino? Item, AtualizarItemTreinoRequest Dados, string Divisao, int Ordem, string Repeticao, string Descanso)>();
 
             foreach (var entrada in entradas)
             {
                 var atualizacao = entrada!;
-                var item = originais[atualizacao.Id];
-                if (atualizacao.ExercicioId.HasValue == atualizacao.MaquinaId.HasValue
-                    || item.MaquinaId.HasValue != atualizacao.MaquinaId.HasValue)
+                var item = atualizacao.Id == 0 ? null : originais[atualizacao.Id];
+                var divisao = item?.DivisaoTreino ?? atualizacao.DivisaoTreino?.Trim();
+                if (string.IsNullOrWhiteSpace(divisao) || !diasOriginais.ContainsKey(divisao)
+                    || (item is not null && atualizacao.DivisaoTreino is not null
+                        && atualizacao.DivisaoTreino.Trim() != item.DivisaoTreino))
                 {
                     return Results.BadRequest(new
                     {
-                        mensagem = "Substitua exercícios por exercícios e máquinas por máquinas, informando apenas um vínculo."
+                        mensagem = "Adicione itens somente aos dias existentes e mantenha cada item original no seu dia."
+                    });
+                }
+
+                if (atualizacao.ExercicioId.HasValue == atualizacao.MaquinaId.HasValue)
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Selecione apenas um exercício ou uma máquina para cada item do plano."
                     });
                 }
 
@@ -345,8 +361,9 @@ public static class TreinoEndpoints
                     });
                 }
 
-                if (atualizacao.ExercicioId != item.ExercicioId
-                    && (!exercicios.TryGetValue(atualizacao.ExercicioId ?? 0, out var exercicio)
+                if (atualizacao.ExercicioId.HasValue
+                    && (item is null || atualizacao.ExercicioId != item.ExercicioId)
+                    && (!exercicios.TryGetValue(atualizacao.ExercicioId.Value, out var exercicio)
                         || !exercicio.Ativo || exercicio.UsuarioId != donoId))
                 {
                     return Results.BadRequest(new
@@ -355,8 +372,9 @@ public static class TreinoEndpoints
                     });
                 }
 
-                if (atualizacao.MaquinaId != item.MaquinaId
-                    && (!maquinas.TryGetValue(atualizacao.MaquinaId ?? 0, out var maquina)
+                if (atualizacao.MaquinaId.HasValue
+                    && (item is null || atualizacao.MaquinaId != item.MaquinaId)
+                    && (!maquinas.TryGetValue(atualizacao.MaquinaId.Value, out var maquina)
                         || !maquina.Ativo || maquina.UsuarioId != donoId))
                 {
                     return Results.BadRequest(new
@@ -365,20 +383,33 @@ public static class TreinoEndpoints
                     });
                 }
 
-                alteracoes.Add((item, atualizacao, repeticao, descanso));
+                ordensPorDia.TryGetValue(divisao, out var ordem);
+                ordensPorDia[divisao] = ++ordem;
+                alteracoes.Add((item, atualizacao, divisao, ordem, repeticao, descanso));
             }
 
             // Só altera entidades após validar toda a edição. SaveChanges grava em uma transação.
-            var idsMantidos = entradas.Select(i => i!.Id).ToHashSet();
+            var idsMantidos = entradas.Where(i => i!.Id > 0).Select(i => i!.Id).ToHashSet();
             var removidos = treino.Itens.Where(i => !idsMantidos.Contains(i.Id)).ToList();
             var houveAlteracao = removidos.Count > 0;
-            foreach (var (item, atualizacao, repeticao, descanso) in alteracoes)
+            db.ItensTreino.RemoveRange(removidos);
+            treino.Itens.RemoveAll(i => !idsMantidos.Contains(i.Id));
+
+            foreach (var (original, atualizacao, divisao, ordem, repeticao, descanso) in alteracoes)
             {
-                houveAlteracao |= item.ExercicioId != atualizacao.ExercicioId
+                var item = original ?? new ItemTreino
+                {
+                    TreinoId = treino.Id,
+                    DivisaoTreino = divisao,
+                    TempoAerobico = diasOriginais[divisao]
+                };
+                houveAlteracao |= original is null
+                    || item.ExercicioId != atualizacao.ExercicioId
                     || item.MaquinaId != atualizacao.MaquinaId
                     || item.Series != atualizacao.Series
                     || item.Repeticao != repeticao
-                    || item.TempoDescanso != descanso;
+                    || item.TempoDescanso != descanso
+                    || item.OrdemExercicio != ordem;
 
                 if (item.ExercicioId != atualizacao.ExercicioId)
                 {
@@ -393,18 +424,15 @@ public static class TreinoEndpoints
                 item.Series = atualizacao.Series;
                 item.Repeticao = repeticao;
                 item.TempoDescanso = descanso;
-            }
+                item.OrdemExercicio = ordem;
 
-            db.ItensTreino.RemoveRange(removidos);
-            treino.Itens.RemoveAll(i => !idsMantidos.Contains(i.Id));
-            foreach (var dia in treino.Itens.GroupBy(i => i.DivisaoTreino))
-            {
-                var ordem = 1;
-                foreach (var item in dia.OrderBy(i => i.OrdemExercicio).ThenBy(i => i.Id))
+                if (original is null)
                 {
-                    item.OrdemExercicio = ordem++;
+                    treino.Itens.Add(item);
+                    db.ItensTreino.Add(item);
                 }
             }
+
             if (houveAlteracao)
             {
                 treino.Status = "Rascunho";
@@ -1184,6 +1212,16 @@ public static class TreinoEndpoints
 
         var dias = itensOrdenados
             .GroupBy(i => string.IsNullOrWhiteSpace(i.DivisaoTreino) ? "Treino" : i.DivisaoTreino)
+            .OrderBy(grupoDia =>
+            {
+                // Mantém A/B/C e A1/B1/C1/A2/B2/C2 mesmo após substituir todos os itens de um dia.
+                var prefixo = Regex.Match(grupoDia.Key, @"^Treino ([A-Z])([1-9]\d*)?(?:\s+-|$)");
+                var ciclo = 0;
+                return prefixo.Success
+                    && (prefixo.Groups[2].Value.Length == 0 || int.TryParse(prefixo.Groups[2].Value, out ciclo))
+                    ? (ciclo, prefixo.Groups[1].Value[0])
+                    : (int.MaxValue, char.MaxValue);
+            })
             .Select(grupoDia => new
             {
                 nome = grupoDia.Key,

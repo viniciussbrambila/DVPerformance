@@ -17,12 +17,39 @@ export function removerItemDoPlano(dias, itemId) {
   }));
 }
 
-export function substituirItemDoPlano(dias, itemId, substituto) {
+export function adicionarItemAoPlano(dias, indiceDia, selecionado, tipo) {
+  const id = Math.min(0, ...dias.flatMap((dia) => dia.exercicios.map((item) => item.id))) - 1;
+  const maquina = tipo === "maquina";
+
+  return dias.map((dia, indice) =>
+    indice !== indiceDia
+      ? dia
+      : {
+          ...dia,
+          exercicios: [
+            ...dia.exercicios,
+            {
+              id,
+              nome: selecionado.nome,
+              grupo: selecionado.grupo,
+              tipo: maquina ? "Máquina" : "Exercício",
+              exercicioId: maquina ? null : selecionado.id,
+              maquinaId: maquina ? selecionado.id : null,
+              series: "3",
+              repeticoes: "10-12",
+              descanso: "60",
+            },
+          ],
+        },
+  );
+}
+
+export function substituirItemDoPlano(dias, itemId, substituto, tipo) {
   return dias.map((dia) => ({
     ...dia,
     exercicios: dia.exercicios.map((item) => {
       if (item.id !== itemId) return item;
-      const maquina = item.maquinaId != null;
+      const maquina = tipo ? tipo === "maquina" : item.maquinaId != null;
       return {
         ...item,
         nome: substituto.nome,
@@ -38,7 +65,8 @@ export function substituirItemDoPlano(dias, itemId, substituto) {
 export function montarItensEdicao(dias) {
   return dias.flatMap((dia) =>
     dia.exercicios.map((item) => ({
-      id: item.id,
+      id: item.id > 0 ? item.id : 0,
+      divisaoTreino: dia.nome,
       exercicioId: item.exercicioId ?? null,
       maquinaId: item.maquinaId ?? null,
       series: Number(item.series),

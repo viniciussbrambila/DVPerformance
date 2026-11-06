@@ -96,6 +96,7 @@ export default function Maquinas({
   onSelecionar,
   onVoltar,
   itemAtualId,
+  modoSelecao = "substituir",
 }) {
   const [maquinas, setMaquinas] = useState(
     () => lerCache(obterChaveMaquinas()) || [],
@@ -296,7 +297,9 @@ export default function Maquinas({
       )}
       {onSelecionar && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Escolha uma máquina para substituir o item do plano.
+          {modoSelecao === "adicionar"
+            ? "Escolha uma máquina para adicionar ao plano."
+            : "Escolha uma máquina para substituir o item do plano."}{" "}
           A alteração será gravada ao salvar o plano.
         </Alert>
       )}
@@ -544,9 +547,15 @@ export default function Maquinas({
                         startIcon={<CheckCircleOutlinedIcon />}
                         disabled={maq.id === itemAtualId}
                         onClick={() => onSelecionar(maq)}
-                        aria-label={"Selecionar " + maq.nome}
+                        aria-label={
+                          (modoSelecao === "adicionar" ? "Adicionar " : "Substituir por ") + maq.nome
+                        }
                       >
-                        {maq.id === itemAtualId ? "Atual" : "Selecionar"}
+                        {maq.id === itemAtualId
+                          ? "Atual"
+                          : modoSelecao === "adicionar"
+                            ? "Adicionar"
+                            : "Substituir"}
                       </Button>
                     ) : (
                       <Box

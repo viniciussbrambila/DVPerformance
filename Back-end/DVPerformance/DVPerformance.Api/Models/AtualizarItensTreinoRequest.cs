@@ -6,6 +6,7 @@ public record AtualizarItemTreinoRequest(
     int? MaquinaId,
     int Series,
     string? Repeticao,
-    string? TempoDescanso);
+    string? TempoDescanso,
+    string? DivisaoTreino = null);
 
 public record AtualizarItensTreinoRequest(List<AtualizarItemTreinoRequest?>? Itens);
