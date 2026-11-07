@@ -38,6 +38,6 @@ public class ItemTreino
     // tempoDescanso: intervalo entre séries (ex: "45s", "60s", "120s")
     public string TempoDescanso { get; set; } = string.Empty;
 
-    // tempoAerobico: prescrição de cardio daquele dia (ex: "25 min HIIT / Esteira pós-treino")
-    public string TempoAerobico { get; set; } = string.Empty;
+    // Duração do aeróbico do dia em minutos; zero indica que foi removido.
+    public int TempoAerobico { get; set; }
 }

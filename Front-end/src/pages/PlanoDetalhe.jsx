@@ -31,13 +31,14 @@ import CloseIcon from "@mui/icons-material/Close";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
-import AddIcon from "@mui/icons-material/Add";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import Exercicios from "./Exercicios";
 import Maquinas from "./Maquinas";
 import {
   prepararEdicao,
+  formatarTempoAerobico,
+  alterarAerobicoDoPlano,
   adicionarItemAoPlano,
   removerItemDoPlano,
   substituirItemDoPlano,
@@ -88,6 +89,7 @@ const LIMITES = {
   series: { min: 1, max: 10 },
   repeticoes: { min: 6, max: 30 },
   descanso: { min: 30, max: 300 },
+  aerobico: { min: 10, max: 100 },
 };
 
 function validarCampo(campo, valor) {
@@ -131,6 +133,8 @@ export default function PlanoDetalhe({ glassStyle }) {
   const [selecaoItem, setSelecaoItem] = useState(null);
   const [substitutoSelecionado, setSubstitutoSelecionado] = useState(null);
   const [itemParaExcluir, setItemParaExcluir] = useState(null);
+  const [edicaoAerobico, setEdicaoAerobico] = useState(null);
+  const [diaParaRemoverAerobico, setDiaParaRemoverAerobico] = useState(null);
 
   useEffect(() => {
     const chave = `planoDetalhe:${id}`;
@@ -212,6 +216,14 @@ export default function PlanoDetalhe({ glassStyle }) {
   }
 
   const dias = editando ? diasEdicao : plano.dias || [];
+  const minutosAerobico = Number(edicaoAerobico?.minutos);
+  const tempoAerobicoValido = Boolean(
+    edicaoAerobico &&
+    /^\d+$/.test(edicaoAerobico.minutos) &&
+    Number.isInteger(minutosAerobico) &&
+    minutosAerobico >= LIMITES.aerobico.min &&
+    minutosAerobico <= LIMITES.aerobico.max,
+  );
 
   const erros = {};
   if (editando) {
@@ -247,6 +259,33 @@ export default function PlanoDetalhe({ glassStyle }) {
             },
       ),
     );
+  };
+
+  const abrirEdicaoAerobico = (indiceDia) => {
+    if (!editando) iniciarEdicao();
+    const minutos = dias[indiceDia].tempoAerobico || 0;
+    setEdicaoAerobico({
+      indiceDia,
+      minutos: minutos > 0 ? String(minutos) : "20",
+      adicionando: minutos === 0,
+    });
+  };
+
+  const confirmarAerobico = (event) => {
+    event.preventDefault();
+    if (!tempoAerobicoValido || salvando) return;
+    setDiasEdicao((lista) =>
+      alterarAerobicoDoPlano(lista, edicaoAerobico.indiceDia, minutosAerobico),
+    );
+    setEdicaoAerobico(null);
+  };
+
+  const confirmarRemocaoAerobico = () => {
+    if (diaParaRemoverAerobico === null) return;
+    setDiasEdicao((lista) =>
+      alterarAerobicoDoPlano(lista, diaParaRemoverAerobico, 0),
+    );
+    setDiaParaRemoverAerobico(null);
   };
 
   const fecharSelecao = () => {
@@ -442,6 +481,8 @@ export default function PlanoDetalhe({ glassStyle }) {
                   setErroApi("");
                   fecharSelecao();
                   setItemParaExcluir(null);
+                  setEdicaoAerobico(null);
+                  setDiaParaRemoverAerobico(null);
                   setEditando(false);
                 }}
               >
@@ -770,44 +811,90 @@ export default function PlanoDetalhe({ glassStyle }) {
                     </TableRow>
                   ))}
                   <TableRow className="no-print">
-                    <TableCell align="center" sx={{ py: 3 }}>
+                    <TableCell
+                      colSpan={editando ? 5 : 4}
+                      align="left"
+                      sx={{ py: 3, px: 0 }}
+                    >
                       <Button
-                        color="inherit"
-                        startIcon={<AddIcon />}
+                        variant="contained"
+                        color="primary"
+                        startIcon={<FitnessCenterIcon />}
                         disabled={salvando}
                         onClick={() => abrirAdicao(indiceDia)}
                         aria-label={`Adicionar exercício ou máquina em ${dia.nome}`}
-                        sx={{ bgcolor: "action.hover", whiteSpace: "nowrap" }}
+                        sx={{ whiteSpace: "nowrap" }}
                       >
-                        Adicionar exercício/máquina
+                        Adicionar
                       </Button>
                     </TableCell>
-                    <TableCell colSpan={editando ? 4 : 3} />
                   </TableRow>
                 </TableBody>
               </Table>
             </TableContainer>
 
-            {(dia.tempoAerobico || plano.tempoAerobico) && (
+            {dia.tempoAerobico > 0 ? (
               <Box
                 className="info-faixa"
                 sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 2,
                   p: 2,
                   mt: 2,
                   borderRadius: 3,
                   bgcolor: "action.hover",
                 }}
               >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 700, textTransform: "uppercase" }}
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontWeight: 700, textTransform: "uppercase" }}
+                  >
+                    Aeróbico
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {formatarTempoAerobico(dia.tempoAerobico)}
+                  </Typography>
+                </Box>
+                {editando && (
+                  <Box className="no-print" sx={{ display: "flex", gap: 1 }}>
+                    <Button
+                      color="inherit"
+                      startIcon={<EditOutlinedIcon />}
+                      disabled={salvando}
+                      onClick={() => abrirEdicaoAerobico(indiceDia)}
+                      aria-label={`Editar aeróbico em ${dia.nome}`}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      color="error"
+                      startIcon={<DeleteOutlinedIcon />}
+                      disabled={salvando}
+                      onClick={() => setDiaParaRemoverAerobico(indiceDia)}
+                      aria-label={`Remover aeróbico em ${dia.nome}`}
+                    >
+                      Remover
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              <Box className="no-print" sx={{ mt: 2 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<DirectionsRunIcon />}
+                  disabled={salvando}
+                  onClick={() => abrirEdicaoAerobico(indiceDia)}
+                  aria-label={`Adicionar aeróbico em ${dia.nome}`}
                 >
-                  Orientação de Cardio / Aeróbico
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {dia.tempoAerobico || plano.tempoAerobico}
-                </Typography>
+                  Aeróbico+
+                </Button>
               </Box>
             )}
           </Box>
@@ -1005,6 +1092,117 @@ export default function PlanoDetalhe({ glassStyle }) {
             onClick={confirmarExclusao}
           >
             Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(edicaoAerobico)}
+        onClose={() => setEdicaoAerobico(null)}
+        maxWidth="xs"
+        fullWidth
+        aria-labelledby="editar-aerobico-titulo"
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <Box component="form" onSubmit={confirmarAerobico}>
+          <DialogTitle
+            id="editar-aerobico-titulo"
+            sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
+          >
+            {edicaoAerobico?.adicionando
+              ? "Adicionar aeróbico"
+              : "Editar aeróbico"}
+          </DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              type="number"
+              label="Tempo do aeróbico"
+              value={edicaoAerobico?.minutos ?? ""}
+              onChange={(event) =>
+                setEdicaoAerobico((atual) => ({
+                  ...atual,
+                  minutos: event.target.value,
+                }))
+              }
+              error={Boolean(edicaoAerobico && !tempoAerobicoValido)}
+              helperText={
+                edicaoAerobico && !tempoAerobicoValido
+                  ? `Informe minutos inteiros entre ${LIMITES.aerobico.min} e ${LIMITES.aerobico.max}.`
+                  : `Tempo permitido: ${LIMITES.aerobico.min} a ${LIMITES.aerobico.max} minutos.`
+              }
+              sx={{ mt: 1 }}
+              slotProps={{
+                htmlInput: {
+                  min: LIMITES.aerobico.min,
+                  max: LIMITES.aerobico.max,
+                  step: 1,
+                },
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">min</InputAdornment>
+                  ),
+                },
+              }}
+            />
+            {tempoAerobicoValido && (
+              <Typography color="text.secondary" sx={{ mt: 2 }}>
+                {formatarTempoAerobico(minutosAerobico)}
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+            <Button color="inherit" onClick={() => setEdicaoAerobico(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<CheckCircleOutlinedIcon />}
+              disabled={!tempoAerobicoValido || salvando}
+            >
+              Confirmar
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={diaParaRemoverAerobico !== null}
+        onClose={() => setDiaParaRemoverAerobico(null)}
+        maxWidth="xs"
+        fullWidth
+        aria-labelledby="remover-aerobico-titulo"
+        aria-describedby="remover-aerobico-descricao"
+        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+      >
+        <DialogTitle
+          id="remover-aerobico-titulo"
+          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
+        >
+          Remover aeróbico
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="remover-aerobico-descricao" color="text.secondary">
+            Tem certeza de que deseja remover o aeróbico de{" "}
+            {dias[diaParaRemoverAerobico]?.nome}?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button
+            color="inherit"
+            onClick={() => setDiaParaRemoverAerobico(null)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteOutlinedIcon />}
+            onClick={confirmarRemocaoAerobico}
+          >
+            Remover
           </Button>
         </DialogActions>
       </Dialog>

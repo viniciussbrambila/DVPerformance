@@ -628,10 +628,10 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("series");
 
-                    b.Property<string>("TempoAerobico")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
+                    b.Property<int>("TempoAerobico")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
                         .HasColumnName("tempo_aerobico");
 
                     b.Property<string>("TempoDescanso")

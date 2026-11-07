@@ -26,6 +26,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CabecalhoRelatorio from "../components/CabecalhoRelatorio";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import { exportarPdfRelatorio } from "../utils/relatorios";
+import { formatarTempoAerobico } from "../utils/edicaoTreino";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
@@ -61,7 +62,6 @@ function montarTexto(plano) {
     `Objetivo: ${plano.objetivo}`,
     `Frequência: ${plano.frequencia}x/semana`,
     plano.divisao ? `Divisão: ${plano.divisao}` : null,
-    plano.tempoAerobico ? `Orientação Aeróbica: ${plano.tempoAerobico}` : null,
     `Data: ${formatarData(plano.data)}`,
     "",
   ].filter((l) => l !== null);
@@ -75,7 +75,7 @@ function montarTexto(plano) {
       );
     });
     if (dia.tempoAerobico) {
-      linhas.push(`  * Cardio do dia: ${dia.tempoAerobico}`);
+      linhas.push(`  * ${formatarTempoAerobico(dia.tempoAerobico)}`);
     }
     linhas.push("");
   });

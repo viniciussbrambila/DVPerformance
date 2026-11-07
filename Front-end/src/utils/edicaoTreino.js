@@ -1,6 +1,7 @@
 export function prepararEdicao(dias) {
   return dias.map((dia) => ({
     ...dia,
+    tempoAerobico: dia.tempoAerobico ?? 0,
     exercicios: (dia.exercicios || []).map((item) => ({
       ...item,
       series: String(item.series),
@@ -8,6 +9,16 @@ export function prepararEdicao(dias) {
       descanso: String(parseInt(item.descanso, 10) || 60),
     })),
   }));
+}
+
+export function formatarTempoAerobico(minutos) {
+  return minutos > 0 ? `${minutos} min de aeróbico` : "";
+}
+
+export function alterarAerobicoDoPlano(dias, indiceDia, minutos) {
+  return dias.map((dia, indice) =>
+    indice === indiceDia ? { ...dia, tempoAerobico: minutos } : dia,
+  );
 }
 
 export function removerItemDoPlano(dias, itemId) {
@@ -67,6 +78,7 @@ export function montarItensEdicao(dias) {
     dia.exercicios.map((item) => ({
       id: item.id > 0 ? item.id : 0,
       divisaoTreino: dia.nome,
+      tempoAerobico: dia.tempoAerobico ?? 0,
       exercicioId: item.exercicioId ?? null,
       maquinaId: item.maquinaId ?? null,
       series: Number(item.series),

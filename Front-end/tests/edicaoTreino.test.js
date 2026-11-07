@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   prepararEdicao,
+  formatarTempoAerobico,
+  alterarAerobicoDoPlano,
   adicionarItemAoPlano,
   removerItemDoPlano,
   substituirItemDoPlano,
@@ -63,8 +65,8 @@ test("salvar envia substituicoes, prescricao e apenas os itens mantidos", () => 
   dias = removerItemDoPlano(dias, 1);
   dias[0].exercicios[0].repeticoes = " 8 - 12 ";
   assert.deepEqual(montarItensEdicao(dias), [
-    { id: 2, divisaoTreino: "A", exercicioId: null, maquinaId: 21, series: 4, repeticao: "8-12", tempoDescanso: "90s" },
-    { id: 3, divisaoTreino: "B", exercicioId: 10, maquinaId: null, series: 3, repeticao: "8-12", tempoDescanso: "60s" },
+    { id: 2, divisaoTreino: "A", tempoAerobico: 0, exercicioId: null, maquinaId: 21, series: 4, repeticao: "8-12", tempoDescanso: "90s" },
+    { id: 3, divisaoTreino: "B", tempoAerobico: 0, exercicioId: 10, maquinaId: null, series: 3, repeticao: "8-12", tempoDescanso: "60s" },
   ]);
 });
 
@@ -130,4 +132,43 @@ test("adicionar em dia esvaziado preserva o dia e envia o novo item ao final", (
   assert.equal(enviados.at(-1).id, 0);
   assert.equal(enviados.at(-1).divisaoTreino, "B");
   assert.equal(enviados.at(-1).maquinaId, 22);
+});
+
+test("aerobico exibe apenas minutos e o texto padronizado", () => {
+  assert.equal(formatarTempoAerobico(20), "20 min de aeróbico");
+  assert.equal(formatarTempoAerobico(15), "15 min de aeróbico");
+  assert.equal(formatarTempoAerobico(0), "");
+});
+
+test("editar, remover e readicionar aerobico preserva outros dias e o plano original", () => {
+  const original = plano();
+  original[0].tempoAerobico = 20;
+  original[1].tempoAerobico = 15;
+  let dias = alterarAerobicoDoPlano(prepararEdicao(original), 0, 35);
+  assert.equal(dias[0].tempoAerobico, 35);
+  assert.equal(dias[1].tempoAerobico, 15);
+  dias = alterarAerobicoDoPlano(dias, 0, 0);
+  assert.equal(dias[0].tempoAerobico, 0);
+  dias = alterarAerobicoDoPlano(dias, 0, 25);
+  assert.equal(dias[0].tempoAerobico, 25);
+  assert.equal(original[0].tempoAerobico, 20);
+});
+
+test("salvar propaga o aerobico para todos os itens do dia inclusive novos", () => {
+  let dias = alterarAerobicoDoPlano(prepararEdicao(plano()), 0, 30);
+  dias = alterarAerobicoDoPlano(dias, 1, 15);
+  dias = adicionarItemAoPlano(dias, 0, { id: 30, nome: "Supino", grupo: "Peito" }, "exercicio");
+  const enviados = montarItensEdicao(dias);
+  assert.deepEqual(enviados.filter((item) => item.divisaoTreino === "A").map((item) => item.tempoAerobico), [30, 30, 30]);
+  assert.equal(enviados.at(-1).tempoAerobico, 15);
+});
+
+test("remover aerobico envia zero e excluir o primeiro exercicio nao perde o tempo do dia", () => {
+  let dias = alterarAerobicoDoPlano(prepararEdicao(plano()), 0, 25);
+  dias = alterarAerobicoDoPlano(dias, 1, 0);
+  dias = removerItemDoPlano(dias, 1);
+  const enviados = montarItensEdicao(dias);
+  assert.equal(enviados[0].id, 2);
+  assert.equal(enviados[0].tempoAerobico, 25);
+  assert.equal(enviados[1].tempoAerobico, 0);
 });

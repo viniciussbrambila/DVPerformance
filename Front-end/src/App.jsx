@@ -11,10 +11,9 @@ import {
   Navigate,
 } from "react-router-dom";
 import { styled, ThemeProvider } from "@mui/material/styles";
-import { CssBaseline, Box, IconButton, Badge, Switch } from "@mui/material";
+import { CssBaseline, Box, Switch } from "@mui/material";
 import Darktheme, { darkGlassStyle } from "./themes/Dark.js";
 import Lighttheme, { lightGlassStyle } from "./themes/Light";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 
 import Sidebar from "./components/Sidebar";
 import Alunos from "./pages/Alunos";
@@ -170,7 +169,6 @@ export default function App() {
                 zIndex: 1200,
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
               }}
             >
               <MaterialUISwitch
@@ -178,11 +176,6 @@ export default function App() {
                 onChange={handleThemeChange}
               />
 
-              <IconButton color="inherit">
-                <Badge badgeContent={978} color="secondary">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
             </Box>
 
             <Box

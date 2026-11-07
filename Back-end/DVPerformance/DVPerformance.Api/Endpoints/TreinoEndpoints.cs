@@ -16,6 +16,8 @@ public static class TreinoEndpoints
     private const int MaxRepeticoes = 30;
     private const int MinDescansoSegundos = 30;
     private const int MaxDescansoSegundos = 300;
+    private const int MinAerobicoMinutos = 10;
+    private const int MaxAerobicoMinutos = 100;
 
     private static readonly HashSet<string> StatusPermitidos = new()
     {
@@ -326,6 +328,7 @@ public static class TreinoEndpoints
                 .Where(m => idsMaquinas.Contains(m.Id)).ToDictionaryAsync(m => m.Id);
             var donoId = treino.UsuarioId ?? treino.Aluno?.UsuarioId;
             var ordensPorDia = new Dictionary<string, int>();
+            var aerobicosPorDia = new Dictionary<string, int>();
             var alteracoes = new List<(ItemTreino? Item, AtualizarItemTreinoRequest Dados, string Divisao, int Ordem, string Repeticao, string Descanso)>();
 
             foreach (var entrada in entradas)
@@ -341,6 +344,25 @@ public static class TreinoEndpoints
                     {
                         mensagem = "Adicione itens somente aos dias existentes e mantenha cada item original no seu dia."
                     });
+                }
+
+                if (atualizacao.TempoAerobico is int minutos)
+                {
+                    if (!TempoAerobicoValido(minutos))
+                    {
+                        return Results.BadRequest(new
+                        {
+                            mensagem = $"Informe o aeróbico entre {MinAerobicoMinutos} e {MaxAerobicoMinutos} minutos inteiros. Use zero para removê-lo."
+                        });
+                    }
+                    if (aerobicosPorDia.TryGetValue(divisao, out var informado) && informado != minutos)
+                    {
+                        return Results.BadRequest(new
+                        {
+                            mensagem = "Informe a mesma quantidade de minutos inteiros para todos os itens do dia. Use zero para remover o aeróbico."
+                        });
+                    }
+                    aerobicosPorDia[divisao] = minutos;
                 }
 
                 if (atualizacao.ExercicioId.HasValue == atualizacao.MaquinaId.HasValue)
@@ -397,6 +419,7 @@ public static class TreinoEndpoints
 
             foreach (var (original, atualizacao, divisao, ordem, repeticao, descanso) in alteracoes)
             {
+                var minutos = aerobicosPorDia.GetValueOrDefault(divisao, diasOriginais[divisao]);
                 var item = original ?? new ItemTreino
                 {
                     TreinoId = treino.Id,
@@ -409,7 +432,8 @@ public static class TreinoEndpoints
                     || item.Series != atualizacao.Series
                     || item.Repeticao != repeticao
                     || item.TempoDescanso != descanso
-                    || item.OrdemExercicio != ordem;
+                    || item.OrdemExercicio != ordem
+                    || item.TempoAerobico != minutos;
 
                 if (item.ExercicioId != atualizacao.ExercicioId)
                 {
@@ -425,6 +449,7 @@ public static class TreinoEndpoints
                 item.Repeticao = repeticao;
                 item.TempoDescanso = descanso;
                 item.OrdemExercicio = ordem;
+                item.TempoAerobico = minutos;
 
                 if (original is null)
                 {
@@ -458,6 +483,14 @@ public static class TreinoEndpoints
             if (dadosAtualizados.Series < MinSeries || dadosAtualizados.Series > MaxSeries)
             {
                 return Results.BadRequest(new { mensagem = $"O número de séries deve ser entre {MinSeries} e {MaxSeries}." });
+            }
+
+            if (!TempoAerobicoValido(dadosAtualizados.TempoAerobico))
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = $"Informe o aeróbico entre {MinAerobicoMinutos} e {MaxAerobicoMinutos} minutos inteiros. Use zero para removê-lo."
+                });
             }
 
             string? repeticaoNormalizada = null;
@@ -508,9 +541,20 @@ public static class TreinoEndpoints
                 item.TempoDescanso = descansoNormalizado;
             }
 
-            if (dadosAtualizados.TempoAerobico is not null)
+            var itensDia = await db.ItensTreino
+                .Where(i => i.TreinoId == item.TreinoId && i.DivisaoTreino == item.DivisaoTreino)
+                .ToListAsync();
+            var alterouAerobico = item.TempoAerobico != dadosAtualizados.TempoAerobico
+                || itensDia.Any(i => i.TempoAerobico != dadosAtualizados.TempoAerobico);
+            item.TempoAerobico = dadosAtualizados.TempoAerobico;
+            foreach (var itemDia in itensDia)
             {
-                item.TempoAerobico = dadosAtualizados.TempoAerobico.Trim();
+                itemDia.TempoAerobico = dadosAtualizados.TempoAerobico;
+            }
+            if (alterouAerobico)
+            {
+                var treino = await db.Treinos.FindAsync(item.TreinoId);
+                if (treino is not null) treino.Status = "Rascunho";
             }
 
             await db.SaveChangesAsync();
@@ -611,6 +655,9 @@ public static class TreinoEndpoints
 
         return disponiveisNesteCiclo[Random.Shared.Next(disponiveisNesteCiclo.Count)];
     }
+
+    private static bool TempoAerobicoValido(int minutos) =>
+        minutos == 0 || (minutos >= MinAerobicoMinutos && minutos <= MaxAerobicoMinutos);
 
     private static bool TentarNormalizarRepeticoes(string valorBruto, out string repeticaoNormalizada)
     {
@@ -799,14 +846,14 @@ public static class TreinoEndpoints
         return treino;
     }
 
-    private static (int series, string repeticoes, string descanso, string aerobicoGeral, string aerobicoDia)
+    private static (int series, string repeticoes, string descanso, string aerobicoGeral, int aerobicoDia)
         CalcularParametrosFisiologicos(Aluno aluno)
     {
         int series;
         string repeticoes;
         int descansoSegundos;
         string aerobicoGeral;
-        string aerobicoDia;
+        int aerobicoDia;
 
         switch (aluno.Experiencia)
         {
@@ -815,7 +862,7 @@ public static class TreinoEndpoints
                 repeticoes = "12-15";
                 descansoSegundos = 60;
                 aerobicoGeral = "15 a 20 min de cardio leve a moderado pós-treino";
-                aerobicoDia = "15 min Esteira ou Bike leve/moderada";
+                aerobicoDia = 15;
                 break;
 
             case "Avançado":
@@ -823,7 +870,7 @@ public static class TreinoEndpoints
                 repeticoes = "8-12";
                 descansoSegundos = 75;
                 aerobicoGeral = "20 a 25 min de cardio moderado ou intervalado pós-treino";
-                aerobicoDia = "20 min Cardio moderado/intervalado pós-treino";
+                aerobicoDia = 20;
                 break;
 
             case "Intermediário":
@@ -832,7 +879,7 @@ public static class TreinoEndpoints
                 repeticoes = "10-12";
                 descansoSegundos = 60;
                 aerobicoGeral = "20 min de cardio moderado pós-treino";
-                aerobicoDia = "20 min Esteira, Bike ou Elíptico moderado";
+                aerobicoDia = 20;
                 break;
         }
 
@@ -841,7 +888,7 @@ public static class TreinoEndpoints
             series = Math.Min(series, 3);
             descansoSegundos += 15;
             aerobicoGeral = "15 min de caminhada ou bicicleta ergométrica leve pós-treino";
-            aerobicoDia = "15 min Bike ergométrica / Caminhada leve";
+            aerobicoDia = 15;
         }
 
         return (series, repeticoes, $"{descansoSegundos}s", aerobicoGeral, aerobicoDia);
@@ -1225,7 +1272,7 @@ public static class TreinoEndpoints
             .Select(grupoDia => new
             {
                 nome = grupoDia.Key,
-                tempoAerobico = grupoDia.FirstOrDefault()?.TempoAerobico ?? string.Empty,
+                tempoAerobico = grupoDia.FirstOrDefault()?.TempoAerobico ?? 0,
                 exercicios = grupoDia
                     .OrderBy(i => i.OrdemExercicio)
                     .ThenBy(i => i.Id)

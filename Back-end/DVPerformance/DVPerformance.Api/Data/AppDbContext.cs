@@ -465,7 +465,7 @@ public class AppDbContext : DbContext
 
             entity.Property(i => i.TempoAerobico)
                   .HasColumnName("tempo_aerobico")
-                  .HasMaxLength(120)
+                  .HasDefaultValue(0)
                   .IsRequired();
 
             entity.HasOne(i => i.Exercicio)
