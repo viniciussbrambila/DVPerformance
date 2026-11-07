@@ -10,6 +10,7 @@ import {
   InputAdornment,
 } from "@mui/material";
 import { useState } from "react";
+import Marca from "../components/Marca";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
@@ -111,9 +112,7 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
           alignItems: "center",
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2 }}>
-          DV Performance
-        </Typography>
+        <Marca />
 
         <Typography
           variant="body2"
@@ -147,9 +146,13 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
             label="Usuário"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
+            autoComplete="username"
+            slotProps={{ htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } }}
             error={tentouEnviar && !usuario.trim()}
             helperText={
-              tentouEnviar && !usuario.trim() ? "Informe o seu usuário" : ""
+              tentouEnviar && !usuario.trim()
+                ? "Informe o seu usuário"
+                : ""
             }
             disabled={enviado}
           />

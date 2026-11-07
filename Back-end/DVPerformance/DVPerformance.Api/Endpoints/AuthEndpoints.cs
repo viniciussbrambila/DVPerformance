@@ -26,9 +26,9 @@ public static class AuthEndpoints
 
             var nomeLimpo = dados!.Usuario.Trim();
 
-            // Verifica no banco se já existe um usuário com o mesmo nome (ignorando maiúsculas/minúsculas)
+            // O nome de usuário diferencia maiúsculas e minúsculas, como no login.
             var usuarioJaExiste = await db.Usuarios.AnyAsync(u =>
-                u.NomeUsuario.ToLower() == nomeLimpo.ToLower());
+                u.NomeUsuario == nomeLimpo);
 
             if (usuarioJaExiste)
             {
@@ -82,7 +82,7 @@ public static class AuthEndpoints
             var nomeLimpo = dados!.Usuario.Trim();
 
             var conta = await db.Usuarios.FirstOrDefaultAsync(u =>
-                u.NomeUsuario.ToLower() == nomeLimpo.ToLower() &&
+                u.NomeUsuario == nomeLimpo &&
                 u.Senha == dados.Senha);
 
             if (conta is null)
@@ -136,7 +136,7 @@ public static class AuthEndpoints
             var nomeLimpo = dados!.Usuario.Trim();
 
             var conta = await db.Usuarios.FirstOrDefaultAsync(u =>
-                u.NomeUsuario.ToLower() == nomeLimpo.ToLower() && u.Ativo);
+                u.NomeUsuario == nomeLimpo && u.Ativo);
 
             if (conta is null)
             {

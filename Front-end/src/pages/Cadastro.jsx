@@ -10,6 +10,7 @@ import {
   InputAdornment,
 } from "@mui/material";
 import { useState } from "react";
+import Marca from "../components/Marca";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
@@ -109,9 +110,7 @@ export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
           alignItems: "center",
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2 }}>
-          DV Performance
-        </Typography>
+        <Marca />
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           Preencha os dados para criar sua conta
@@ -134,6 +133,8 @@ export default function Cadastro({ glassStyle, onCadastro, onVoltarLogin }) {
             label="Nome de usuário"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
+            autoComplete="username"
+            slotProps={{ htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } }}
             error={tentouCadastrar && usuarioInvalido}
             helperText={
               tentouCadastrar && !usuarioTrim

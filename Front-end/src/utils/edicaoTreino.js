@@ -28,7 +28,20 @@ export function removerItemDoPlano(dias, itemId) {
   }));
 }
 
+export function filtrarCatalogoDoDia(catalogo, dia, tipo) {
+  const campo = tipo === "maquina" ? "maquinaId" : "exercicioId";
+  const idsUtilizados = new Set(
+    (dia?.exercicios || []).map((item) => item[campo]).filter((id) => id != null),
+  );
+  return catalogo.filter((item) => !idsUtilizados.has(item.id));
+}
+
 export function adicionarItemAoPlano(dias, indiceDia, selecionado, tipo) {
+  const dia = dias[indiceDia];
+  if (!dia || filtrarCatalogoDoDia([selecionado], dia, tipo).length === 0) {
+    return dias;
+  }
+
   const id = Math.min(0, ...dias.flatMap((dia) => dia.exercicios.map((item) => item.id))) - 1;
   const maquina = tipo === "maquina";
 
@@ -56,11 +69,19 @@ export function adicionarItemAoPlano(dias, indiceDia, selecionado, tipo) {
 }
 
 export function substituirItemDoPlano(dias, itemId, substituto, tipo) {
+  const dia = dias.find((dia) => dia.exercicios.some((item) => item.id === itemId));
+  const itemAtual = dia?.exercicios.find((item) => item.id === itemId);
+  if (!itemAtual) return dias;
+
+  const maquina = tipo ? tipo === "maquina" : itemAtual.maquinaId != null;
+  if (filtrarCatalogoDoDia([substituto], dia, maquina ? "maquina" : "exercicio").length === 0) {
+    return dias;
+  }
+
   return dias.map((dia) => ({
     ...dia,
     exercicios: dia.exercicios.map((item) => {
       if (item.id !== itemId) return item;
-      const maquina = tipo ? tipo === "maquina" : item.maquinaId != null;
       return {
         ...item,
         nome: substituto.nome,

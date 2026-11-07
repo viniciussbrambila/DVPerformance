@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   prepararEdicao,
+  filtrarCatalogoDoDia,
   formatarTempoAerobico,
   alterarAerobicoDoPlano,
   adicionarItemAoPlano,
@@ -111,13 +112,13 @@ test("adicionar em dias diferentes cria ids temporarios unicos e envia o dia cor
 
 test("substituir e excluir itens novos afeta somente a ocorrencia escolhida", () => {
   let dias = prepararEdicao(plano());
-  dias = adicionarItemAoPlano(dias, 0, { id: 10, nome: "Agachamento", grupo: "Quadríceps" }, "exercicio");
+  dias = adicionarItemAoPlano(dias, 0, { id: 30, nome: "Supino", grupo: "Peito" }, "exercicio");
   const itemNovoId = dias[0].exercicios.at(-1).id;
-  dias = adicionarItemAoPlano(dias, 1, { id: 10, nome: "Agachamento", grupo: "Quadríceps" }, "exercicio");
+  dias = adicionarItemAoPlano(dias, 1, { id: 30, nome: "Supino", grupo: "Peito" }, "exercicio");
   const outroNovoId = dias[1].exercicios.at(-1).id;
   dias = substituirItemDoPlano(dias, itemNovoId, { id: 21, nome: "Hack", grupo: "Quadríceps" }, "maquina");
   assert.equal(dias[0].exercicios.at(-1).maquinaId, 21);
-  assert.equal(dias[1].exercicios.at(-1).exercicioId, 10);
+  assert.equal(dias[1].exercicios.at(-1).exercicioId, 30);
   dias = removerItemDoPlano(dias, itemNovoId);
   assert.equal(dias[0].exercicios.length, 2);
   assert.equal(dias[1].exercicios.at(-1).id, outroNovoId);
@@ -171,4 +172,72 @@ test("remover aerobico envia zero e excluir o primeiro exercicio nao perde o tem
   assert.equal(enviados[0].id, 2);
   assert.equal(enviados[0].tempoAerobico, 25);
   assert.equal(enviados[1].tempoAerobico, 0);
+});
+
+test("catalogos ocultam apenas os itens do mesmo tipo presentes no dia escolhido", () => {
+  const catalogo = [{ id: 10 }, { id: 20 }, { id: 30 }];
+  const dias = prepararEdicao(plano());
+  assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[0], "exercicio"), [{ id: 20 }, { id: 30 }]);
+  assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[0], "maquina"), [{ id: 10 }, { id: 30 }]);
+  assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[1], "maquina"), catalogo);
+  assert.deepEqual(filtrarCatalogoDoDia(catalogo, undefined, "exercicio"), catalogo);
+  assert.deepEqual(catalogo, [{ id: 10 }, { id: 20 }, { id: 30 }]);
+});
+
+for (const tipo of ["exercicio", "maquina"]) {
+  const selecionado = tipo === "maquina"
+    ? { id: 20, nome: "Leg press", grupo: "Quadríceps" }
+    : { id: 10, nome: "Agachamento", grupo: "Quadríceps" };
+
+  test(`impede adicionar ${tipo} que ja existe no mesmo dia`, () => {
+    const original = prepararEdicao(plano());
+    const copia = structuredClone(original);
+    const dias = adicionarItemAoPlano(original, 0, selecionado, tipo);
+    assert.strictEqual(dias, original);
+    assert.deepEqual(original, copia);
+  });
+
+  test(`adicionar e remover ${tipo} atualiza as opcoes do catalogo`, () => {
+    const catalogo = [selecionado, { id: 30, nome: "Novo item" }];
+    let dias = prepararEdicao(plano());
+    dias = adicionarItemAoPlano(dias, 0, catalogo[1], tipo);
+    const novoId = dias[0].exercicios.at(-1).id;
+    assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[0], tipo), []);
+    assert.strictEqual(adicionarItemAoPlano(dias, 0, catalogo[1], tipo), dias);
+    dias = removerItemDoPlano(dias, novoId);
+    assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[0], tipo), [catalogo[1]]);
+  });
+
+  test(`permite o mesmo ${tipo} em dias diferentes`, () => {
+    let dias = prepararEdicao(plano());
+    const novo = { id: 30, nome: "Novo item" };
+    dias = adicionarItemAoPlano(dias, 0, novo, tipo);
+    dias = adicionarItemAoPlano(dias, 1, novo, tipo);
+    const campo = tipo === "maquina" ? "maquinaId" : "exercicioId";
+    assert.equal(dias[0].exercicios.at(-1)[campo], 30);
+    assert.equal(dias[1].exercicios.at(-1)[campo], 30);
+    assert.notEqual(dias[0].exercicios.at(-1).id, dias[1].exercicios.at(-1).id);
+  });
+
+  test(`impede substituir por ${tipo} ja presente no mesmo dia inclusive entre catalogos`, () => {
+    const original = prepararEdicao(plano());
+    const outroItemId = tipo === "maquina" ? 1 : 2;
+    assert.strictEqual(substituirItemDoPlano(original, outroItemId, selecionado, tipo), original);
+  });
+}
+
+test("exercicio e maquina com o mesmo ID podem coexistir no mesmo dia", () => {
+  const original = prepararEdicao(plano());
+  let dias = adicionarItemAoPlano(original, 0, { id: 10, nome: "Máquina 10" }, "maquina");
+  dias = adicionarItemAoPlano(dias, 0, { id: 20, nome: "Exercício 20" }, "exercicio");
+  assert.equal(dias[0].exercicios.length, 4);
+  assert.equal(dias[0].exercicios.at(-2).maquinaId, 10);
+  assert.equal(dias[0].exercicios.at(-1).exercicioId, 20);
+});
+
+test("substituicao libera o item anterior e oculta o novo no catalogo do dia", () => {
+  const catalogo = [{ id: 10, nome: "Agachamento" }, { id: 30, nome: "Supino" }];
+  const dias = substituirItemDoPlano(prepararEdicao(plano()), 1, catalogo[1], "exercicio");
+  assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[0], "exercicio"), [catalogo[0]]);
+  assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[1], "exercicio"), [catalogo[1]]);
 });

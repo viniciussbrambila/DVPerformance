@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
 import {
   Box,
   Paper,
@@ -96,6 +97,7 @@ export default function Exercicios({
   onSelecionar,
   onVoltar,
   itemAtualId,
+  diaTreino,
   modoSelecao = "substituir",
 }) {
   const [exercicios, setExercicios] = useState(
@@ -141,7 +143,10 @@ export default function Exercicios({
     carregarExercicios();
   }, []);
 
-  const exerciciosFiltrados = exercicios
+  const exerciciosDisponiveis = onSelecionar
+    ? filtrarCatalogoDoDia(exercicios, diaTreino, "exercicio")
+    : exercicios;
+  const exerciciosFiltrados = exerciciosDisponiveis
     .filter((ex) =>
       ex.nome.toLowerCase().includes(busca.trim().toLowerCase()),
     )
@@ -502,7 +507,9 @@ export default function Exercicios({
                   >
                     {exercicios.length === 0
                       ? "Nenhum exercício cadastrado."
-                      : "Nenhum exercício encontrado."}
+                      : onSelecionar && exerciciosDisponiveis.length === 0
+                        ? "Todos os exercícios deste catálogo já estão neste dia do treino."
+                        : "Nenhum exercício encontrado."}
                   </TableCell>
                 </TableRow>
               )}

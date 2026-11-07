@@ -981,6 +981,7 @@ export default function PlanoDetalhe({ glassStyle }) {
               onSelecionar={selecionarItem}
               onVoltar={fecharSelecao}
               itemAtualId={selecaoItem.itemAtual?.maquinaId}
+              diaTreino={diasEdicao[selecaoItem.indiceDia]}
               modoSelecao={selecaoItem.itemAtual ? "substituir" : "adicionar"}
             />
           ) : selecaoItem?.tipoCatalogo === "exercicio" ? (
@@ -989,6 +990,7 @@ export default function PlanoDetalhe({ glassStyle }) {
               onSelecionar={selecionarItem}
               onVoltar={fecharSelecao}
               itemAtualId={selecaoItem.itemAtual?.exercicioId}
+              diaTreino={diasEdicao[selecaoItem.indiceDia]}
               modoSelecao={selecaoItem.itemAtual ? "substituir" : "adicionar"}
             />
           ) : null}

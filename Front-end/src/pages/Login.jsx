@@ -10,6 +10,7 @@ import {
   InputAdornment,
 } from "@mui/material";
 import { useState } from "react";
+import Marca from "../components/Marca";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
@@ -97,9 +98,7 @@ export default function Login({
           alignItems: "center",
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2 }}>
-          DV Performance
-        </Typography>
+        <Marca />
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           Insira suas credenciais para acessar o sistema
@@ -123,9 +122,13 @@ export default function Login({
             size="Normal"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
+            autoComplete="username"
+            slotProps={{ htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } }}
             error={tentouEntrar && !usuario.trim()}
             helperText={
-              tentouEntrar && !usuario.trim() ? "Informe o seu usuário" : ""
+              tentouEntrar && !usuario.trim()
+                ? "Informe o seu usuário"
+                : ""
             }
           />
 

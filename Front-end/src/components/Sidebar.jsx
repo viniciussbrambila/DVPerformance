@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
+import Marca from "./Marca";
 import PeopleIcon from "@mui/icons-material/People";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
@@ -60,12 +61,10 @@ export default function Sidebar({
       }}
     >
       <Box sx={{ px: 2.5, py: 2.5 }}>
-        <Typography variant="h5" sx={{ fontWeight: "bold" }} noWrap>
-          DV Performance
-        </Typography>
+        <Marca compacta />
         <Typography
           variant="h6"
-          sx={{ fontSize: 14, fontWeight: 500, color: "text.secondary" }}
+          sx={{ mt: 0.5, fontSize: 14, fontWeight: 500, color: "text.secondary" }}
           noWrap
         >
           Sistema de Geração de Treino

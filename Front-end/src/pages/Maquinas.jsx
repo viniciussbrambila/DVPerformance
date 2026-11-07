@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
 import {
   Box,
   Paper,
@@ -96,6 +97,7 @@ export default function Maquinas({
   onSelecionar,
   onVoltar,
   itemAtualId,
+  diaTreino,
   modoSelecao = "substituir",
 }) {
   const [maquinas, setMaquinas] = useState(
@@ -141,7 +143,10 @@ export default function Maquinas({
     carregarMaquinas();
   }, []);
 
-  const maquinasFiltradas = maquinas
+  const maquinasDisponiveis = onSelecionar
+    ? filtrarCatalogoDoDia(maquinas, diaTreino, "maquina")
+    : maquinas;
+  const maquinasFiltradas = maquinasDisponiveis
     .filter((maq) =>
       maq.nome.toLowerCase().includes(busca.trim().toLowerCase()),
     )
@@ -504,7 +509,9 @@ export default function Maquinas({
                   >
                     {maquinas.length === 0
                       ? "Nenhuma máquina cadastrada."
-                      : "Nenhuma máquina encontrada."}
+                      : onSelecionar && maquinasDisponiveis.length === 0
+                        ? "Todas as máquinas deste catálogo já estão neste dia do treino."
+                        : "Nenhuma máquina encontrada."}
                   </TableCell>
                 </TableRow>
               )}

@@ -329,6 +329,7 @@ public static class TreinoEndpoints
             var donoId = treino.UsuarioId ?? treino.Aluno?.UsuarioId;
             var ordensPorDia = new Dictionary<string, int>();
             var aerobicosPorDia = new Dictionary<string, int>();
+            var itensPorDia = new HashSet<(string Divisao, int? ExercicioId, int? MaquinaId)>();
             var alteracoes = new List<(ItemTreino? Item, AtualizarItemTreinoRequest Dados, string Divisao, int Ordem, string Repeticao, string Descanso)>();
 
             foreach (var entrada in entradas)
@@ -370,6 +371,14 @@ public static class TreinoEndpoints
                     return Results.BadRequest(new
                     {
                         mensagem = "Selecione apenas um exercício ou uma máquina para cada item do plano."
+                    });
+                }
+
+                if (!itensPorDia.Add((divisao, atualizacao.ExercicioId, atualizacao.MaquinaId)))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Não é permitido repetir o mesmo exercício ou máquina no mesmo dia do treino."
                     });
                 }
 
@@ -517,10 +526,30 @@ public static class TreinoEndpoints
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(dadosAtualizados.DivisaoTreino))
+            if (dadosAtualizados.ExercicioId.HasValue == dadosAtualizados.MaquinaId.HasValue)
             {
-                item.DivisaoTreino = dadosAtualizados.DivisaoTreino.Trim();
+                return Results.BadRequest(new
+                {
+                    mensagem = "Selecione apenas um exercício ou uma máquina para cada item do plano."
+                });
             }
+
+            var divisao = string.IsNullOrWhiteSpace(dadosAtualizados.DivisaoTreino)
+                ? item.DivisaoTreino
+                : dadosAtualizados.DivisaoTreino.Trim();
+            var itemRepetido = await db.ItensTreino.AnyAsync(i =>
+                i.Id != idItem && i.TreinoId == item.TreinoId && i.DivisaoTreino == divisao
+                && ((dadosAtualizados.ExercicioId.HasValue && i.ExercicioId == dadosAtualizados.ExercicioId)
+                    || (dadosAtualizados.MaquinaId.HasValue && i.MaquinaId == dadosAtualizados.MaquinaId)));
+            if (itemRepetido)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Não é permitido repetir o mesmo exercício ou máquina no mesmo dia do treino."
+                });
+            }
+
+            item.DivisaoTreino = divisao;
 
             if (dadosAtualizados.OrdemExercicio > 0)
             {
