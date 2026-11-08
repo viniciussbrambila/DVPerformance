@@ -7,6 +7,8 @@ import {
   alterarAerobicoDoPlano,
   adicionarItemAoPlano,
   removerItemDoPlano,
+  moverItemNoPlano,
+  restaurarOrdemDoPlano,
   substituirItemDoPlano,
   montarItensEdicao,
 } from "../src/utils/edicaoTreino.js";
@@ -240,4 +242,95 @@ test("substituicao libera o item anterior e oculta o novo no catalogo do dia", (
   const dias = substituirItemDoPlano(prepararEdicao(plano()), 1, catalogo[1], "exercicio");
   assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[0], "exercicio"), [catalogo[0]]);
   assert.deepEqual(filtrarCatalogoDoDia(catalogo, dias[1], "exercicio"), [catalogo[1]]);
+});
+
+test("mover item muda somente a ordem no dia escolhido e permite cancelar sem alterar o plano", () => {
+  const original = plano();
+  original[0].tempoAerobico = 25;
+  const copia = structuredClone(original);
+  const rascunho = prepararEdicao(original);
+  const dias = moverItemNoPlano(rascunho, 0, 1, -1);
+
+  assert.deepEqual(dias[0].exercicios.map((item) => item.id), [2, 1]);
+  assert.equal(dias[0].exercicios[0], rascunho[0].exercicios[1]);
+  assert.equal(dias[0].exercicios[1], rascunho[0].exercicios[0]);
+  assert.equal(dias[0].tempoAerobico, 25);
+  assert.equal(dias[1], rascunho[1]);
+  assert.deepEqual(original, copia);
+  assert.deepEqual(rascunho[0].exercicios.map((item) => item.id), [1, 2]);
+});
+
+test("mover para baixo salva os itens na sequencia escolhida com a prescricao e aerobico", () => {
+  const rascunho = alterarAerobicoDoPlano(prepararEdicao(plano()), 0, 30);
+  rascunho[0].exercicios[0].series = "5";
+  rascunho[0].exercicios[0].repeticoes = " 10 - 15 ";
+  rascunho[0].exercicios[0].descanso = "120";
+  const enviados = montarItensEdicao(moverItemNoPlano(rascunho, 0, 0, 1));
+
+  assert.deepEqual(enviados.map((item) => item.id), [2, 1, 3]);
+  assert.deepEqual(enviados[1], {
+    id: 1, divisaoTreino: "A", tempoAerobico: 30,
+    exercicioId: 10, maquinaId: null, series: 5,
+    repeticao: "10-15", tempoDescanso: "120s",
+  });
+  assert.equal(enviados[0].tempoAerobico, 30);
+  assert.equal(enviados[2].divisaoTreino, "B");
+});
+
+test("limites da reordenacao impedem atravessar dias ou mover indices invalidos", () => {
+  const dias = prepararEdicao(plano());
+  assert.equal(moverItemNoPlano(dias, 0, 0, -1), dias);
+  assert.equal(moverItemNoPlano(dias, 0, 1, 1), dias);
+  assert.equal(moverItemNoPlano(dias, 1, 0, -1), dias);
+  assert.equal(moverItemNoPlano(dias, 1, 0, 1), dias);
+  assert.equal(moverItemNoPlano(dias, 2, 0, 1), dias);
+  assert.equal(moverItemNoPlano(dias, 0, -1, 1), dias);
+  assert.equal(moverItemNoPlano(dias, 0, 5, -1), dias);
+  assert.equal(moverItemNoPlano(dias, 0, 0.5, 1), dias);
+  assert.equal(moverItemNoPlano(dias, 0, 0, 2), dias);
+});
+
+test("reordenar apos adicionar, substituir e remover preserva os vinculos enviados", () => {
+  let dias = alterarAerobicoDoPlano(prepararEdicao(plano()), 0, 20);
+  dias = adicionarItemAoPlano(dias, 0, { id: 30, nome: "Hack", grupo: "Pernas" }, "maquina");
+  const novoId = dias[0].exercicios[2].id;
+  dias = moverItemNoPlano(dias, 0, 2, -1);
+  dias = substituirItemDoPlano(dias, novoId, { id: 31, nome: "Extensora", grupo: "Pernas" }, "maquina");
+  dias = removerItemDoPlano(dias, 1);
+  const enviados = montarItensEdicao(dias);
+
+  assert.deepEqual(enviados.map((item) => item.id), [0, 2, 3]);
+  assert.equal(enviados[0].maquinaId, 31);
+  assert.equal(enviados[0].exercicioId, null);
+  assert.equal(enviados[0].tempoAerobico, 20);
+  assert.equal(enviados[1].tempoAerobico, 20);
+});
+
+test("restaurar ordem preserva edicoes e substituicoes sem recriar removidos ou perder novos", () => {
+  const original = plano();
+  let dias = prepararEdicao(original);
+  dias[0].exercicios[1].series = "6";
+  dias = substituirItemDoPlano(dias, 2, { id: 21, nome: "Hack", grupo: "Pernas" }, "maquina");
+  dias = adicionarItemAoPlano(dias, 0, { id: 30, nome: "Supino", grupo: "Peito" }, "exercicio");
+  const novoId = dias[0].exercicios[2].id;
+  dias = moverItemNoPlano(dias, 0, 2, -1);
+  dias = moverItemNoPlano(dias, 0, 1, -1);
+  dias = removerItemDoPlano(dias, 1);
+  dias = alterarAerobicoDoPlano(dias, 0, 35);
+  const restaurado = restaurarOrdemDoPlano(dias, 0, original);
+
+  assert.deepEqual(dias[0].exercicios.map((item) => item.id), [novoId, 2]);
+  assert.deepEqual(restaurado[0].exercicios.map((item) => item.id), [2, novoId]);
+  assert.equal(restaurado[0].exercicios[0].maquinaId, 21);
+  assert.equal(restaurado[0].exercicios[0].series, "6");
+  assert.equal(restaurado[0].tempoAerobico, 35);
+  assert.equal(restaurado[1], dias[1]);
+});
+
+test("restaurar ordem sem alteracoes ou em dia inexistente preserva a lista", () => {
+  const original = plano();
+  const dias = prepararEdicao(original);
+  assert.equal(restaurarOrdemDoPlano(dias, 0, original), dias);
+  assert.equal(restaurarOrdemDoPlano(dias, 2, original), dias);
+  assert.equal(restaurarOrdemDoPlano(dias, 0, []), dias);
 });

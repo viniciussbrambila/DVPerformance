@@ -18,7 +18,12 @@ export default function Marca({ compacta = false }) {
         },
       }}
     >
-      <Activity size={32} strokeWidth={2} aria-hidden="true" focusable="false" />
+      <Activity
+        size={32}
+        strokeWidth={2}
+        aria-hidden="true"
+        focusable="false"
+      />
       <Typography
         component={compacta ? "div" : "h1"}
         variant={compacta ? "h6" : "h4"}

@@ -352,7 +352,9 @@ public class AppDbContext : DbContext
         // 7. Mapeamento da tabela 'treinos' (Cabeçalho da Ficha de Treino gerada para o Aluno)
         modelBuilder.Entity<Treino>(entity =>
         {
-            entity.ToTable("treinos");
+            entity.ToTable("treinos", tabela => tabela.HasCheckConstraint(
+                "ck_treinos_dicas_distintas",
+                "\"dica_objetivo_id\" <> \"segunda_dica_objetivo_id\""));
 
             entity.HasKey(t => t.Id);
 
@@ -368,6 +370,9 @@ public class AppDbContext : DbContext
 
             entity.Property(t => t.DicaObjetivoId)
                   .HasColumnName("dica_objetivo_id");
+
+            entity.Property(t => t.SegundaDicaObjetivoId)
+                  .HasColumnName("segunda_dica_objetivo_id");
 
             entity.Property(t => t.NomePlano)
                   .HasColumnName("nome_plano")
@@ -412,6 +417,11 @@ public class AppDbContext : DbContext
             entity.HasOne(t => t.DicaObjetivo)
                   .WithMany()
                   .HasForeignKey(t => t.DicaObjetivoId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(t => t.SegundaDicaObjetivo)
+                  .WithMany()
+                  .HasForeignKey(t => t.SegundaDicaObjetivoId)
                   .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasMany(t => t.Itens)

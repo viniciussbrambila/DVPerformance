@@ -5,7 +5,7 @@ import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 
 export default function CabecalhoRelatorio({
   titulo,
-  voltar = "/relatorios",
+  voltar = "/alunos",
   onExportar,
   desabilitado,
 }) {

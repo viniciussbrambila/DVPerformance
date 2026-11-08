@@ -17,6 +17,11 @@ public class Treino
 
     public DicaObjetivo? DicaObjetivo { get; set; }
 
+    // Segunda dica do mesmo objetivo, sorteada e persistida junto com a ficha.
+    public int? SegundaDicaObjetivoId { get; set; }
+
+    public DicaObjetivo? SegundaDicaObjetivo { get; set; }
+
     // Título descritivo gerado pelo motor (ex: "Protocolo Emagrecimento Feminino - ABA (3x)")
     public string NomePlano { get; set; } = string.Empty;
 

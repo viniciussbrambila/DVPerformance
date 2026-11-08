@@ -163,7 +163,7 @@ public static class AlunoEndpoints
                 alunoExistente.UsuarioId = dadosAtualizados.UsuarioId;
             }
 
-            // Se o objetivo do aluno foi alterado, atualiza a dica dos planos ativos ainda não exportados respeitando o ciclo sem repetição
+            // Atualiza as duas dicas dos planos ativos ainda não exportados ao mudar o objetivo.
             if (objetivoMudou)
             {
                 var objetivoParaDica = TreinoEndpoints.NormalizarObjetivoParaDica(alunoExistente.Objetivo);
@@ -171,30 +171,27 @@ public static class AlunoEndpoints
                     .AsNoTracking()
                     .Where(d => d.Objetivo == objetivoParaDica)
                     .ToListAsync();
+                var historicoDicasAluno = await TreinoEndpoints.ObterHistoricoDicasAlunoAsync(db, alunoExistente.Id);
+                var treinosNaoExportados = await db.Treinos
+                    .Where(t => t.AlunoId == alunoExistente.Id && t.Ativo && t.Status != "Exportado")
+                    .OrderBy(t => t.DataCriacao)
+                    .ThenBy(t => t.Id)
+                    .ToListAsync();
 
-                if (dicasNovoObjetivo.Count > 0)
+                foreach (var treino in treinosNaoExportados)
                 {
-                    var historicoDicasAluno = await db.Treinos
-                        .AsNoTracking()
-                        .Where(t => t.AlunoId == alunoExistente.Id && t.DicaObjetivoId != null)
-                        .OrderBy(t => t.DataCriacao)
-                        .ThenBy(t => t.Id)
-                        .Select(t => t.DicaObjetivoId!.Value)
-                        .ToListAsync();
-
-                    var treinosNaoExportados = await db.Treinos
-                        .Where(t => t.AlunoId == alunoExistente.Id && t.Ativo && t.Status != "Exportado")
-                        .ToListAsync();
-
-                    foreach (var treino in treinosNaoExportados)
+                    var dicasSorteadas = TreinoEndpoints.SortearDuasDicasSemRepetirCiclo(dicasNovoObjetivo, historicoDicasAluno);
+                    if (dicasSorteadas.Count != 2)
                     {
-                        var dicaSorteada = TreinoEndpoints.SortearDicaSemRepetirCiclo(dicasNovoObjetivo, historicoDicasAluno);
-                        if (dicaSorteada is not null)
+                        return Results.BadRequest(new
                         {
-                            treino.DicaObjetivoId = dicaSorteada.Id;
-                            historicoDicasAluno.Add(dicaSorteada.Id);
-                        }
+                            mensagem = "Cadastre pelo menos duas dicas distintas para o novo objetivo do aluno."
+                        });
                     }
+
+                    treino.DicaObjetivoId = dicasSorteadas[0].Id;
+                    treino.SegundaDicaObjetivoId = dicasSorteadas[1].Id;
+                    historicoDicasAluno.AddRange(dicasSorteadas.Select(d => d.Id));
                 }
             }
 

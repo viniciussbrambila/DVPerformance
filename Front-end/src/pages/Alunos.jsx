@@ -20,7 +20,19 @@ import {
   Grid,
   Alert,
   CircularProgress,
+  InputAdornment,
 } from "@mui/material";
+import { Link } from "react-router-dom";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
+import {
+  obterDataCadastro,
+  formatarDataCadastro,
+  filtrarAlunosCadastrados,
+  prepararAlunosRelatorio,
+  exportarPdfRelatorio,
+} from "../utils/relatorios";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
@@ -83,6 +95,12 @@ export default function Alunos({ glassStyle }) {
     const chave = obterChaveAlunos();
     return Boolean(chave && !temCache(chave));
   });
+  const [busca, setBusca] = useState("");
+  const [dia, setDia] = useState("");
+  const [mes, setMes] = useState("");
+  const [ano, setAno] = useState("");
+  const [ordem, setOrdem] = useState("recentes");
+  const [erro, setErro] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // Guarda o ID do aluno em edição (ou null se for novo)
   const [idParaExcluir, setIdParaExcluir] = useState(null); // Guarda o ID do aluno para confirmar exclusão
@@ -109,6 +127,7 @@ export default function Alunos({ glassStyle }) {
     }
 
     const chave = `alunos:${usuarioLogado.id}`;
+    setErro("");
 
     try {
       const dados = await buscarComCache(chave, async () => {
@@ -121,6 +140,7 @@ export default function Alunos({ glassStyle }) {
       setAlunos(dados);
     } catch (erro) {
       console.error("Erro ao conectar com a API:", erro);
+      setErro("Não foi possível carregar os alunos. Tente novamente.");
     } finally {
       setCarregando(false);
     }
@@ -320,117 +340,289 @@ export default function Alunos({ glassStyle }) {
     }
   };
 
+  const usuarioId = obterUsuarioLogado()?.id;
+  const alunosVisiveis = usuarioId
+    ? prepararAlunosRelatorio(alunos, usuarioId)
+    : [];
+  const filtrados = filtrarAlunosCadastrados(alunosVisiveis, {
+    busca,
+    dia,
+    mes,
+    ano,
+    ordem,
+  });
+  const anos = [
+    ...new Set(
+      alunosVisiveis
+        .map((aluno) => obterDataCadastro(aluno)?.getFullYear())
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => b - a);
+  const semData = alunosVisiveis.some((aluno) => !obterDataCadastro(aluno));
+
   return (
-    <Box>
+    <Box className="relatorio-impressao">
+      <ImpressaoRelatorio />
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
           mb: 3,
         }}
       >
         <Typography variant="h4" color="text.primary">
           Gerir Alunos
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          size="large"
-          startIcon={<AddIcon />}
-          onClick={handleAbrirModal}
-        >
-          Novo Aluno
-        </Button>
+        <Box className="no-print" sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<PrintOutlinedIcon />}
+            onClick={() => exportarPdfRelatorio("relatorio-alunos-cadastrados")}
+            disabled={carregando || filtrados.length === 0}
+          >
+            Exportar PDF
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            size="large"
+            startIcon={<AddIcon />}
+            onClick={handleAbrirModal}
+          >
+            Novo Aluno
+          </Button>
+        </Box>
       </Box>
 
-      {/* Tabela com o efeito de Vidro Fumado */}
+      <Box
+        className="no-print"
+        sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 3 }}
+      >
+        <TextField
+          placeholder="Pesquisar por nome do aluno"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          sx={{ flex: "1 1 280px" }}
+          slotProps={{
+            htmlInput: { "aria-label": "Pesquisar alunos por nome" },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <TextField
+          select
+          label="Ordenar por data"
+          value={ordem}
+          onChange={(e) => setOrdem(e.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="recentes">Mais recentes</MenuItem>
+          <MenuItem value="antigos">Mais antigos</MenuItem>
+        </TextField>
+        <TextField
+          select
+          label="Dia"
+          value={dia}
+          onChange={(e) => setDia(e.target.value)}
+          sx={{ minWidth: 100 }}
+        >
+          <MenuItem value="">Todos</MenuItem>
+          {Array.from({ length: 31 }, (_, i) => i + 1).map((valor) => (
+            <MenuItem key={valor} value={valor}>
+              {valor}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          label="Mês"
+          value={mes}
+          onChange={(e) => setMes(e.target.value)}
+          sx={{ minWidth: 140 }}
+        >
+          <MenuItem value="">Todos</MenuItem>
+          {[
+            "Janeiro",
+            "Fevereiro",
+            "Março",
+            "Abril",
+            "Maio",
+            "Junho",
+            "Julho",
+            "Agosto",
+            "Setembro",
+            "Outubro",
+            "Novembro",
+            "Dezembro",
+          ].map((nome, i) => (
+            <MenuItem key={nome} value={i + 1}>
+              {nome}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          label="Ano"
+          value={ano}
+          onChange={(e) => setAno(e.target.value)}
+          sx={{ minWidth: 110 }}
+        >
+          <MenuItem value="">Todos</MenuItem>
+          {anos.map((valor) => (
+            <MenuItem key={valor} value={valor}>
+              {valor}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Box>
+      {erro && (
+        <Alert severity="error" className="no-print" sx={{ mb: 3 }}>
+          {erro}
+        </Alert>
+      )}
+      {semData && (
+        <Alert severity="info" className="no-print" sx={{ mb: 3 }}>
+          A data de cadastro ainda não está disponível para alguns alunos. Os
+          filtros de data se aplicam aos alunos com data informada.
+        </Alert>
+      )}
+
+      {/* Data e nome na primeira linha; características na linha abaixo. */}
       <TableContainer
         component={Paper}
         elevation={0}
-        sx={{
-          ...glassStyle,
-          borderRadius: 4,
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-        }}
+        sx={{ ...glassStyle, borderRadius: 4, p: 2 }}
       >
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>Nome</TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>
-                Idade
+              <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                Data de cadastro
               </TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>
-                Peso (kg)
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>
-                Altura (m)
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>
-                Objetivo
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>
-                Experiência
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: "bold" }}>
+              <TableCell sx={{ fontWeight: "bold" }}>Nome do aluno</TableCell>
+              <TableCell
+                className="no-print"
+                align="center"
+                sx={{ fontWeight: "bold", width: "1%", whiteSpace: "nowrap" }}
+              >
                 Ações
               </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {carregando && alunos.length === 0 && (
+            {carregando && alunosVisiveis.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={3} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
             )}
 
-            {!carregando && alunos.length === 0 && (
+            {!carregando && filtrados.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={3}
                   align="center"
                   sx={{ py: 4, color: "text.secondary" }}
                 >
-                  Nenhum aluno cadastrado.
+                  {alunosVisiveis.length === 0
+                    ? "Nenhum aluno cadastrado."
+                    : "Nenhum aluno encontrado para os filtros selecionados."}
                 </TableCell>
               </TableRow>
             )}
 
-            {alunos.map((aluno) => (
+            {filtrados.map((aluno) => (
               <TableRow
                 key={aluno.id}
+                hover
                 sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
               >
-                <TableCell component="th" scope="row">
-                  {aluno.nome}
+                <TableCell sx={{ verticalAlign: "top", whiteSpace: "nowrap" }}>
+                  {formatarDataCadastro(aluno)}
                 </TableCell>
-                <TableCell align="center">{aluno.idade}</TableCell>
-                <TableCell align="center">{formatarMedida(aluno.peso)}</TableCell>
-                <TableCell align="center">{formatarMedida(aluno.altura)}</TableCell>
-                <TableCell align="center">{aluno.objetivo}</TableCell>
-                <TableCell align="center">{aluno.experiencia}</TableCell>
-                <TableCell align="center">
-                  <IconButton
-                    size="small"
-                    aria-label="Editar aluno"
-                    onClick={() => handleEditar(aluno)}
-                    sx={{ mr: 1, bgcolor: "action.hover" }}
+                <TableCell component="th" scope="row" sx={{ minWidth: 240 }}>
+                  <Typography sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                    {aluno.nome}
+                  </Typography>
+                  <Box
+                    className="no-print"
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      columnGap: 2,
+                      rowGap: 0.5,
+                      mt: 1,
+                    }}
                   >
-                    <EditOutlinedIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    aria-label="Excluir aluno"
-                    onClick={() => handleExcluir(aluno.id)}
-                    sx={{ bgcolor: "action.hover" }}
+                    {[
+                      ["Idade", `${aluno.idade} anos`],
+                      ["Peso", `${formatarMedida(aluno.peso)} kg`],
+                      ["Altura", `${formatarMedida(aluno.altura)} m`],
+                      ["Objetivo", aluno.objetivo],
+                      ["Experiência", aluno.experiencia],
+                      ["Frequência", `${aluno.frequenciaSemanal} dias/semana`],
+                    ].map(([rotulo, valor]) => (
+                      <Typography key={rotulo} variant="body2" color="text.secondary">
+                        <Box component="span" sx={{ fontWeight: 600 }}>{rotulo}:</Box>{" "}
+                        {valor}
+                      </Typography>
+                    ))}
+                  </Box>
+                </TableCell>
+                <TableCell
+                  className="no-print"
+                  align="center"
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      flexWrap: "nowrap",
+                      width: "max-content",
+                      mx: "auto",
+                      gap: 1,
+                    }}
                   >
-                    <DeleteOutlinedIcon fontSize="small" />
-                  </IconButton>
+                    <Button
+                      component={Link}
+                      to={`/alunos/${aluno.id}/caracteristicas`}
+                      size="small"
+                      color="inherit"
+                      startIcon={<PrintOutlinedIcon />}
+                      aria-label={`Exportar PDF de ${aluno.nome}`}
+                      sx={{ bgcolor: "action.hover", whiteSpace: "nowrap" }}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <IconButton
+                      size="small"
+                      aria-label={`Editar ${aluno.nome}`}
+                      onClick={() => handleEditar(aluno)}
+                      sx={{ bgcolor: "action.hover" }}
+                    >
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      aria-label={`Excluir ${aluno.nome}`}
+                      onClick={() => handleExcluir(aluno.id)}
+                      sx={{ bgcolor: "action.hover" }}
+                    >
+                      <DeleteOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}

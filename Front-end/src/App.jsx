@@ -9,6 +9,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useParams,
 } from "react-router-dom";
 import { styled, ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box, Switch } from "@mui/material";
@@ -25,10 +26,7 @@ import Exercicios from "./pages/Exercicios.jsx";
 import Maquinas from "./pages/Maquinas";
 import PlanosExportados from "./pages/PlanosExportados";
 import PlanoDetalhe from "./pages/PlanoDetalhe";
-import Relatorios from "./pages/Relatorios";
-import RelatorioCaracteristicas from "./pages/RelatorioCaracteristicas";
 import RelatorioAluno from "./pages/RelatorioAluno";
-import RelatorioAlunosCadastrados from "./pages/RelatorioAlunosCadastrados";
 
 const drawerWidth = 240;
 
@@ -88,6 +86,11 @@ const MaterialUISwitch = styled(Switch)(({ theme }) => ({
     }),
   },
 }));
+
+function RedirecionarCaracteristicasAluno() {
+  const { id } = useParams();
+  return <Navigate to={`/alunos/${id}/caracteristicas`} replace />;
+}
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -224,24 +227,28 @@ export default function App() {
                   element={<Alunos glassStyle={glassStyle} />}
                 />
                 <Route
-                  path="/relatorios"
-                  element={<Relatorios glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/relatorios/caracteristicas"
-                  element={<RelatorioCaracteristicas glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/relatorios/caracteristicas/:id"
+                  path="/alunos/:id/caracteristicas"
                   element={<RelatorioAluno glassStyle={glassStyle} />}
                 />
                 <Route
+                  path="/relatorios"
+                  element={<Navigate to="/alunos" replace />}
+                />
+                <Route
+                  path="/relatorios/caracteristicas"
+                  element={<Navigate to="/alunos" replace />}
+                />
+                <Route
+                  path="/relatorios/caracteristicas/:id"
+                  element={<RedirecionarCaracteristicasAluno />}
+                />
+                <Route
                   path="/relatorios/planos"
-                  element={<PlanosExportados glassStyle={glassStyle} modoRelatorio />}
+                  element={<Navigate to="/planos" replace />}
                 />
                 <Route
                   path="/relatorios/alunos"
-                  element={<RelatorioAlunosCadastrados glassStyle={glassStyle} />}
+                  element={<Navigate to="/alunos" replace />}
                 />
               </Routes>
             </Box>

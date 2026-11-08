@@ -6,7 +6,6 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import AddTaskIcon from "@mui/icons-material/AddTask";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
-import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import { buscarComCache, lerCache } from "../utils/cacheSessao";
 
 const DASHBOARD_RESUMO_URL = "http://localhost:5011/dashboard/resumo";
@@ -178,12 +177,6 @@ export default function Dashboard({ glassStyle }) {
           icone={<DescriptionOutlinedIcon />}
           texto="Ver Planos"
           onClick={() => navigate("/planos")}
-        />
-        <BotaoAcesso
-          glassStyle={glassStyle}
-          icone={<AssessmentOutlinedIcon />}
-          texto="Relatórios"
-          onClick={() => navigate("/relatorios")}
         />
         <BotaoAcesso
           glassStyle={glassStyle}

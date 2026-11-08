@@ -40,6 +40,7 @@ public static class TreinoEndpoints
                 .AsNoTracking()
                 .Include(t => t.Aluno)
                 .Include(t => t.DicaObjetivo)
+                .Include(t => t.SegundaDicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -82,6 +83,7 @@ public static class TreinoEndpoints
                 .AsNoTracking()
                 .Include(t => t.Aluno)
                 .Include(t => t.DicaObjetivo)
+                .Include(t => t.SegundaDicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -111,6 +113,7 @@ public static class TreinoEndpoints
                 .Where(t => t.AlunoId == alunoId && t.Ativo)
                 .Include(t => t.Aluno)
                 .Include(t => t.DicaObjetivo)
+                .Include(t => t.SegundaDicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -185,13 +188,7 @@ public static class TreinoEndpoints
 
             // Busca todo o histórico cronológico de dicas já recebidas por este aluno (ativos e inativos)
             // para garantir que nenhuma dica se repita até que todas as dicas do objetivo tenham aparecido
-            var historicoDicasAluno = await db.Treinos
-                .AsNoTracking()
-                .Where(t => t.AlunoId == aluno.Id && t.DicaObjetivoId != null)
-                .OrderBy(t => t.DataCriacao)
-                .ThenBy(t => t.Id)
-                .Select(t => t.DicaObjetivoId!.Value)
-                .ToListAsync();
+            var historicoDicasAluno = await ObterHistoricoDicasAlunoAsync(db, aluno.Id);
 
             // Desativa treinos anteriores ativos desse aluno para que o novo seja o principal (mantendo histórico)
             var treinosAnteriores = await db.Treinos
@@ -203,20 +200,28 @@ public static class TreinoEndpoints
                 antigo.Ativo = false;
             }
 
-            // Sorteia 1 nova dica contextualizada conforme o objetivo do aluno sem repetir no ciclo atual
+            // Sorteia duas dicas distintas do objetivo, sem repetir antes de completar o ciclo.
             var objetivoParaDica = NormalizarObjetivoParaDica(aluno.Objetivo);
             var dicasDoObjetivo = await db.DicasObjetivo
                 .AsNoTracking()
                 .Where(d => d.Objetivo == objetivoParaDica)
                 .ToListAsync();
 
-            var dicaSorteada = SortearDicaSemRepetirCiclo(dicasDoObjetivo, historicoDicasAluno);
+            var dicasSorteadas = SortearDuasDicasSemRepetirCiclo(dicasDoObjetivo, historicoDicasAluno);
+            if (dicasSorteadas.Count != 2)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Cadastre pelo menos duas dicas distintas para o objetivo do aluno antes de gerar o treino."
+                });
+            }
 
             // Executa o Motor de Prescrição Inteligente baseado exclusivamente em Experiência, Sexo, Frequência Semanal e Idade
             var novoTreino = GerarTreinoPersonalizado(
                 aluno,
                 donoId,
-                dicaSorteada?.Id,
+                dicasSorteadas[0].Id,
+                dicasSorteadas[1].Id,
                 gruposMusculares,
                 exerciciosDisponiveis,
                 maquinasDisponiveis);
@@ -233,11 +238,12 @@ public static class TreinoEndpoints
             db.Treinos.Add(novoTreino);
             await db.SaveChangesAsync();
 
-            // Recarrega o treino com as navegações completas (Aluno, DicaObjetivo, Exercicio, Maquina e GrupoMuscular) para retornar ao cliente
+            // Recarrega o treino com as navegações completas (Aluno, DicaObjetivo, SegundaDicaObjetivo, Exercicio, Maquina e GrupoMuscular) para retornar ao cliente
             var treinoSalvo = await db.Treinos
                 .AsNoTracking()
                 .Include(t => t.Aluno)
                 .Include(t => t.DicaObjetivo)
+                .Include(t => t.SegundaDicaObjetivo)
                 .Include(t => t.Itens.OrderBy(i => i.Id))
                     .ThenInclude(i => i.Exercicio)
                         .ThenInclude(e => e!.GrupoMuscular)
@@ -297,6 +303,7 @@ public static class TreinoEndpoints
             var treino = await db.Treinos
                 .Include(t => t.Aluno)
                 .Include(t => t.DicaObjetivo)
+                .Include(t => t.SegundaDicaObjetivo)
                 .Include(t => t.Itens).ThenInclude(i => i.Exercicio).ThenInclude(e => e!.GrupoMuscular)
                 .Include(t => t.Itens).ThenInclude(i => i.Maquina).ThenInclude(m => m!.GrupoMuscular)
                 .FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
@@ -685,6 +692,45 @@ public static class TreinoEndpoints
         return disponiveisNesteCiclo[Random.Shared.Next(disponiveisNesteCiclo.Count)];
     }
 
+    public static async Task<List<int>> ObterHistoricoDicasAlunoAsync(AppDbContext db, int alunoId)
+    {
+        var historico = await db.Treinos
+            .AsNoTracking()
+            .Where(t => t.AlunoId == alunoId)
+            .OrderBy(t => t.DataCriacao)
+            .ThenBy(t => t.Id)
+            .Select(t => new { t.DicaObjetivoId, t.SegundaDicaObjetivoId })
+            .ToListAsync();
+
+        return historico
+            .SelectMany(t => new[] { t.DicaObjetivoId, t.SegundaDicaObjetivoId })
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToList();
+    }
+
+    public static List<DicaObjetivo> SortearDuasDicasSemRepetirCiclo(
+        List<DicaObjetivo> opcoes,
+        IReadOnlyList<int> historicoDicasAluno)
+    {
+        var distintas = opcoes
+            .Where(d => !string.IsNullOrWhiteSpace(d.Texto))
+            .GroupBy(d => d.Texto.Trim(), StringComparer.Ordinal)
+            .Select(grupo => grupo.First())
+            .ToList();
+        var historico = historicoDicasAluno.ToList();
+        var sorteadas = new List<DicaObjetivo>();
+
+        for (var indice = 0; indice < Math.Min(2, distintas.Count); indice++)
+        {
+            var dica = SortearDicaSemRepetirCiclo(distintas, historico)!;
+            sorteadas.Add(dica);
+            historico.Add(dica.Id);
+        }
+
+        return sorteadas;
+    }
+
     private static bool TempoAerobicoValido(int minutos) =>
         minutos == 0 || (minutos >= MinAerobicoMinutos && minutos <= MaxAerobicoMinutos);
 
@@ -755,6 +801,7 @@ public static class TreinoEndpoints
         Aluno aluno,
         int? usuarioId,
         int? dicaObjetivoId,
+        int? segundaDicaObjetivoId,
         List<GrupoMuscular> gruposMusculares,
         List<Exercicio> exercicios,
         List<Maquina> maquinas)
@@ -790,6 +837,7 @@ public static class TreinoEndpoints
             AlunoId = aluno.Id,
             UsuarioId = usuarioId,
             DicaObjetivoId = dicaObjetivoId,
+            SegundaDicaObjetivoId = segundaDicaObjetivoId,
             NomePlano = nomePlano,
             Divisao = nomeDivisao,
             TempoAerobico = tempoAerobicoGeral,
@@ -1346,6 +1394,12 @@ public static class TreinoEndpoints
             divisao = treino.Divisao,
             tempoAerobico = treino.TempoAerobico,
             dicaObjetivoId = treino.DicaObjetivoId,
+            segundaDicaObjetivoId = treino.SegundaDicaObjetivoId,
+            dicas = new[] { treino.DicaObjetivo?.Texto, treino.SegundaDicaObjetivo?.Texto }
+                .Where(texto => !string.IsNullOrWhiteSpace(texto))
+                .Select(texto => texto!)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray(),
             dica = treino.DicaObjetivo?.Texto ?? string.Empty,
             dicaObjetivo = treino.DicaObjetivo is null ? null : new
             {

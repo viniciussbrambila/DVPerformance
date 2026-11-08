@@ -4,11 +4,11 @@ import {
   Typography,
   Button,
   ButtonBase,
+  IconButton,
   Divider,
   TextField,
   Alert,
   InputAdornment,
-  GlobalStyles,
   Table,
   TableBody,
   TableCell,
@@ -33,6 +33,11 @@ import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import RestoreOutlinedIcon from "@mui/icons-material/RestoreOutlined";
+import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
+import { exportarPdfRelatorio } from "../utils/relatorios";
 import Exercicios from "./Exercicios";
 import Maquinas from "./Maquinas";
 import {
@@ -41,6 +46,8 @@ import {
   alterarAerobicoDoPlano,
   adicionarItemAoPlano,
   removerItemDoPlano,
+  moverItemNoPlano,
+  restaurarOrdemDoPlano,
   substituirItemDoPlano,
   montarItensEdicao,
 } from "../utils/edicaoTreino";
@@ -216,6 +223,11 @@ export default function PlanoDetalhe({ glassStyle }) {
   }
 
   const dias = editando ? diasEdicao : plano.dias || [];
+  const dicas = Array.isArray(plano.dicas)
+    ? plano.dicas.slice(0, 2)
+    : plano.dica
+      ? [plano.dica]
+      : [];
   const minutosAerobico = Number(edicaoAerobico?.minutos);
   const tempoAerobicoValido = Boolean(
     edicaoAerobico &&
@@ -411,10 +423,9 @@ export default function PlanoDetalhe({ glassStyle }) {
     if (!ok) return;
 
     setTimeout(() => {
-      const tituloAnterior = document.title;
-      document.title = `plano-${plano.aluno.toLowerCase().replace(/\s+/g, "-")}`;
-      window.print();
-      document.title = tituloAnterior;
+      exportarPdfRelatorio(
+        `plano-${plano.aluno.toLowerCase().replace(/\s+/g, "-")}`,
+      );
     }, 300);
   };
 
@@ -428,21 +439,8 @@ export default function PlanoDetalhe({ glassStyle }) {
   ];
 
   return (
-    <Box>
-      <GlobalStyles
-        styles={{
-          "@page": { size: "A4", margin: 0 },
-          "@media print": {
-            ".MuiDrawer-root, .no-print": { display: "none !important" },
-            "html, body": { background: "#fff !important" },
-            main: {
-              padding: "0 !important",
-              overflow: "visible !important",
-              minHeight: "auto !important",
-            },
-          },
-        }}
-      />
+    <Box className="plano-impressao">
+      <ImpressaoRelatorio margemSuperior="12mm" />
 
       <Box
         className="no-print"
@@ -570,7 +568,7 @@ export default function PlanoDetalhe({ glassStyle }) {
             boxShadow: "none !important",
             border: "none !important",
             backdropFilter: "none !important",
-            padding: "12mm 15mm !important",
+            padding: "0 !important",
             borderRadius: 0,
             boxDecorationBreak: "clone",
             WebkitBoxDecorationBreak: "clone",
@@ -645,21 +643,52 @@ export default function PlanoDetalhe({ glassStyle }) {
             key={`${dia.nome}-${indiceDia}`}
             sx={{ mb: 5, breakInside: "avoid" }}
           >
-            <Typography
-              className="rotulo-dia"
-              variant="h5"
+            <Box
               sx={{
-                display: "inline-block",
-                fontWeight: "bold",
-                px: 2.5,
-                py: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 2,
                 mb: 2,
-                bgcolor: "text.primary",
-                color: "background.default",
               }}
             >
-              {dia.nome}
-            </Typography>
+              <Typography
+                className="rotulo-dia"
+                variant="h5"
+                sx={{
+                  display: "inline-block",
+                  fontWeight: "bold",
+                  px: 2.5,
+                  py: 1,
+                  bgcolor: "text.primary",
+                  color: "background.default",
+                }}
+              >
+                {dia.nome}
+              </Typography>
+              {editando && (
+                <Button
+                  className="no-print"
+                  size="small"
+                  color="inherit"
+                  startIcon={<RestoreOutlinedIcon />}
+                  disabled={
+                    salvando ||
+                    restaurarOrdemDoPlano(diasEdicao, indiceDia, plano.dias || []) ===
+                      diasEdicao
+                  }
+                  onClick={() =>
+                    setDiasEdicao((lista) =>
+                      restaurarOrdemDoPlano(lista, indiceDia, plano.dias || []),
+                    )
+                  }
+                  sx={{ bgcolor: "action.hover" }}
+                >
+                  Restaurar ordem original
+                </Button>
+              )}
+            </Box>
 
             <TableContainer>
               <Table>
@@ -777,8 +806,44 @@ export default function PlanoDetalhe({ glassStyle }) {
                               display: "flex",
                               gap: 1,
                               justifyContent: "center",
+                              alignItems: "center",
+                              flexWrap: "wrap",
                             }}
                           >
+                            <Box sx={{ display: "flex" }}>
+                              <IconButton
+                                size="small"
+                                color="inherit"
+                                title="Mover para cima"
+                                aria-label={`Mover ${ex.nome} para cima em ${dia.nome}`}
+                                disabled={salvando || indiceEx === 0}
+                                onClick={() =>
+                                  setDiasEdicao((lista) =>
+                                    moverItemNoPlano(lista, indiceDia, indiceEx, -1),
+                                  )
+                                }
+                                sx={{ bgcolor: "action.hover" }}
+                              >
+                                <KeyboardArrowUpIcon />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="inherit"
+                                title="Mover para baixo"
+                                aria-label={`Mover ${ex.nome} para baixo em ${dia.nome}`}
+                                disabled={
+                                  salvando || indiceEx === dia.exercicios.length - 1
+                                }
+                                onClick={() =>
+                                  setDiasEdicao((lista) =>
+                                    moverItemNoPlano(lista, indiceDia, indiceEx, 1),
+                                  )
+                                }
+                                sx={{ bgcolor: "action.hover" }}
+                              >
+                                <KeyboardArrowDownIcon />
+                              </IconButton>
+                            </Box>
                             <Button
                               size="small"
                               color="inherit"
@@ -899,6 +964,20 @@ export default function PlanoDetalhe({ glassStyle }) {
             )}
           </Box>
         ))}
+
+        {dicas.length > 0 && (
+          <Box sx={{ mt: 4, breakInside: "avoid" }}>
+            <Divider sx={{ mb: 3 }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Dicas para {plano.objetivo}
+            </Typography>
+            {dicas.map((dica, indice) => (
+              <Typography key={indice} sx={{ mb: indice < dicas.length - 1 ? 1.5 : 0 }}>
+                {indice + 1}. {dica}
+              </Typography>
+            ))}
+          </Box>
+        )}
       </Paper>
 
       <Dialog

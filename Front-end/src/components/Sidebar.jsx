@@ -15,7 +15,6 @@ import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import AddTaskIcon from "@mui/icons-material/AddTask";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
 
@@ -144,18 +143,6 @@ export default function Sidebar({
             <AssignmentIcon />
           </ListItemIcon>
           <ListItemText primary="Planos de Treino" />
-        </ListItemButton>
-
-        <ListItemButton
-          component={Link}
-          to="/relatorios"
-          selected={estaAtivo("/relatorios")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <AssessmentOutlinedIcon />
-          </ListItemIcon>
-          <ListItemText primary="Relatórios" />
         </ListItemButton>
       </List>
 

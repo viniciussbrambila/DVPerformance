@@ -43,7 +43,7 @@ export default function RelatorioAluno({ glassStyle }) {
       <ImpressaoRelatorio />
       <CabecalhoRelatorio
         titulo="Características do Aluno"
-        voltar="/relatorios/caracteristicas"
+        voltar="/alunos"
         onExportar={() =>
           exportarPdfRelatorio(`caracteristicas-${aluno?.nome || "aluno"}`)
         }

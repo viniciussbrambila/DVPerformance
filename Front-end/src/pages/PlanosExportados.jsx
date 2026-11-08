@@ -23,7 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import SearchIcon from "@mui/icons-material/Search";
-import CabecalhoRelatorio from "../components/CabecalhoRelatorio";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import { exportarPdfRelatorio } from "../utils/relatorios";
 import { formatarTempoAerobico } from "../utils/edicaoTreino";
@@ -80,6 +80,16 @@ function montarTexto(plano) {
     linhas.push("");
   });
 
+  const dicas = Array.isArray(plano.dicas)
+    ? plano.dicas.slice(0, 2)
+    : plano.dica
+      ? [plano.dica]
+      : [];
+  if (dicas.length > 0) {
+    linhas.push(`Dicas para ${plano.objetivo}`);
+    dicas.forEach((dica, indice) => linhas.push(`${indice + 1}. ${dica}`));
+  }
+
   return linhas.join("\n");
 }
 
@@ -88,10 +98,7 @@ const obterChavePlanos = () => {
   return `planos:${usuarioLogado?.id || "geral"}`;
 };
 
-export default function PlanosExportados({
-  glassStyle,
-  modoRelatorio = false,
-}) {
+export default function PlanosExportados({ glassStyle }) {
   const navigate = useNavigate();
   const [planos, setPlanos] = useState(
     () => lerCache(obterChavePlanos()) || [],
@@ -235,26 +242,31 @@ export default function PlanosExportados({
   const cabecalhoSx = { fontWeight: 600, color: "text.primary" };
 
   return (
-    <Box className={modoRelatorio ? "relatorio-impressao" : undefined}>
-      {modoRelatorio && <ImpressaoRelatorio />}
-      {modoRelatorio ? (
-        <CabecalhoRelatorio
-          titulo="Relatório de Planos de Treino"
-          onExportar={() => exportarPdfRelatorio("relatorio-planos-de-treino")}
-          desabilitado={carregando || planosFiltrados.length === 0}
-        />
-      ) : (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3,
-          }}
-        >
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Planos de Treino
-          </Typography>
+    <Box className="relatorio-impressao">
+      <ImpressaoRelatorio />
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+          Planos de Treino
+        </Typography>
+        <Box className="no-print" sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<PrintOutlinedIcon />}
+            onClick={() => exportarPdfRelatorio("relatorio-planos-de-treino")}
+            disabled={carregando || planosFiltrados.length === 0}
+          >
+            Exportar PDF
+          </Button>
           <Button
             variant="contained"
             size="large"
@@ -263,7 +275,7 @@ export default function PlanosExportados({
             Novo Treino
           </Button>
         </Box>
-      )}
+      </Box>
 
       {erro && (
         <Alert severity="error" className="no-print" sx={{ mb: 3 }}>
@@ -293,6 +305,7 @@ export default function PlanosExportados({
 
         <TextField
           select
+          label="Status"
           value={filtroStatus}
           onChange={(e) => setFiltroStatus(e.target.value)}
           sx={{ minWidth: 160 }}

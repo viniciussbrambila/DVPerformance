@@ -28,6 +28,50 @@ export function removerItemDoPlano(dias, itemId) {
   }));
 }
 
+export function moverItemNoPlano(dias, indiceDia, indiceItem, direcao) {
+  const dia = dias[indiceDia];
+  const destino = indiceItem + direcao;
+  if (
+    !dia ||
+    !Number.isInteger(indiceItem) ||
+    (direcao !== -1 && direcao !== 1) ||
+    indiceItem < 0 ||
+    indiceItem >= dia.exercicios.length ||
+    destino < 0 ||
+    destino >= dia.exercicios.length
+  ) {
+    return dias;
+  }
+
+  const exercicios = [...dia.exercicios];
+  const [item] = exercicios.splice(indiceItem, 1);
+  exercicios.splice(destino, 0, item);
+  return dias.map((atual, indice) =>
+    indice === indiceDia ? { ...atual, exercicios } : atual,
+  );
+}
+
+export function restaurarOrdemDoPlano(dias, indiceDia, diasOriginais) {
+  const dia = dias[indiceDia];
+  const original = diasOriginais[indiceDia];
+  if (!dia || !original) return dias;
+
+  const posicoes = new Map(
+    (original.exercicios || []).map((item, indice) => [item.id, indice]),
+  );
+  const exercicios = [...dia.exercicios].sort(
+    (a, b) =>
+      (posicoes.get(a.id) ?? Infinity) - (posicoes.get(b.id) ?? Infinity),
+  );
+  if (exercicios.every((item, indice) => item === dia.exercicios[indice])) {
+    return dias;
+  }
+
+  return dias.map((atual, indice) =>
+    indice === indiceDia ? { ...atual, exercicios } : atual,
+  );
+}
+
 export function filtrarCatalogoDoDia(catalogo, dia, tipo) {
   const campo = tipo === "maquina" ? "maquinaId" : "exercicioId";
   const idsUtilizados = new Set(
