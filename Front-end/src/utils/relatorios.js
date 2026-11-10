@@ -39,15 +39,43 @@ export function formatarMedidaRelatorio(valor, unidade) {
   })} ${unidade}`;
 }
 
+function normalizarDataFiltro(valor, fimDoDia = false) {
+  if (!valor) return null;
+  const base =
+    valor instanceof Date
+      ? valor
+      : /^\d{4}-\d{2}-\d{2}$/.test(String(valor))
+        ? new Date(`${valor}T12:00:00`)
+        : new Date(valor);
+  if (Number.isNaN(base.getTime())) return null;
+  return new Date(
+    base.getFullYear(),
+    base.getMonth(),
+    base.getDate(),
+    fimDoDia ? 23 : 0,
+    fimDoDia ? 59 : 0,
+    fimDoDia ? 59 : 0,
+    fimDoDia ? 999 : 0,
+  );
+}
+
 export function filtrarAlunosCadastrados(
   alunos,
-  { busca, dia, mes, ano, ordem },
+  { busca = "", dia, mes, ano, dataInicio, dataFim, ordem = "recentes" },
 ) {
+  const inicio = normalizarDataFiltro(dataInicio, false);
+  const fim = normalizarDataFiltro(dataFim, true);
+
   return alunos
     .filter((aluno) => {
       const data = obterDataCadastro(aluno);
+      const dentroDoIntervalo =
+        (!inicio || (data && data.getTime() >= inicio.getTime())) &&
+        (!fim || (data && data.getTime() <= fim.getTime()));
+
       return (
         aluno.nome.toLowerCase().includes(busca.trim().toLowerCase()) &&
+        dentroDoIntervalo &&
         (!dia || data?.getDate() === Number(dia)) &&
         (!mes || (data && data.getMonth() + 1 === Number(mes))) &&
         (!ano || data?.getFullYear() === Number(ano))

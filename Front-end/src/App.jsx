@@ -92,8 +92,21 @@ function RedirecionarCaracteristicasAluno() {
   return <Navigate to={`/alunos/${id}/caracteristicas`} replace />;
 }
 
+const CHAVE_TEMA = "temaModo";
+
+const lerTemaSalvo = () => {
+  try {
+    const salvo = localStorage.getItem(CHAVE_TEMA);
+    if (salvo === "light") return false;
+    if (salvo === "dark") return true;
+  } catch {
+    // Ignora erro de acesso ao localStorage
+  }
+  return true;
+};
+
 export default function App() {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(lerTemaSalvo);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
   const [telaAuth, setTelaAuth] = useState("login"); // 'login' ou 'cadastro'
   const [usuarioLogado, setUsuarioLogado] = useState(null);
@@ -107,7 +120,13 @@ export default function App() {
   }, [isLoggedIn, usuarioLogado?.id]);
 
   const handleThemeChange = (event) => {
-    setIsDarkMode(event.target.checked);
+    const novoModoEscuro = event.target.checked;
+    setIsDarkMode(novoModoEscuro);
+    try {
+      localStorage.setItem(CHAVE_TEMA, novoModoEscuro ? "dark" : "light");
+    } catch {
+      // Ignora erro de escrita no localStorage
+    }
   };
 
   const glassStyle = isDarkMode ? darkGlassStyle : lightGlassStyle;
@@ -116,6 +135,26 @@ export default function App() {
     <Router>
       <ThemeProvider theme={isDarkMode ? Darktheme : Lighttheme}>
         <CssBaseline />
+
+        <Box
+          className="no-print"
+          sx={{
+            position: "fixed",
+            top: 16,
+            right: 24,
+            zIndex: 1200,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <MaterialUISwitch
+            checked={isDarkMode}
+            onChange={handleThemeChange}
+            slotProps={{
+              input: { "aria-label": "Alternar entre tema claro e escuro" },
+            }}
+          />
+        </Box>
 
         {!isLoggedIn ? (
           telaAuth === "login" ? (
@@ -162,24 +201,6 @@ export default function App() {
                 setTelaAuth("login");
               }}
             />
-
-            <Box
-              className="no-print"
-              sx={{
-                position: "fixed",
-                top: 16,
-                right: 24,
-                zIndex: 1200,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <MaterialUISwitch
-                checked={isDarkMode}
-                onChange={handleThemeChange}
-              />
-
-            </Box>
 
             <Box
               component="main"

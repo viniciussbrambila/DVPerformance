@@ -100,6 +100,14 @@ const DarkTheme = createTheme({
         },
       },
     },
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          ...darkGlassStyle,
+          background: 'rgba(15, 23, 42, 0.94)',
+        },
+      },
+    },
 
     // 4. Barra Superior e Sidebar também herdam do tema
     MuiAppBar: {
@@ -149,6 +157,14 @@ const DarkTheme = createTheme({
 
       '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
         borderColor: '#2563EB',
+      },
+
+      '& input:-webkit-autofill': {
+        WebkitBoxShadow: '0 0 0 1000px #0f172a inset !important',
+        WebkitTextFillColor: '#F8FAFC !important',
+        caretColor: '#F8FAFC',
+        borderRadius: 'inherit',
+        transition: 'background-color 5000s ease-in-out 0s',
       },
     },
   },

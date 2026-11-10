@@ -101,6 +101,14 @@ const LightTheme = createTheme({
         },
       },
     },
+    MuiPopover: {
+      styleOverrides: {
+        paper: {
+          ...lightGlassStyle,
+          background: 'rgba(255, 255, 255, 0.96)',
+        },
+      },
+    },
 
     // 4. Barra Superior e Sidebar com vidro claro e texto escuro
     MuiAppBar: {
@@ -140,6 +148,13 @@ const LightTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 8,
+          '& input:-webkit-autofill': {
+            WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.85) inset !important',
+            WebkitTextFillColor: '#101828 !important',
+            caretColor: '#101828',
+            borderRadius: 'inherit',
+            transition: 'background-color 5000s ease-in-out 0s',
+          },
         },
       },
     },

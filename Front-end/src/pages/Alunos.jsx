@@ -31,6 +31,7 @@ import {
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
+import DesktopDateRangePicker from "../components/DesktopDateRangePicker";
 import {
   obterDataCadastro,
   formatarDataCadastro,
@@ -96,9 +97,7 @@ export default function Alunos({ glassStyle }) {
     return Boolean(chave && !temCache(chave));
   });
   const [busca, setBusca] = useState("");
-  const [dia, setDia] = useState("");
-  const [mes, setMes] = useState("");
-  const [ano, setAno] = useState("");
+  const [intervaloData, setIntervaloData] = useState([null, null]);
   const [ordem, setOrdem] = useState("recentes");
   const [erro, setErro] = useState("");
   const [open, setOpen] = useState(false);
@@ -349,20 +348,13 @@ export default function Alunos({ glassStyle }) {
   const alunosVisiveis = usuarioId
     ? prepararAlunosRelatorio(alunos, usuarioId)
     : [];
+  const [dataInicio, dataFim] = intervaloData;
   const filtrados = filtrarAlunosCadastrados(alunosVisiveis, {
     busca,
-    dia,
-    mes,
-    ano,
+    dataInicio,
+    dataFim,
     ordem,
   });
-  const anos = [
-    ...new Set(
-      alunosVisiveis
-        .map((aluno) => obterDataCadastro(aluno)?.getFullYear())
-        .filter(Boolean),
-    ),
-  ].sort((a, b) => b - a);
   const semData = alunosVisiveis.some((aluno) => !obterDataCadastro(aluno));
 
   return (
@@ -433,61 +425,12 @@ export default function Alunos({ glassStyle }) {
           <MenuItem value="recentes">Mais recentes</MenuItem>
           <MenuItem value="antigos">Mais antigos</MenuItem>
         </TextField>
-        <TextField
-          select
-          label="Dia"
-          value={dia}
-          onChange={(e) => setDia(e.target.value)}
-          sx={{ minWidth: 100 }}
-        >
-          <MenuItem value="">Todos</MenuItem>
-          {Array.from({ length: 31 }, (_, i) => i + 1).map((valor) => (
-            <MenuItem key={valor} value={valor}>
-              {valor}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          label="Mês"
-          value={mes}
-          onChange={(e) => setMes(e.target.value)}
-          sx={{ minWidth: 140 }}
-        >
-          <MenuItem value="">Todos</MenuItem>
-          {[
-            "Janeiro",
-            "Fevereiro",
-            "Março",
-            "Abril",
-            "Maio",
-            "Junho",
-            "Julho",
-            "Agosto",
-            "Setembro",
-            "Outubro",
-            "Novembro",
-            "Dezembro",
-          ].map((nome, i) => (
-            <MenuItem key={nome} value={i + 1}>
-              {nome}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          label="Ano"
-          value={ano}
-          onChange={(e) => setAno(e.target.value)}
-          sx={{ minWidth: 110 }}
-        >
-          <MenuItem value="">Todos</MenuItem>
-          {anos.map((valor) => (
-            <MenuItem key={valor} value={valor}>
-              {valor}
-            </MenuItem>
-          ))}
-        </TextField>
+        <DesktopDateRangePicker
+          label="Período de cadastro"
+          startDate={dataInicio}
+          endDate={dataFim}
+          onChange={setIntervaloData}
+        />
       </Box>
       {erro && (
         <Alert severity="error" className="no-print" sx={{ mb: 3 }}>
