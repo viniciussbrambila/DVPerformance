@@ -23,6 +23,11 @@ import {
   InputAdornment,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import {
+  converterDataNascimentoParaISO,
+  dataNascimentoValida,
+  formatarDataNascimento,
+} from "../utils/dataNascimento";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
@@ -81,11 +86,6 @@ const medidaValida = (campo, valor) => {
 const converterMedida = (valor) =>
   valor === "" ? null : Number(String(valor).replace(",", "."));
 
-const formatarMedida = (valor) =>
-  valor == null || valor === ""
-    ? "—"
-    : Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-
 export default function Alunos({ glassStyle }) {
   const [alunos, setAlunos] = useState(() => {
     const chave = obterChaveAlunos();
@@ -108,7 +108,7 @@ export default function Alunos({ glassStyle }) {
   const [errosApi, setErrosApi] = useState([]); // Guarda mensagens de erro vindas do Back-end
   const [formData, setFormData] = useState({
     nome: "",
-    idade: "",
+    dataDeNascimento: "",
     peso: "",
     altura: "",
     sexo: "",
@@ -162,7 +162,7 @@ export default function Alunos({ glassStyle }) {
     setErrosApi([]);
     setFormData({
       nome: "",
-      idade: "",
+      dataDeNascimento: "",
       peso: "",
       altura: "",
       sexo: "",
@@ -175,10 +175,13 @@ export default function Alunos({ glassStyle }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Se for o campo idade, aceita apenas números de 0 a 9
-    if (name === "idade") {
-      const apenasNumeros = value.replace(/\D/g, "");
-      setFormData({ ...formData, [name]: apenasNumeros });
+    if (name === "dataDeNascimento") {
+      const dataDigitada = value
+        .replace(/\D/g, "")
+        .slice(0, 8)
+        .replace(/^(\d{2})(\d)/, "$1/$2")
+        .replace(/^(\d{2}\/\d{2})(\d)/, "$1/$2");
+      setFormData({ ...formData, [name]: dataDigitada });
       return;
     }
 
@@ -200,7 +203,9 @@ export default function Alunos({ glassStyle }) {
     setErrosApi([]);
     setFormData({
       nome: aluno.nome,
-      idade: String(aluno.idade),
+      dataDeNascimento: aluno.dataDeNascimento
+        ? formatarDataNascimento(aluno.dataDeNascimento)
+        : "",
       peso: aluno.peso == null ? "" : String(aluno.peso).replace(".", ","),
       altura: aluno.altura == null ? "" : String(aluno.altura).replace(".", ","),
       sexo: aluno.sexo,
@@ -249,10 +254,10 @@ export default function Alunos({ glassStyle }) {
   };
 
   // Valida os campos obrigatórios e os limites de peso e altura
+  const nascimentoISO = converterDataNascimentoParaISO(formData.dataDeNascimento);
   const formularioValido =
     formData.nome.trim() !== "" &&
-    String(formData.idade).trim() !== "" &&
-    Number(formData.idade) > 0 &&
+    dataNascimentoValida(nascimentoISO) &&
     medidaValida("peso", formData.peso) &&
     medidaValida("altura", formData.altura) &&
     formData.sexo !== "" &&
@@ -277,7 +282,7 @@ export default function Alunos({ glassStyle }) {
 
     const payload = {
       nome: formData.nome,
-      idade: Number(formData.idade),
+      dataDeNascimento: nascimentoISO,
       peso: converterMedida(formData.peso),
       altura: converterMedida(formData.altura),
       sexo: formData.sexo,
@@ -496,19 +501,26 @@ export default function Alunos({ glassStyle }) {
         </Alert>
       )}
 
-      {/* Data e nome na primeira linha; características na linha abaixo. */}
+      {/* Uma linha por aluno, com as características resumidas em colunas. */}
       <TableContainer
         component={Paper}
         elevation={0}
         sx={{ ...glassStyle, borderRadius: 4, p: 2 }}
       >
-        <Table>
+        <Table size="small" sx={{ minWidth: 1000, "@media print": { minWidth: 0 } }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
                 Data de cadastro
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Nome do aluno</TableCell>
+              <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                Nome do aluno
+              </TableCell>
+              <TableCell className="no-print" sx={{ fontWeight: "bold" }}>Objetivo</TableCell>
+              <TableCell className="no-print" sx={{ fontWeight: "bold" }}>Experiência</TableCell>
+              <TableCell className="no-print" sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                Frequência
+              </TableCell>
               <TableCell
                 className="no-print"
                 align="center"
@@ -521,7 +533,7 @@ export default function Alunos({ glassStyle }) {
           <TableBody>
             {carregando && alunosVisiveis.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
@@ -530,7 +542,7 @@ export default function Alunos({ glassStyle }) {
             {!carregando && filtrados.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={6}
                   align="center"
                   sx={{ py: 4, color: "text.secondary" }}
                 >
@@ -545,40 +557,20 @@ export default function Alunos({ glassStyle }) {
               <TableRow
                 key={aluno.id}
                 hover
-                sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                sx={{
+                  "& td, & th": { whiteSpace: "nowrap", py: 1.5 },
+                  "&:last-child td, &:last-child th": { border: 0 },
+                }}
               >
-                <TableCell sx={{ verticalAlign: "top", whiteSpace: "nowrap" }}>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>
                   {formatarDataCadastro(aluno)}
                 </TableCell>
-                <TableCell component="th" scope="row" sx={{ minWidth: 240 }}>
-                  <Typography sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
-                    {aluno.nome}
-                  </Typography>
-                  <Box
-                    className="no-print"
-                    sx={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      columnGap: 2,
-                      rowGap: 0.5,
-                      mt: 1,
-                    }}
-                  >
-                    {[
-                      ["Idade", `${aluno.idade} anos`],
-                      ["Peso", `${formatarMedida(aluno.peso)} kg`],
-                      ["Altura", `${formatarMedida(aluno.altura)} m`],
-                      ["Objetivo", aluno.objetivo],
-                      ["Experiência", aluno.experiencia],
-                      ["Frequência", `${aluno.frequenciaSemanal} dias/semana`],
-                    ].map(([rotulo, valor]) => (
-                      <Typography key={rotulo} variant="body2" color="text.secondary">
-                        <Box component="span" sx={{ fontWeight: 600 }}>{rotulo}:</Box>{" "}
-                        {valor}
-                      </Typography>
-                    ))}
-                  </Box>
+                <TableCell component="th" scope="row" sx={{ fontWeight: 600 }}>
+                  {aluno.nome}
                 </TableCell>
+                <TableCell className="no-print">{aluno.objetivo}</TableCell>
+                <TableCell className="no-print">{aluno.experiencia}</TableCell>
+                <TableCell className="no-print">{aluno.frequenciaSemanal} dias/semana</TableCell>
                 <TableCell
                   className="no-print"
                   align="center"
@@ -600,11 +592,11 @@ export default function Alunos({ glassStyle }) {
                       to={`/alunos/${aluno.id}/caracteristicas`}
                       size="small"
                       color="inherit"
-                      startIcon={<PrintOutlinedIcon />}
-                      aria-label={`Exportar PDF de ${aluno.nome}`}
+                      startIcon={<InfoOutlinedIcon />}
+                      aria-label={`Ver mais sobre ${aluno.nome}`}
                       sx={{ bgcolor: "action.hover", whiteSpace: "nowrap" }}
                     >
-                      Exportar PDF
+                      Ver mais
                     </Button>
                     <IconButton
                       size="small"
@@ -670,24 +662,28 @@ export default function Alunos({ glassStyle }) {
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
-                label="Idade"
-                name="idade"
-                value={formData.idade}
+                required
+                type="text"
+                label="Data de nascimento"
+                placeholder="DD/MM/AAAA"
+                name="dataDeNascimento"
+                value={formData.dataDeNascimento}
                 onChange={handleChange}
                 slotProps={{
-                  htmlInput: { inputMode: "numeric", maxLength: 3 },
+                  inputLabel: { shrink: true },
+                  htmlInput: {
+                    inputMode: "numeric",
+                    maxLength: 10,
+                    autoComplete: "bday",
+                  },
                 }}
                 error={
-                  tentouGravar &&
-                  (!String(formData.idade).trim() ||
-                    Number(formData.idade) <= 0)
+                  tentouGravar && !dataNascimentoValida(nascimentoISO)
                 }
                 helperText={
-                  tentouGravar &&
-                  (!String(formData.idade).trim() ||
-                    Number(formData.idade) <= 0)
-                    ? "Informe a idade"
-                    : ""
+                  tentouGravar && !dataNascimentoValida(nascimentoISO)
+                    ? "Informe uma data válida para alunos de 13 a 120 anos"
+                    : "Digite no formato DD/MM/AAAA"
                 }
               />
             </Grid>

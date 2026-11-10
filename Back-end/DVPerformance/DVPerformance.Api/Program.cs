@@ -21,7 +21,7 @@ public class Program
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        // Bloqueia envio de texto em campos numéricos (ex: "idade": "25" ou "idade": "abc")
+        // Bloqueia envio de texto em campos numéricos (ex: "frequenciaSemanal": "3")
         builder.Services.Configure<JsonOptions>(options =>
         {
             options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
@@ -61,7 +61,7 @@ public class Program
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await context.Response.WriteAsJsonAsync(new
                 {
-                    mensagem = "Formato de dados inválido. Verifique se campos numéricos (como idade e frequência semanal) contêm apenas números inteiros e se os campos de texto estão entre aspas.",
+                    mensagem = "Formato de dados inválido. Envie a data de nascimento no formato AAAA-MM-DD, a frequência semanal como número inteiro e os campos de texto entre aspas.",
                     detalhe = ex.Message
                 });
             }

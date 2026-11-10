@@ -150,7 +150,7 @@ public static class AlunoEndpoints
             var objetivoMudou = !string.Equals(alunoExistente.Objetivo, dadosAtualizados!.Objetivo, StringComparison.Ordinal);
 
             alunoExistente.Nome = dadosAtualizados.Nome.Trim();
-            alunoExistente.Idade = dadosAtualizados.Idade;
+            alunoExistente.DataDeNascimento = dadosAtualizados.DataDeNascimento;
             alunoExistente.Sexo = dadosAtualizados.Sexo;
             alunoExistente.Experiencia = dadosAtualizados.Experiencia;
             alunoExistente.FrequenciaSemanal = dadosAtualizados.FrequenciaSemanal;
@@ -232,6 +232,37 @@ public static class AlunoEndpoints
         });
     }
 
+    // Também é executada ao gerar planos, pois aniversários alteram as regras aplicáveis.
+    public static List<string> ValidarDadosEtarios(Aluno aluno, DateOnly? dataReferencia = null)
+    {
+        var erros = new List<string>();
+        var hoje = dataReferencia ?? Aluno.ObterDataAtual();
+        if (!aluno.DataDeNascimento.HasValue)
+        {
+            erros.Add("A data de nascimento é obrigatória. Preencha esse campo no cadastro do aluno.");
+            return erros;
+        }
+
+        if (aluno.DataDeNascimento.Value > hoje)
+        {
+            erros.Add("A data de nascimento não pode estar no futuro.");
+            return erros;
+        }
+
+        var idade = Aluno.CalcularIdade(aluno.DataDeNascimento, hoje);
+        if (idade is < 13 or > 120)
+        {
+            erros.Add("A data de nascimento deve corresponder a um aluno entre 13 e 120 anos.");
+            return erros;
+        }
+
+        if (idade > 65 && aluno.Experiencia == "Avançado")
+            erros.Add("Para alunos com mais de 65 anos, o nível 'Avançado' não é permitido por segurança fisiológica.");
+        if (idade > 65 && aluno.FrequenciaSemanal > 5)
+            erros.Add("Alunos com mais de 65 anos devem ter no mínimo 2 dias de descanso semanal (frequência máxima de 5 dias).");
+        return erros;
+    }
+
     // Valida todos os campos do Aluno segundo o Dicionário de Dados e as Regras de Negócio (RNs)
     private static List<string> ValidarAluno(Aluno? aluno, bool exigirUsuarioId)
     {
@@ -262,15 +293,8 @@ public static class AlunoEndpoints
             }
         }
 
-        // 2. Validação da Idade (inteiro 3 dígitos, faixa segura de treino: 13 a 120 anos)
-        if (aluno.Idade <= 0)
-        {
-            erros.Add("A idade é obrigatória e deve ser um número inteiro maior que zero.");
-        }
-        else if (aluno.Idade < 13 || aluno.Idade > 120)
-        {
-            erros.Add("A idade do aluno deve estar entre 13 e 120 anos.");
-        }
+        // 2. A data é obrigatória ao cadastrar/editar; as regras usam a idade atual.
+        erros.AddRange(ValidarDadosEtarios(aluno));
 
         // 3. Validação do Sexo (Select: "M" ou "F")
         if (string.IsNullOrWhiteSpace(aluno.Sexo) || !SexosPermitidos.Contains(aluno.Sexo))
@@ -283,20 +307,11 @@ public static class AlunoEndpoints
         {
             erros.Add("Selecione um nível de experiência válido ('Iniciante', 'Intermediário' ou 'Avançado').");
         }
-        else if (aluno.Idade > 65 && aluno.Experiencia == "Avançado")
-        {
-            // RN01: O sistema deve utilizar a idade do cliente como critério para limitar os níveis de treino disponíveis
-            erros.Add("Para alunos com mais de 65 anos, o nível 'Avançado' não é permitido por segurança fisiológica.");
-        }
 
         // 5. Validação da Frequência Semanal (Select: 2 a 6 dias + RN02 e RN07)
         if (aluno.FrequenciaSemanal < 2 || aluno.FrequenciaSemanal > 6)
         {
             erros.Add("A frequência semanal de treino deve ser entre 2 e 6 dias.");
-        }
-        else if (aluno.Idade > 65 && aluno.FrequenciaSemanal > 5)
-        {
-            erros.Add("Alunos com mais de 65 anos devem ter no mínimo 2 dias de descanso semanal (frequência máxima de 5 dias).");
         }
 
         // 6. Validação do Objetivo (Select: "Hipertrofia", "Emagrecimento", "Força", "Resistência" - usado para as dicas no PDF)

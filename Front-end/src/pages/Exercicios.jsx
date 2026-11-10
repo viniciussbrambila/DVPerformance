@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
+import { normalizarTextoBusca } from "../utils/busca";
 import {
   Box,
   Paper,
@@ -143,12 +144,13 @@ export default function Exercicios({
     carregarExercicios();
   }, []);
 
+  const termoBusca = normalizarTextoBusca(busca).trim();
   const exerciciosDisponiveis = onSelecionar
     ? filtrarCatalogoDoDia(exercicios, diaTreino, "exercicio")
     : exercicios;
   const exerciciosFiltrados = exerciciosDisponiveis
     .filter((ex) =>
-      ex.nome.toLowerCase().includes(busca.trim().toLowerCase()),
+      normalizarTextoBusca(ex.nome).includes(termoBusca),
     )
     .sort((a, b) =>
       ordem === "asc"

@@ -7,6 +7,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { useParams } from "react-router-dom";
+import { calcularIdade } from "../utils/dataNascimento";
 import CabecalhoRelatorio from "../components/CabecalhoRelatorio";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import useAlunosRelatorio from "../hooks/useAlunosRelatorio";
@@ -19,10 +20,11 @@ export default function RelatorioAluno({ glassStyle }) {
   const { id } = useParams();
   const { alunos, carregando, erro } = useAlunosRelatorio();
   const aluno = alunos.find((item) => String(item.id) === id);
+  const idade = calcularIdade(aluno?.dataDeNascimento);
   const dados = aluno
     ? [
         ["Nome completo", aluno.nome],
-        ["Idade", `${aluno.idade} anos`],
+        ["Idade", idade == null ? "Não informada" : `${idade} anos`],
         [
           "Sexo",
           aluno.sexo === "M"

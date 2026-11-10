@@ -48,6 +48,10 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnName("data_cadastro")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<DateOnly?>("DataDeNascimento")
+                        .HasColumnType("date")
+                        .HasColumnName("data_de_nascimento");
+
                     b.Property<string>("Experiencia")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -58,9 +62,9 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("frequencia_semanal");
 
-                    b.Property<int>("Idade")
+                    b.Property<int?>("IdadeLegada")
                         .HasColumnType("integer")
-                        .HasColumnName("idade");
+                        .HasColumnName("idade_legada");
 
                     b.Property<string>("Nome")
                         .IsRequired()

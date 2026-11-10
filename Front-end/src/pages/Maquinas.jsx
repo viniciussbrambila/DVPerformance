@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
+import { normalizarTextoBusca } from "../utils/busca";
 import {
   Box,
   Paper,
@@ -143,12 +144,13 @@ export default function Maquinas({
     carregarMaquinas();
   }, []);
 
+  const termoBusca = normalizarTextoBusca(busca).trim();
   const maquinasDisponiveis = onSelecionar
     ? filtrarCatalogoDoDia(maquinas, diaTreino, "maquina")
     : maquinas;
   const maquinasFiltradas = maquinasDisponiveis
     .filter((maq) =>
-      maq.nome.toLowerCase().includes(busca.trim().toLowerCase()),
+      normalizarTextoBusca(maq.nome).includes(termoBusca),
     )
     .sort((a, b) =>
       ordem === "asc"

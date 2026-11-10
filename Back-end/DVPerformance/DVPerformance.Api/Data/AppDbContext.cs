@@ -88,9 +88,13 @@ public class AppDbContext : DbContext
                   .HasMaxLength(1)
                   .IsRequired();
 
-            entity.Property(a => a.Idade)
-                  .HasColumnName("idade")
-                  .IsRequired();
+            entity.Property(a => a.DataDeNascimento)
+                  .HasColumnName("data_de_nascimento")
+                  .HasColumnType("date");
+
+            // Guarda o dado histórico sem expor ou utilizar uma idade desatualizada.
+            entity.Property<int?>("IdadeLegada")
+                  .HasColumnName("idade_legada");
 
             entity.Property(a => a.Experiencia)
                   .HasColumnName("experiencia")

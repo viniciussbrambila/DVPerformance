@@ -33,6 +33,20 @@ public static class TreinoEndpoints
     {
         var grupo = app.MapGroup("/treinos");
 
+        // GET /treinos/divisoes?dias=4 -> Opções compatíveis com a frequência do aluno.
+        grupo.MapGet("/divisoes", (int? dias) =>
+        {
+            if (dias is null or < 2 or > 6)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Informe uma frequência semanal entre 2 e 6 dias."
+                });
+            }
+
+            return Results.Ok(DivisoesTreino.ObterDisponiveis(dias.Value));
+        });
+
         // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos já enriquecidos com dados do aluno, dica sorteada, status e dias agrupados
         grupo.MapGet("/", async (int? usuarioId, int? alunoId, bool? incluirInativos, AppDbContext db) =>
         {
@@ -127,7 +141,7 @@ public static class TreinoEndpoints
         });
 
         // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha usando os exercícios e máquinas ativos da conta do Personal
-        grupo.MapPost("/gerar/{alunoId:int}", async (int alunoId, int? usuarioId, AppDbContext db) =>
+        grupo.MapPost("/gerar/{alunoId:int}", async (int alunoId, int? usuarioId, string? divisao, AppDbContext db) =>
         {
             if (alunoId <= 0)
             {
@@ -138,6 +152,25 @@ public static class TreinoEndpoints
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou inativo no sistema." });
+            }
+
+            var errosEtarios = AlunoEndpoints.ValidarDadosEtarios(aluno);
+            if (errosEtarios.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Atualize os dados do aluno antes de gerar o treino.",
+                    erros = errosEtarios
+                });
+            }
+
+            var divisaoSelecionada = DivisoesTreino.Obter(divisao, aluno.FrequenciaSemanal);
+            if (divisaoSelecionada is null)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = $"Selecione uma divisão compatível com os {aluno.FrequenciaSemanal} dias de treino do aluno."
+                });
             }
 
             // Identifica o Personal dono da ficha (pelo query param ou pelo vínculo do próprio aluno)
@@ -186,19 +219,20 @@ public static class TreinoEndpoints
                 });
             }
 
+            var errosCatalogo = ValidarCatalogoDivisao(
+                divisaoSelecionada, gruposMusculares, exerciciosDisponiveis, maquinasDisponiveis);
+            if (errosCatalogo.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "O catálogo não possui todos os grupos musculares necessários para esta divisão.",
+                    erros = errosCatalogo
+                });
+            }
+
             // Busca todo o histórico cronológico de dicas já recebidas por este aluno (ativos e inativos)
             // para garantir que nenhuma dica se repita até que todas as dicas do objetivo tenham aparecido
             var historicoDicasAluno = await ObterHistoricoDicasAlunoAsync(db, aluno.Id);
-
-            // Desativa treinos anteriores ativos desse aluno para que o novo seja o principal (mantendo histórico)
-            var treinosAnteriores = await db.Treinos
-                .Where(t => t.AlunoId == aluno.Id && t.Ativo)
-                .ToListAsync();
-
-            foreach (var antigo in treinosAnteriores)
-            {
-                antigo.Ativo = false;
-            }
 
             // Sorteia duas dicas distintas do objetivo, sem repetir antes de completar o ciclo.
             var objetivoParaDica = NormalizarObjetivoParaDica(aluno.Objetivo);
@@ -216,7 +250,7 @@ public static class TreinoEndpoints
                 });
             }
 
-            // Executa o Motor de Prescrição Inteligente baseado exclusivamente em Experiência, Sexo, Frequência Semanal e Idade
+            // Gera a ficha conforme a divisão escolhida e os parâmetros do aluno
             var novoTreino = GerarTreinoPersonalizado(
                 aluno,
                 donoId,
@@ -224,7 +258,8 @@ public static class TreinoEndpoints
                 dicasSorteadas[1].Id,
                 gruposMusculares,
                 exerciciosDisponiveis,
-                maquinasDisponiveis);
+                maquinasDisponiveis,
+                divisaoSelecionada);
 
             if (novoTreino.Itens.Count == 0)
             {
@@ -233,6 +268,16 @@ public static class TreinoEndpoints
                     mensagem = "Não foi possível montar os itens do treino com o catálogo atual.",
                     erros = new[] { "Cadastre exercícios ou máquinas compatíveis com os grupos musculares do treino." }
                 });
+            }
+
+            // Desativa treinos anteriores ativos desse aluno para que o novo seja o principal (mantendo histórico)
+            var treinosAnteriores = await db.Treinos
+                .Where(t => t.AlunoId == aluno.Id && t.Ativo)
+                .ToListAsync();
+
+            foreach (var antigo in treinosAnteriores)
+            {
+                antigo.Ativo = false;
             }
 
             db.Treinos.Add(novoTreino);
@@ -795,24 +840,45 @@ public static class TreinoEndpoints
 
     // =========================================================================
     // MOTOR DE PRESCRIÇÃO INTELIGENTE DV PERFORMANCE
-    // (Baseado exclusivamente em Experiência, Sexo, Frequência Semanal e Idade)
+    // (Divisão escolhida pelo Personal, com parâmetros de experiência e idade)
     // =========================================================================
-    private static Treino GerarTreinoPersonalizado(
+    public static IReadOnlyList<string> ValidarCatalogoDivisao(
+        DivisaoTreinoConfiguracao divisao,
+        List<GrupoMuscular> gruposMusculares,
+        List<Exercicio> exercicios,
+        List<Maquina> maquinas)
+    {
+        var mapaGrupos = gruposMusculares.ToDictionary(g => g.Nome, StringComparer.Ordinal);
+        var erros = new List<string>();
+        foreach (var sessao in divisao.Sessoes)
+        {
+            foreach (var nomeGrupo in sessao.Grupos.Distinct(StringComparer.Ordinal))
+            {
+                if (!mapaGrupos.TryGetValue(nomeGrupo, out var grupo)
+                    || (!exercicios.Any(e => e.Ativo && e.GrupoMuscularId == grupo.Id)
+                        && !maquinas.Any(m => m.Ativo && m.GrupoMuscularId == grupo.Id)))
+                {
+                    erros.Add($"{sessao.Titulo}: cadastre ou restaure ao menos um exercício ou máquina para {nomeGrupo}.");
+                }
+            }
+        }
+        return erros;
+    }
+
+    public static Treino GerarTreinoPersonalizado(
         Aluno aluno,
         int? usuarioId,
         int? dicaObjetivoId,
         int? segundaDicaObjetivoId,
         List<GrupoMuscular> gruposMusculares,
         List<Exercicio> exercicios,
-        List<Maquina> maquinas)
+        List<Maquina> maquinas,
+        DivisaoTreinoConfiguracao divisao)
     {
-        var mapaGrupos = gruposMusculares.ToDictionary(g => g.Nome, g => g);
-
-        // 1. Parâmetros base de Séries, Repetições, Descanso e Aeróbico conforme EXPERIÊNCIA e IDADE (sem influência do Objetivo)
+        var mapaGrupos = gruposMusculares.ToDictionary(g => g.Nome, StringComparer.Ordinal);
         var (seriesBase, repeticoes, descansoBase, tempoAerobicoGeral, tempoAerobicoDia) =
             CalcularParametrosFisiologicos(aluno);
 
-        // 2. Proporção entre Máquinas Guiadas vs Exercícios Livres conforme Nível de Experiência e Idade (RN01)
         double proporcaoMaquinas = aluno.Experiencia switch
         {
             "Iniciante" => 0.75,
@@ -820,98 +886,89 @@ public static class TreinoEndpoints
             "Avançado" => 0.40,
             _ => 0.50
         };
-
+        int volumeDia = aluno.Experiencia switch
+        {
+            "Iniciante" => 5,
+            "Intermediário" => 6,
+            "Avançado" => 7,
+            _ => 5
+        };
         if (aluno.Idade > 65)
         {
             proporcaoMaquinas = Math.Max(proporcaoMaquinas, 0.80);
+            volumeDia = Math.Min(volumeDia, 5);
         }
 
-        // 3. Monta a Matriz de Divisão Semanal conforme Sexo, Frequência Semanal, Experiência e Idade
-        var (nomeDivisao, diasPlanejados) = ObterDivisaoSemanal(aluno);
-
         var sufixoSexo = aluno.Sexo == "F" ? "Feminino" : "Masculino";
-        var nomePlano = $"Protocolo {sufixoSexo} ({aluno.Experiencia}) - {nomeDivisao}";
-
         var treino = new Treino
         {
             AlunoId = aluno.Id,
             UsuarioId = usuarioId,
             DicaObjetivoId = dicaObjetivoId,
             SegundaDicaObjetivoId = segundaDicaObjetivoId,
-            NomePlano = nomePlano,
-            Divisao = nomeDivisao,
+            NomePlano = $"Protocolo {sufixoSexo} ({aluno.Experiencia}) - {divisao.Nome}",
+            Divisao = divisao.Nome,
             TempoAerobico = tempoAerobicoGeral,
             Status = "Rascunho",
             DataCriacao = DateTime.UtcNow,
-            Ativo = true,
-            Itens = new List<ItemTreino>()
+            Ativo = true
         };
 
-        // 4. Para cada Dia de Treino, ordena os grupos musculares pela OrdemPrioridade da tabela grupos_musculares
-        // (1 = Músculo Grande -> 2 = Médio -> 3 = Pequeno -> 4 = Core/Finalizador)
         var usadosNoTreinoExercicio = new HashSet<int>();
         var usadosNoTreinoMaquina = new HashSet<int>();
-
-        foreach (var (tituloDia, nomesGruposDoDia) in diasPlanejados)
+        for (int indiceDia = 0; indiceDia < divisao.Sessoes.Count; indiceDia++)
         {
-            var gruposOrdenadosPorPrioridade = nomesGruposDoDia
-                .Where(nome => mapaGrupos.ContainsKey(nome))
+            var sessao = divisao.Sessoes[indiceDia];
+            var gruposObrigatorios = sessao.Grupos
+                .Distinct(StringComparer.Ordinal)
+                .Where(mapaGrupos.ContainsKey)
                 .Select(nome => mapaGrupos[nome])
-                .OrderBy(g => g.OrdemPrioridade)
                 .ToList();
+            if (gruposObrigatorios.Count == 0)
+                continue;
 
-            var selecionadosDoDia = new List<(int prioridade, Exercicio? ex, Maquina? maq)>();
-            int totalSlotsDia = gruposOrdenadosPorPrioridade.Count;
-            int metaMaquinasDia = (int)Math.Round(totalSlotsDia * proporcaoMaquinas);
-            int maquinasEscolhidasNoDia = 0;
-
-            foreach (var grupoMuscular in gruposOrdenadosPorPrioridade)
+            // A cobertura muscular vem antes dos slots adicionais de volume.
+            var slots = gruposObrigatorios.ToList();
+            int quantidadeDesejada = Math.Max(volumeDia, gruposObrigatorios.Count);
+            while (slots.Count < quantidadeDesejada)
             {
-                bool preferirMaquina = maquinasEscolhidasNoDia < metaMaquinasDia;
-
-                // Busca somente entre os exercícios e máquinas reais cadastrados no banco
-                var (exercicioEscolhido, maquinaEscolhida) = SelecionarMovimentoParaGrupo(
-                    grupoMuscular,
-                    preferirMaquina,
-                    exercicios,
-                    maquinas,
-                    usadosNoTreinoExercicio,
-                    usadosNoTreinoMaquina);
-
-                // Se não houver nenhum exercício/máquina cadastrado para aquele grupo nem na mesma região, pula o slot sem criar item vazio
-                if (exercicioEscolhido is null && maquinaEscolhida is null)
-                {
-                    continue;
-                }
-
-                if (maquinaEscolhida is not null)
-                {
-                    maquinasEscolhidasNoDia++;
-                }
-
-                int prioridadeReal = exercicioEscolhido?.GrupoMuscular?.OrdemPrioridade
-                    ?? maquinaEscolhida?.GrupoMuscular?.OrdemPrioridade
-                    ?? grupoMuscular.OrdemPrioridade;
-
-                selecionadosDoDia.Add((prioridadeReal, exercicioEscolhido, maquinaEscolhida));
+                int indiceGrupo = (slots.Count - gruposObrigatorios.Count + indiceDia)
+                    % gruposObrigatorios.Count;
+                slots.Add(gruposObrigatorios[indiceGrupo]);
             }
 
-            // Garante que mesmo em caso de substituição por outro exercício da região, a ordem final respeite estritamente 1 -> 2 -> 3 -> 4
+            var usadosNoDiaExercicio = new HashSet<int>();
+            var usadosNoDiaMaquina = new HashSet<int>();
+            var selecionadosDoDia = new List<(int Prioridade, Exercicio? Exercicio, Maquina? Maquina)>();
+            int metaMaquinasDia = (int)Math.Round(slots.Count * proporcaoMaquinas);
+            int maquinasEscolhidasNoDia = 0;
+            foreach (var grupoMuscular in slots)
+            {
+                var (exercicioEscolhido, maquinaEscolhida) = SelecionarMovimentoParaGrupo(
+                    grupoMuscular, maquinasEscolhidasNoDia < metaMaquinasDia,
+                    exercicios, maquinas,
+                    usadosNoTreinoExercicio, usadosNoTreinoMaquina,
+                    usadosNoDiaExercicio, usadosNoDiaMaquina);
+                // O catálogo pode ter menos movimentos distintos que o volume desejado.
+                if (exercicioEscolhido is null && maquinaEscolhida is null)
+                    continue;
+                if (maquinaEscolhida is not null)
+                    maquinasEscolhidasNoDia++;
+                selecionadosDoDia.Add((grupoMuscular.OrdemPrioridade, exercicioEscolhido, maquinaEscolhida));
+            }
+
             int ordem = 1;
-            foreach (var itemSelecionado in selecionadosDoDia.OrderBy(s => s.prioridade))
+            foreach (var selecionado in selecionadosDoDia.OrderBy(item => item.Prioridade))
             {
                 int seriesItem = seriesBase;
-                if (seriesBase >= 4 && itemSelecionado.prioridade >= 3 && aluno.Experiencia != "Avançado")
-                {
-                    seriesItem = seriesBase - 1;
-                }
-
+                if (seriesBase >= 4 && selecionado.Prioridade >= 3 && aluno.Experiencia != "Avançado")
+                    seriesItem--;
                 treino.Itens.Add(new ItemTreino
                 {
-                    DivisaoTreino = tituloDia,
+                    DivisaoTreino = sessao.Titulo,
                     OrdemExercicio = ordem++,
-                    ExercicioId = itemSelecionado.ex?.Id,
-                    MaquinaId = itemSelecionado.maq?.Id,
+                    ExercicioId = selecionado.Exercicio?.Id,
+                    MaquinaId = selecionado.Maquina?.Id,
                     Series = seriesItem,
                     Repeticao = repeticoes,
                     TempoDescanso = descansoBase,
@@ -919,7 +976,6 @@ public static class TreinoEndpoints
                 });
             }
         }
-
         return treino;
     }
 
@@ -971,360 +1027,57 @@ public static class TreinoEndpoints
         return (series, repeticoes, $"{descansoSegundos}s", aerobicoGeral, aerobicoDia);
     }
 
-    private static (string nomeDivisao, List<(string tituloDia, List<string> grupos)> dias)
-        ObterDivisaoSemanal(Aluno aluno)
-    {
-        bool feminino = aluno.Sexo == "F";
-        int freq = Math.Clamp(aluno.FrequenciaSemanal, 2, 6);
-
-        int volumeDia = aluno.Experiencia switch
-        {
-            "Iniciante" => 5,
-            "Intermediário" => 6,
-            "Avançado" => 7,
-            _ => 5
-        };
-
-        if (aluno.Idade > 65)
-        {
-            volumeDia = Math.Min(volumeDia, 5);
-        }
-
-        var dias = new List<(string tituloDia, List<string> grupos)>();
-        string nomeDivisao;
-
-        if (freq == 2)
-        {
-            nomeDivisao = "Full Body / AB (2x)";
-            if (feminino)
-            {
-                dias.Add(("Treino A - Full Body (Ênfase Quadríceps, Glúteos e Superiores)", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Glúteos", "Costas", "Peito", "Ombros", "Abdômen", "Panturrilha"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Full Body (Ênfase Posterior, Glúteos e Superiores)", AjustarVolume(new[]
-                {
-                    "Posterior de Coxa", "Glúteos", "Adutores / Abdutores", "Costas", "Tríceps", "Abdômen", "Lombar"
-                }, volumeDia)));
-            }
-            else
-            {
-                dias.Add(("Treino A - Full Body (Ênfase Peito, Costas e Quadríceps)", AjustarVolume(new[]
-                {
-                    "Peito", "Costas", "Quadríceps", "Ombros", "Bíceps", "Abdômen", "Panturrilha"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Full Body (Ênfase Costas, Peito e Posterior)", AjustarVolume(new[]
-                {
-                    "Costas", "Peito", "Posterior de Coxa", "Ombros", "Tríceps", "Glúteos", "Lombar"
-                }, volumeDia)));
-            }
-        }
-        else if (freq == 3)
-        {
-            if (feminino)
-            {
-                nomeDivisao = "ABA Ênfase Inferiores (3x)";
-
-                dias.Add(("Treino A - Inferiores (Foco Quadríceps, Glúteos e Core)", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Glúteos", "Adutores / Abdutores", "Panturrilha", "Abdômen", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Membros Superiores e Core", AjustarVolume(new[]
-                {
-                    "Costas", "Peito", "Ombros", "Tríceps", "Bíceps", "Abdômen", "Lombar"
-                }, volumeDia)));
-
-                dias.Add(("Treino C - Inferiores (Foco Posterior, Glúteos e Core)", AjustarVolume(new[]
-                {
-                    "Posterior de Coxa", "Posterior de Coxa", "Glúteos", "Glúteos", "Adutores / Abdutores", "Abdômen", "Panturrilha"
-                }, volumeDia)));
-            }
-            else
-            {
-                nomeDivisao = "ABC Clássico (3x)";
-
-                dias.Add(("Treino A - Peito, Ombros e Tríceps", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Ombros", "Ombros", "Tríceps", "Tríceps", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Costas, Trapézio e Bíceps", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Trapézio", "Bíceps", "Bíceps", "Antebraço", "Lombar"
-                }, volumeDia)));
-
-                dias.Add(("Treino C - Membros Inferiores e Core", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Posterior de Coxa", "Glúteos", "Adutores / Abdutores", "Panturrilha", "Abdômen"
-                }, volumeDia)));
-            }
-        }
-        else if (freq == 4)
-        {
-            nomeDivisao = feminino ? "ABCD Ênfase Inferiores (4x)" : "AB 2x - Superior / Inferior (4x)";
-
-            if (feminino)
-            {
-                dias.Add(("Treino A - Quadríceps, Adutores e Panturrilha", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Quadríceps", "Adutores / Abdutores", "Panturrilha", "Abdômen", "Panturrilha"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Costas, Ombros e Bíceps", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Ombros", "Ombros", "Bíceps", "Abdômen", "Lombar"
-                }, volumeDia)));
-
-                dias.Add(("Treino C - Glúteos e Posterior de Coxa", AjustarVolume(new[]
-                {
-                    "Glúteos", "Glúteos", "Posterior de Coxa", "Posterior de Coxa", "Adutores / Abdutores", "Lombar", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino D - Peito, Ombros, Tríceps e Core", AjustarVolume(new[]
-                {
-                    "Peito", "Ombros", "Tríceps", "Tríceps", "Costas", "Abdômen", "Abdômen"
-                }, volumeDia)));
-            }
-            else
-            {
-                dias.Add(("Treino A - Superiores (Ênfase Peito, Ombros e Tríceps)", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Costas", "Ombros", "Tríceps", "Bíceps", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Inferiores (Ênfase Quadríceps e Panturrilha)", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Posterior de Coxa", "Glúteos", "Adutores / Abdutores", "Panturrilha", "Lombar"
-                }, volumeDia)));
-
-                dias.Add(("Treino C - Superiores (Ênfase Costas, Trapézio e Bíceps)", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Peito", "Trapézio", "Ombros", "Bíceps", "Antebraço"
-                }, volumeDia)));
-
-                dias.Add(("Treino D - Inferiores (Ênfase Posterior, Glúteos e Core)", AjustarVolume(new[]
-                {
-                    "Posterior de Coxa", "Posterior de Coxa", "Quadríceps", "Glúteos", "Panturrilha", "Abdômen", "Abdômen"
-                }, volumeDia)));
-            }
-        }
-        else if (freq == 5)
-        {
-            nomeDivisao = feminino ? "ABCDE Feminino Especializado (5x)" : "ABCDE Masculino Especializado (5x)";
-
-            if (feminino)
-            {
-                dias.Add(("Treino A - Quadríceps e Panturrilha", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Quadríceps", "Adutores / Abdutores", "Panturrilha", "Panturrilha", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Costas, Ombros e Bíceps", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Ombros", "Ombros", "Bíceps", "Trapézio", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino C - Glúteos e Posterior de Coxa", AjustarVolume(new[]
-                {
-                    "Glúteos", "Glúteos", "Posterior de Coxa", "Posterior de Coxa", "Adutores / Abdutores", "Lombar", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino D - Peito, Ombros, Tríceps e Core", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Ombros", "Tríceps", "Tríceps", "Abdômen", "Lombar"
-                }, volumeDia)));
-
-                dias.Add(("Treino E - Inferiores Completo (Foco Glúteos e Quadríceps)", AjustarVolume(new[]
-                {
-                    "Glúteos", "Quadríceps", "Posterior de Coxa", "Adutores / Abdutores", "Panturrilha", "Abdômen", "Abdômen"
-                }, volumeDia)));
-            }
-            else
-            {
-                dias.Add(("Treino A - Peito e Tríceps", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Peito", "Ombros", "Tríceps", "Tríceps", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino B - Costas, Trapézio e Antebraço", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Costas", "Trapézio", "Bíceps", "Antebraço", "Lombar"
-                }, volumeDia)));
-
-                dias.Add(("Treino C - Membros Inferiores (Quadríceps e Panturrilha)", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Quadríceps", "Posterior de Coxa", "Adutores / Abdutores", "Panturrilha", "Panturrilha"
-                }, volumeDia)));
-
-                dias.Add(("Treino D - Ombros, Trapézio e Abdômen", AjustarVolume(new[]
-                {
-                    "Peito", "Ombros", "Ombros", "Ombros", "Trapézio", "Abdômen", "Abdômen"
-                }, volumeDia)));
-
-                dias.Add(("Treino E - Posterior, Glúteos, Bíceps e Tríceps", AjustarVolume(new[]
-                {
-                    "Posterior de Coxa", "Glúteos", "Bíceps", "Bíceps", "Tríceps", "Antebraço", "Lombar"
-                }, volumeDia)));
-            }
-        }
-        else
-        {
-            nomeDivisao = feminino ? "ABC 2x Feminino (6x)" : "ABC 2x Masculino (6x)";
-
-            if (feminino)
-            {
-                dias.Add(("Treino A1 - Quadríceps, Adutores e Panturrilha", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Quadríceps", "Adutores / Abdutores", "Panturrilha", "Panturrilha", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino B1 - Costas, Ombros e Bíceps", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Ombros", "Ombros", "Bíceps", "Trapézio", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino C1 - Glúteos, Posterior e Lombar", AjustarVolume(new[]
-                {
-                    "Glúteos", "Glúteos", "Posterior de Coxa", "Posterior de Coxa", "Adutores / Abdutores", "Lombar", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino A2 - Quadríceps, Glúteos e Core", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Glúteos", "Adutores / Abdutores", "Panturrilha", "Abdômen", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino B2 - Peito, Ombros e Tríceps", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Costas", "Ombros", "Tríceps", "Tríceps", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino C2 - Posterior, Glúteos e Panturrilha", AjustarVolume(new[]
-                {
-                    "Posterior de Coxa", "Posterior de Coxa", "Glúteos", "Glúteos", "Panturrilha", "Lombar", "Abdômen"
-                }, volumeDia)));
-            }
-            else
-            {
-                dias.Add(("Treino A1 - Peito, Ombros e Tríceps", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Peito", "Ombros", "Ombros", "Tríceps", "Tríceps"
-                }, volumeDia)));
-                dias.Add(("Treino B1 - Costas, Trapézio e Bíceps", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Costas", "Trapézio", "Bíceps", "Bíceps", "Antebraço"
-                }, volumeDia)));
-                dias.Add(("Treino C1 - Pernas Completo (Foco Quadríceps)", AjustarVolume(new[]
-                {
-                    "Quadríceps", "Quadríceps", "Posterior de Coxa", "Glúteos", "Adutores / Abdutores", "Panturrilha", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino A2 - Ombros, Peito e Tríceps", AjustarVolume(new[]
-                {
-                    "Peito", "Peito", "Ombros", "Ombros", "Tríceps", "Tríceps", "Abdômen"
-                }, volumeDia)));
-                dias.Add(("Treino B2 - Costas, Bíceps e Lombar", AjustarVolume(new[]
-                {
-                    "Costas", "Costas", "Trapézio", "Bíceps", "Bíceps", "Antebraço", "Lombar"
-                }, volumeDia)));
-                dias.Add(("Treino C2 - Pernas Completo (Foco Posterior e Glúteos)", AjustarVolume(new[]
-                {
-                    "Posterior de Coxa", "Posterior de Coxa", "Quadríceps", "Glúteos", "Adutores / Abdutores", "Panturrilha", "Abdômen"
-                }, volumeDia)));
-            }
-        }
-
-        return (nomeDivisao, dias);
-    }
-
-    private static List<string> AjustarVolume(string[] sequenciaIdeal, int quantidadeDesejada)
-    {
-        return sequenciaIdeal.Take(Math.Clamp(quantidadeDesejada, 4, sequenciaIdeal.Length)).ToList();
-    }
-
     private static (Exercicio? exercicio, Maquina? maquina) SelecionarMovimentoParaGrupo(
         GrupoMuscular grupoAlvo,
         bool preferirMaquina,
         List<Exercicio> exercicios,
         List<Maquina> maquinas,
-        HashSet<int> usadosExercicio,
-        HashSet<int> usadosMaquina)
+        HashSet<int> usadosNoTreinoExercicio,
+        HashSet<int> usadosNoTreinoMaquina,
+        HashSet<int> usadosNoDiaExercicio,
+        HashSet<int> usadosNoDiaMaquina)
     {
-        // 1º tenta buscar exatamente pelo GrupoMuscularId (ex: "Peito")
-        var maquinasDoGrupo = maquinas.Where(m => m.GrupoMuscularId == grupoAlvo.Id).ToList();
-        var exerciciosDoGrupo = exercicios.Where(e => e.GrupoMuscularId == grupoAlvo.Id).ToList();
-
-        var resultadoDireto = EscolherEntreMaquinaOuExercicio(
-            preferirMaquina,
-            exerciciosDoGrupo,
-            maquinasDoGrupo,
-            usadosExercicio,
-            usadosMaquina);
-
-        if (resultadoDireto.exercicio is not null || resultadoDireto.maquina is not null)
-        {
-            return resultadoDireto;
-        }
-
-        // 2º Caso o Personal tenha removido todos os itens daquele músculo específico,
-        // busca outro item ainda não usado da mesma Região Corporal (ex: outro músculo de "Membros Superiores")
-        var maquinasDaRegiao = maquinas
-            .Where(m => m.GrupoMuscular?.Regiao == grupoAlvo.Regiao && !usadosMaquina.Contains(m.Id))
+        // A divisão determina o grupo exato; outro músculo nunca preenche esta vaga.
+        var exerciciosDoGrupo = exercicios
+            .Where(e => e.Ativo && e.GrupoMuscularId == grupoAlvo.Id
+                && !usadosNoDiaExercicio.Contains(e.Id))
             .ToList();
-
-        var exerciciosDaRegiao = exercicios
-            .Where(e => e.GrupoMuscular?.Regiao == grupoAlvo.Regiao && !usadosExercicio.Contains(e.Id))
+        var maquinasDoGrupo = maquinas
+            .Where(m => m.Ativo && m.GrupoMuscularId == grupoAlvo.Id
+                && !usadosNoDiaMaquina.Contains(m.Id))
             .ToList();
+        var exerciciosIneditos = exerciciosDoGrupo
+            .Where(e => !usadosNoTreinoExercicio.Contains(e.Id)).ToList();
+        var maquinasIneditas = maquinasDoGrupo
+            .Where(m => !usadosNoTreinoMaquina.Contains(m.Id)).ToList();
 
-        return EscolherEntreMaquinaOuExercicio(
-            preferirMaquina,
-            exerciciosDaRegiao,
-            maquinasDaRegiao,
-            usadosExercicio,
-            usadosMaquina);
-    }
-
-    private static (Exercicio? exercicio, Maquina? maquina) EscolherEntreMaquinaOuExercicio(
-        bool preferirMaquina,
-        List<Exercicio> opcoesExercicios,
-        List<Maquina> opcoesMaquinas,
-        HashSet<int> usadosExercicio,
-        HashSet<int> usadosMaquina)
-    {
-        if (preferirMaquina)
+        // A variação entre sessões tem precedência sobre o tipo de equipamento.
+        if (exerciciosIneditos.Count > 0 || maquinasIneditas.Count > 0)
         {
-            var maq = EscolherItemSemRepetir(opcoesMaquinas, usadosMaquina, m => m.Id);
-            if (maq is not null)
-            {
-                return (null, maq);
-            }
-
-            var ex = EscolherItemSemRepetir(opcoesExercicios, usadosExercicio, e => e.Id);
-            return (ex, null);
-        }
-        else
-        {
-            var ex = EscolherItemSemRepetir(opcoesExercicios, usadosExercicio, e => e.Id);
-            if (ex is not null)
-            {
-                return (ex, null);
-            }
-
-            var maq = EscolherItemSemRepetir(opcoesMaquinas, usadosMaquina, m => m.Id);
-            return (null, maq);
-        }
-    }
-
-    private static T? EscolherItemSemRepetir<T>(List<T> opcoes, HashSet<int> jaUsados, Func<T, int> seletorId) where T : class
-    {
-        if (opcoes.Count == 0)
-        {
-            return null;
+            exerciciosDoGrupo = exerciciosIneditos;
+            maquinasDoGrupo = maquinasIneditas;
         }
 
-        var aindaNaoUsados = opcoes.Where(o => !jaUsados.Contains(seletorId(o))).ToList();
-        var candidato = aindaNaoUsados.Count > 0
-            ? aindaNaoUsados[Random.Shared.Next(aindaNaoUsados.Count)]
-            : opcoes[Random.Shared.Next(opcoes.Count)];
+        Exercicio? exercicio = null;
+        Maquina? maquina = null;
+        if (preferirMaquina && maquinasDoGrupo.Count > 0)
+            maquina = maquinasDoGrupo[Random.Shared.Next(maquinasDoGrupo.Count)];
+        else if (exerciciosDoGrupo.Count > 0)
+            exercicio = exerciciosDoGrupo[Random.Shared.Next(exerciciosDoGrupo.Count)];
+        else if (maquinasDoGrupo.Count > 0)
+            maquina = maquinasDoGrupo[Random.Shared.Next(maquinasDoGrupo.Count)];
 
-        jaUsados.Add(seletorId(candidato));
-        return candidato;
+        if (exercicio is not null)
+        {
+            usadosNoDiaExercicio.Add(exercicio.Id);
+            usadosNoTreinoExercicio.Add(exercicio.Id);
+        }
+        if (maquina is not null)
+        {
+            usadosNoDiaMaquina.Add(maquina.Id);
+            usadosNoTreinoMaquina.Add(maquina.Id);
+        }
+        return (exercicio, maquina);
     }
 
     // Monta o objeto completo do plano já com dados do Aluno, Dica do Objetivo, Status e Dias agrupados/ordenados para o Front-end

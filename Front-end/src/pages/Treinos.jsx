@@ -11,7 +11,8 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import EscolhaDivisaoTreino from "../components/EscolhaDivisaoTreino";
 import BoltIcon from "@mui/icons-material/Bolt";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +48,9 @@ export default function Treinos({ glassStyle }) {
   );
   const [carregando, setCarregando] = useState(false);
   const [erros, setErros] = useState([]);
+  const [escolhendoDivisao, setEscolhendoDivisao] = useState(false);
+  const geracaoEmAndamento = useRef(false);
+  const alunoSelecionado = alunos.find((aluno) => String(aluno.id) === String(alunoId));
 
   useEffect(() => {
     const carregarAlunos = async () => {
@@ -87,20 +91,39 @@ export default function Treinos({ glassStyle }) {
     carregarAlunos();
   }, []);
 
-  const handleGerar = async () => {
-    if (!alunoId) return;
+  const abrirEscolhaDivisao = () => {
+    if (!alunoSelecionado || geracaoEmAndamento.current) return;
+    setErros([]);
+    setEscolhendoDivisao(true);
+  };
+
+  const fecharEscolhaDivisao = () => {
+    if (geracaoEmAndamento.current) return;
+    setEscolhendoDivisao(false);
+    setErros([]);
+  };
+
+  const handleGerar = async (divisaoId) => {
+    if (!alunoSelecionado || !divisaoId || geracaoEmAndamento.current) return;
+    const usuarioLogado = obterUsuarioLogado();
+    if (!usuarioLogado?.id) {
+      setErros(["Usuário logado não identificado. Faça login novamente."]);
+      return;
+    }
+
+    geracaoEmAndamento.current = true;
     setGerando(true);
     setErros([]);
-
-    const usuarioLogado = obterUsuarioLogado();
-    const query = usuarioLogado?.id ? `?usuarioId=${usuarioLogado.id}` : "";
+    const query = new URLSearchParams({
+      usuarioId: String(usuarioLogado.id),
+      divisao: divisaoId,
+    });
 
     try {
       const response = await fetch(
-        `${TREINOS_API_URL}/gerar/${alunoId}${query}`,
+        TREINOS_API_URL + "/gerar/" + alunoSelecionado.id + "?" + query,
         { method: "POST" },
       );
-
       const dados = await response.json().catch(() => null);
 
       if (!response.ok) {
@@ -114,18 +137,21 @@ export default function Treinos({ glassStyle }) {
         return;
       }
 
-      if (dados?.id != null) {
-        salvarCache(`planoDetalhe:${dados.id}`, dados);
+      if (dados?.id == null) {
+        setErros(["O servidor não retornou a ficha gerada. Tente novamente."]);
+        return;
       }
+
+      salvarCache("planoDetalhe:" + dados.id, dados);
       expirarCachePorPrefixo("planos:");
       expirarCachePorPrefixo("dashboard:");
       expirarCachePorPrefixo("alunosSemTreino:");
-
-      navigate(`/planos/${dados.id}`);
+      navigate("/planos/" + dados.id);
     } catch (erro) {
       console.error("Erro ao gerar treino:", erro);
       setErros(["Erro de conexão ao gerar o plano de treino no servidor."]);
     } finally {
+      geracaoEmAndamento.current = false;
       setGerando(false);
     }
   };
@@ -167,9 +193,9 @@ export default function Treinos({ glassStyle }) {
         </Typography>
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-          Selecione um aluno abaixo. O sistema analisará o perfil (idade, sexo,
-          experiência, objetivo e frequência) e gerará um plano de treino
-          otimizado utilizando nossa biblioteca de exercícios e máquinas.
+          Selecione um aluno e escolha a divisão de treino. O sistema usará a
+          frequência e o perfil do aluno para montar a ficha com os exercícios e
+          máquinas do catálogo.
         </Typography>
 
         <Box
@@ -239,8 +265,8 @@ export default function Treinos({ glassStyle }) {
             variant="contained"
             fullWidth
             size="large"
-            onClick={handleGerar}
-            disabled={!alunoId || gerando}
+            onClick={abrirEscolhaDivisao}
+            disabled={!alunoSelecionado || gerando || carregando}
             startIcon={!gerando && <RocketLaunchIcon />}
           >
             {gerando
@@ -249,6 +275,15 @@ export default function Treinos({ glassStyle }) {
           </Button>
         </Box>
       </Paper>
+
+      <EscolhaDivisaoTreino
+        open={escolhendoDivisao}
+        aluno={alunoSelecionado}
+        gerando={gerando}
+        erros={erros}
+        onEscolher={handleGerar}
+        onFechar={fecharEscolhaDivisao}
+      />
     </Box>
   );
 }

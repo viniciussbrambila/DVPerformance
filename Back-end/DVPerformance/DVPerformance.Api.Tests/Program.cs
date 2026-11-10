@@ -93,12 +93,13 @@ Testar("motor grava os dois IDs e leitura mantém o mesmo par sem novo sorteio",
     var opcoes = Catalogo(12);
     var sorteadas = TreinoEndpoints.SortearDuasDicasSemRepetirCiclo(opcoes, Array.Empty<int>());
     var gerar = typeof(TreinoEndpoints).GetMethod("GerarTreinoPersonalizado",
-        BindingFlags.NonPublic | BindingFlags.Static)!;
-    var aluno = new Aluno { Id = 1, Nome = "Aluno", Sexo = "M", Idade = 30,
+        BindingFlags.Public | BindingFlags.Static)!;
+    var aluno = new Aluno { Id = 1, Nome = "Aluno", Sexo = "M", DataDeNascimento = Aluno.ObterDataAtual().AddYears(-30),
         Experiencia = "Iniciante", FrequenciaSemanal = 3, Objetivo = "Hipertrofia" };
     var gerado = (Treino)gerar.Invoke(null, new object?[] {
         aluno, 1, sorteadas[0].Id, sorteadas[1].Id,
-        new List<GrupoMuscular>(), new List<Exercicio>(), new List<Maquina>()
+        new List<GrupoMuscular>(), new List<Exercicio>(), new List<Maquina>(),
+        DivisoesTreino.Obter("ppl", 3)!
     })!;
     Exigir(gerado.DicaObjetivoId == sorteadas[0].Id
         && gerado.SegundaDicaObjetivoId == sorteadas[1].Id, "Persistir os dois vínculos na entidade.");
@@ -169,5 +170,85 @@ Testar("migration completa fichas antigas com dica distinta do mesmo objetivo e 
     Exigir(script.Contains("segunda_dica_objetivo_id") && script.Contains("FOREIGN KEY"),
         "Gerar SQL de migração válido sem conectar ao banco.");
 });
+
+Testar("idade muda no aniversário, inclusive em 29 de fevereiro, sem persistir idade", () =>
+{
+    var nascimento = new DateOnly(2000, 11, 9);
+    Exigir(Aluno.CalcularIdade(nascimento, new DateOnly(2026, 11, 8)) == 25, "Antes do aniversário.");
+    Exigir(Aluno.CalcularIdade(nascimento, new DateOnly(2026, 11, 9)) == 26, "No aniversário.");
+    Exigir(Aluno.CalcularIdade(nascimento, new DateOnly(2026, 11, 10)) == 26, "Após o aniversário.");
+    var bissexto = new DateOnly(2000, 2, 29);
+    Exigir(Aluno.CalcularIdade(bissexto, new DateOnly(2025, 2, 28)) == 24, "29/02 aguarda março em ano comum.");
+    Exigir(Aluno.CalcularIdade(bissexto, new DateOnly(2025, 3, 1)) == 25, "29/02 faz aniversário em 01/03.");
+    Exigir(Aluno.CalcularIdade(bissexto, new DateOnly(2024, 2, 29)) == 24, "29/02 em ano bissexto.");
+    Exigir(Aluno.CalcularIdade(null, new DateOnly(2026, 11, 9)) is null, "Não inventar idade de cadastro legado.");
+    Exigir(Aluno.ObterDataAtual(new DateTimeOffset(2026, 11, 10, 1, 30, 0, TimeSpan.Zero))
+        == new DateOnly(2026, 11, 9), "Usar a data de São Paulo na virada do dia em UTC.");
+});
+
+Testar("nascimento é obrigatório, válido e mantém a faixa de 13 a 120 anos", () =>
+{
+    var referencia = new DateOnly(2026, 11, 9);
+    var aluno = new Aluno { Experiencia = "Iniciante", FrequenciaSemanal = 3 };
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, referencia).Count == 1, "Exigir nascimento ausente.");
+    aluno.DataDeNascimento = referencia.AddDays(1);
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, referencia).Single().Contains("futuro"), "Rejeitar nascimento futuro.");
+    aluno.DataDeNascimento = referencia.AddYears(-13).AddDays(1);
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, referencia).Count == 1, "Rejeitar quem ainda tem 12 anos.");
+    aluno.DataDeNascimento = referencia.AddYears(-13);
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, referencia).Count == 0, "Aceitar exatamente 13 anos.");
+    aluno.DataDeNascimento = referencia.AddYears(-121).AddDays(1);
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, referencia).Count == 0, "Aceitar enquanto tem 120 anos.");
+    aluno.DataDeNascimento = referencia.AddYears(-121);
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, referencia).Count == 1, "Rejeitar 121 anos.");
+});
+
+Testar("regras etárias passam a valer após completar 66 anos", () =>
+{
+    var aluno = new Aluno { DataDeNascimento = new DateOnly(1960, 11, 9),
+        Experiencia = "Avançado", FrequenciaSemanal = 6 };
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, new DateOnly(2026, 11, 8)).Count == 0,
+        "Permitir o perfil enquanto tem 65 anos.");
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, new DateOnly(2026, 11, 9)).Count == 2,
+        "Revalidar experiência e frequência quando completa 66 anos.");
+    aluno.Experiencia = "Intermediário";
+    aluno.FrequenciaSemanal = 5;
+    Exigir(AlunoEndpoints.ValidarDadosEtarios(aluno, new DateOnly(2026, 11, 9)).Count == 0,
+        "Aceitar o perfil ajustado para a idade atual.");
+});
+
+Testar("API serializa a data ISO e banco mantém somente nascimento e legado privado", () =>
+{
+    var aluno = new Aluno { DataDeNascimento = new DateOnly(2000, 11, 9) };
+    var json = JsonSerializer.SerializeToElement(aluno, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    Exigir(json.GetProperty("dataDeNascimento").GetString() == "2000-11-09", "Preservar a data sem horário ou fuso.");
+    Exigir(!json.TryGetProperty("idade", out _) && !json.TryGetProperty("idadeLegada", out _),
+        "Não enviar idade derivada ou legada no contrato público.");
+    var entidade = db.Model.FindEntityType(typeof(Aluno))!;
+    var propriedade = entidade.FindProperty(nameof(Aluno.DataDeNascimento))!;
+    Exigir(propriedade.GetColumnName() == "data_de_nascimento" && propriedade.GetColumnType() == "date"
+        && propriedade.IsNullable, "Permitir nascimento pendente apenas nos registros migrados.");
+    Exigir(entidade.FindProperty(nameof(Aluno.Idade)) is null, "Idade calculada não é persistida.");
+    Exigir(entidade.FindProperty("IdadeLegada")!.IsShadowProperty(), "Guardar o histórico sem expor na entidade.");
+});
+
+Testar("migração preserva idade anterior e não inventa aniversário para alunos antigos", () =>
+{
+    var migracao = new SubstituirIdadePorDataDeNascimento();
+    Exigir(migracao.UpOperations.OfType<RenameColumnOperation>()
+        .Any(op => op.Name == "idade" && op.NewName == "idade_legada"), "Preservar a coluna histórica.");
+    Exigir(!migracao.UpOperations.OfType<DropColumnOperation>().Any(), "Não perder o dado anterior.");
+    var coluna = migracao.UpOperations.OfType<AddColumnOperation>().Single();
+    Exigir(coluna.Name == "data_de_nascimento" && coluna.IsNullable && coluna.DefaultValue is null
+        && coluna.DefaultValueSql is null, "Manter os aniversários desconhecidos em branco.");
+    Exigir(!migracao.UpOperations.OfType<SqlOperation>().Any(), "Não estimar datas com base na idade.");
+    var script = db.GetService<IMigrator>().GenerateScript(
+        "20261108160000_AdicionarSegundaDicaAoTreino",
+        "20261109235000_SubstituirIdadePorDataDeNascimento");
+    Exigir(script.Contains("RENAME COLUMN idade TO idade_legada")
+        && script.Contains("ADD data_de_nascimento date"), "Gerar SQL da migração sem conexão.");
+});
+
+DVPerformance.Api.Tests.DivisoesTreinoTests.Executar(Testar, Exigir);
 
 Console.WriteLine($"{quantidade} testes concluídos sem acessar o banco de dados.");

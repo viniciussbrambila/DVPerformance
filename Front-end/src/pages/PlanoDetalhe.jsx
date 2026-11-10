@@ -600,6 +600,11 @@ export default function PlanoDetalhe({ glassStyle }) {
           >
             PRESCRIÇÃO DE TREINAMENTO
           </Typography>
+          {plano.divisao && (
+            <Typography variant="body1" sx={{ fontWeight: 600, mt: 1 }}>
+              Divisão: {plano.divisao}
+            </Typography>
+          )}
         </Box>
 
         <Divider
