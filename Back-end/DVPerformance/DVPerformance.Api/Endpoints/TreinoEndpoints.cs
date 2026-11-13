@@ -854,9 +854,31 @@ public static class TreinoEndpoints
         {
             foreach (var nomeGrupo in sessao.Grupos.Distinct(StringComparer.Ordinal))
             {
-                if (!mapaGrupos.TryGetValue(nomeGrupo, out var grupo)
-                    || (!exercicios.Any(e => e.Ativo && e.GrupoMuscularId == grupo.Id)
-                        && !maquinas.Any(m => m.Ativo && m.GrupoMuscularId == grupo.Id)))
+                if (!mapaGrupos.TryGetValue(nomeGrupo, out var grupo))
+                {
+                    erros.Add($"{sessao.Titulo}: cadastre ou restaure o grupo {nomeGrupo}.");
+                    continue;
+                }
+
+                var focosObrigatorios = nomeGrupo == "Adutores / Abdutores"
+                    ? sessao.FocosAdutoresAbdutores : [];
+                if (focosObrigatorios.Length > 0)
+                {
+                    foreach (var foco in focosObrigatorios)
+                    {
+                        bool disponivel = exercicios.Any(e => e.Ativo && e.GrupoMuscularId == grupo.Id
+                                && FocosMusculares.Resolver(nomeGrupo, e.Nome, e.FocoMuscular) == foco)
+                            || maquinas.Any(m => m.Ativo && m.GrupoMuscularId == grupo.Id
+                                && FocosMusculares.Resolver(nomeGrupo, m.Nome, m.FocoMuscular) == foco);
+                        if (!disponivel)
+                        {
+                            var nomeFoco = foco == "aducao" ? "adutores (adução)" : "abdutores (abdução)";
+                            erros.Add($"{sessao.Titulo}: cadastre ou restaure ao menos um exercício ou máquina para {nomeFoco}, com o foco correspondente.");
+                        }
+                    }
+                }
+                else if (!exercicios.Any(e => e.Ativo && e.GrupoMuscularId == grupo.Id)
+                    && !maquinas.Any(m => m.Ativo && m.GrupoMuscularId == grupo.Id))
                 {
                     erros.Add($"{sessao.Titulo}: cadastre ou restaure ao menos um exercício ou máquina para {nomeGrupo}.");
                 }
@@ -888,15 +910,14 @@ public static class TreinoEndpoints
         };
         int volumeDia = aluno.Experiencia switch
         {
-            "Iniciante" => 5,
-            "Intermediário" => 6,
-            "Avançado" => 7,
-            _ => 5
+            "Iniciante" => 6,
+            "Intermediário" => 7,
+            "Avançado" => 8,
+            _ => 6
         };
         if (aluno.Idade > 65)
         {
             proporcaoMaquinas = Math.Max(proporcaoMaquinas, 0.80);
-            volumeDia = Math.Min(volumeDia, 5);
         }
 
         var sufixoSexo = aluno.Sexo == "F" ? "Feminino" : "Masculino";
@@ -927,41 +948,74 @@ public static class TreinoEndpoints
             if (gruposObrigatorios.Count == 0)
                 continue;
 
-            // A cobertura muscular vem antes dos slots adicionais de volume.
-            var slots = gruposObrigatorios.ToList();
-            int quantidadeDesejada = Math.Max(volumeDia, gruposObrigatorios.Count);
-            while (slots.Count < quantidadeDesejada)
-            {
-                int indiceGrupo = (slots.Count - gruposObrigatorios.Count + indiceDia)
-                    % gruposObrigatorios.Count;
-                slots.Add(gruposObrigatorios[indiceGrupo]);
-            }
-
+            int quantidadeDesejada = volumeDia;
             var usadosNoDiaExercicio = new HashSet<int>();
             var usadosNoDiaMaquina = new HashSet<int>();
-            var selecionadosDoDia = new List<(int Prioridade, Exercicio? Exercicio, Maquina? Maquina)>();
-            int metaMaquinasDia = (int)Math.Round(slots.Count * proporcaoMaquinas);
+            var usosDeFocoNoDia = new Dictionary<(int GrupoId, string Foco), int>();
+            var quantidadePorGrupo = gruposObrigatorios.ToDictionary(g => g.Id, _ => 0);
+            var selecionadosDoDia = new List<(GrupoMuscular Grupo, Exercicio? Exercicio, Maquina? Maquina)>();
+            int metaMaquinasDia = (int)Math.Round(quantidadeDesejada * proporcaoMaquinas);
             int maquinasEscolhidasNoDia = 0;
-            foreach (var grupoMuscular in slots)
+
+            bool TentarAdicionar(GrupoMuscular grupoMuscular, string? focoObrigatorio = null)
             {
+                if (selecionadosDoDia.Count >= quantidadeDesejada)
+                    return false;
+
+                // Adutor/abdutor recebem exatamente uma vaga por foco exigido na sessão.
+                if (grupoMuscular.Nome == "Adutores / Abdutores"
+                    && sessao.FocosAdutoresAbdutores.Length > 0 && focoObrigatorio is null)
+                    return false;
+
+                // Auxiliares/finalizadores têm limite por grupo, mesmo com vários focos.
+                if (grupoMuscular.OrdemPrioridade >= 3 && quantidadePorGrupo[grupoMuscular.Id] >= 2)
+                    return false;
+
                 var (exercicioEscolhido, maquinaEscolhida) = SelecionarMovimentoParaGrupo(
                     grupoMuscular, maquinasEscolhidasNoDia < metaMaquinasDia,
                     exercicios, maquinas,
                     usadosNoTreinoExercicio, usadosNoTreinoMaquina,
-                    usadosNoDiaExercicio, usadosNoDiaMaquina);
-                // O catálogo pode ter menos movimentos distintos que o volume desejado.
+                    usadosNoDiaExercicio, usadosNoDiaMaquina, usosDeFocoNoDia, focoObrigatorio);
                 if (exercicioEscolhido is null && maquinaEscolhida is null)
-                    continue;
+                    return false;
                 if (maquinaEscolhida is not null)
                     maquinasEscolhidasNoDia++;
-                selecionadosDoDia.Add((grupoMuscular.OrdemPrioridade, exercicioEscolhido, maquinaEscolhida));
+                quantidadePorGrupo[grupoMuscular.Id]++;
+                selecionadosDoDia.Add((grupoMuscular, exercicioEscolhido, maquinaEscolhida));
+                return true;
+            }
+
+            var gruposOrdenados = gruposObrigatorios.OrderBy(g => g.OrdemPrioridade)
+                .ThenBy(g => g.OrdemNaPrioridade).ToList();
+
+            // Primeiro garante cobertura; depois distribui o volume por rodadas.
+            foreach (var grupo in gruposOrdenados)
+            {
+                if (grupo.Nome == "Adutores / Abdutores" && sessao.FocosAdutoresAbdutores.Length > 0)
+                {
+                    foreach (var foco in sessao.FocosAdutoresAbdutores)
+                        TentarAdicionar(grupo, foco);
+                }
+                else
+                    TentarAdicionar(grupo);
+            }
+
+            while (selecionadosDoDia.Count < quantidadeDesejada)
+            {
+                // Equilibra a quantidade e desempata a favor dos músculos prioritários.
+                // Se um grupo atingiu seu limite, a vaga pode ir para outro grupo do dia.
+                var candidatos = gruposOrdenados.OrderBy(g => quantidadePorGrupo[g.Id]).ToList();
+                if (!candidatos.Any(grupo => TentarAdicionar(grupo)))
+                    break;
             }
 
             int ordem = 1;
-            foreach (var selecionado in selecionadosDoDia.OrderBy(item => item.Prioridade))
+            foreach (var selecionado in selecionadosDoDia.OrderBy(item => item.Grupo.OrdemPrioridade)
+                .ThenBy(item => item.Grupo.OrdemNaPrioridade))
             {
                 int seriesItem = seriesBase;
-                if (seriesBase >= 4 && selecionado.Prioridade >= 3 && aluno.Experiencia != "Avançado")
+                bool auxiliar = selecionado.Grupo.Nome is "Bíceps" or "Tríceps" or "Panturrilha" or "Antebraço" or "Abdômen" or "Lombar";
+                if (seriesBase >= 4 && auxiliar && aluno.Experiencia != "Avançado")
                     seriesItem--;
                 treino.Itens.Add(new ItemTreino
                 {
@@ -1035,17 +1089,50 @@ public static class TreinoEndpoints
         HashSet<int> usadosNoTreinoExercicio,
         HashSet<int> usadosNoTreinoMaquina,
         HashSet<int> usadosNoDiaExercicio,
-        HashSet<int> usadosNoDiaMaquina)
+        HashSet<int> usadosNoDiaMaquina,
+        Dictionary<(int GrupoId, string Foco), int> usosDeFocoNoDia,
+        string? focoObrigatorio = null)
     {
+        string Foco(string nome, string foco) => FocosMusculares.Resolver(grupoAlvo.Nome, nome, foco);
+        int Usos(string foco) => usosDeFocoNoDia.GetValueOrDefault((grupoAlvo.Id, foco));
+        int limitePorFoco = grupoAlvo.OrdemPrioridade <= 2 ? 2 : 1;
+        bool FocoDisponivel(string foco) =>
+            (focoObrigatorio is null || foco == focoObrigatorio)
+            && Usos(foco) < limitePorFoco
+            && Usos(FocosMusculares.Geral) == 0
+            && (foco != FocosMusculares.Geral || !usosDeFocoNoDia.Keys.Any(f => f.GrupoId == grupoAlvo.Id));
+
         // A divisão determina o grupo exato; outro músculo nunca preenche esta vaga.
         var exerciciosDoGrupo = exercicios
             .Where(e => e.Ativo && e.GrupoMuscularId == grupoAlvo.Id
-                && !usadosNoDiaExercicio.Contains(e.Id))
+                && !usadosNoDiaExercicio.Contains(e.Id)
+                && FocoDisponivel(Foco(e.Nome, e.FocoMuscular)))
             .ToList();
         var maquinasDoGrupo = maquinas
             .Where(m => m.Ativo && m.GrupoMuscularId == grupoAlvo.Id
-                && !usadosNoDiaMaquina.Contains(m.Id))
+                && !usadosNoDiaMaquina.Contains(m.Id)
+                && FocoDisponivel(Foco(m.Nome, m.FocoMuscular)))
             .ToList();
+        // Foco geral/desconhecido só participa se não houver uma opção classificada.
+        if (exerciciosDoGrupo.Any(e => Foco(e.Nome, e.FocoMuscular) != "geral")
+            || maquinasDoGrupo.Any(m => Foco(m.Nome, m.FocoMuscular) != "geral"))
+        {
+            exerciciosDoGrupo = exerciciosDoGrupo.Where(e => Foco(e.Nome, e.FocoMuscular) != "geral").ToList();
+            maquinasDoGrupo = maquinasDoGrupo.Where(m => Foco(m.Nome, m.FocoMuscular) != "geral").ToList();
+        }
+        // Usa primeiro focos ainda ausentes; só depois admite a segunda ocorrência.
+        // A diversidade tem precedência sobre equipamento e ineditismo na semana.
+        var contagens = exerciciosDoGrupo.Select(e => Usos(Foco(e.Nome, e.FocoMuscular)))
+            .Concat(maquinasDoGrupo.Select(m => Usos(Foco(m.Nome, m.FocoMuscular)))).ToList();
+        if (contagens.Count > 0)
+        {
+            int menorUso = contagens.Min();
+            exerciciosDoGrupo = exerciciosDoGrupo
+                .Where(e => Usos(Foco(e.Nome, e.FocoMuscular)) == menorUso).ToList();
+            maquinasDoGrupo = maquinasDoGrupo
+                .Where(m => Usos(Foco(m.Nome, m.FocoMuscular)) == menorUso).ToList();
+        }
+
         var exerciciosIneditos = exerciciosDoGrupo
             .Where(e => !usadosNoTreinoExercicio.Contains(e.Id)).ToList();
         var maquinasIneditas = maquinasDoGrupo
@@ -1069,11 +1156,15 @@ public static class TreinoEndpoints
 
         if (exercicio is not null)
         {
+            var foco = Foco(exercicio.Nome, exercicio.FocoMuscular);
+            usosDeFocoNoDia[(grupoAlvo.Id, foco)] = Usos(foco) + 1;
             usadosNoDiaExercicio.Add(exercicio.Id);
             usadosNoTreinoExercicio.Add(exercicio.Id);
         }
         if (maquina is not null)
         {
+            var foco = Foco(maquina.Nome, maquina.FocoMuscular);
+            usosDeFocoNoDia[(grupoAlvo.Id, foco)] = Usos(foco) + 1;
             usadosNoDiaMaquina.Add(maquina.Id);
             usadosNoTreinoMaquina.Add(maquina.Id);
         }

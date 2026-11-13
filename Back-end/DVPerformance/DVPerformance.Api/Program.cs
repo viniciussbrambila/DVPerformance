@@ -47,6 +47,7 @@ public class Program
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Database.MigrateAsync();
             await CatalogoPadraoService.InicializarContasPendentesAsync(db);
+            await CatalogoPadraoService.ClassificarFocosPendentesAsync(db);
         }
 
         // 2. Middleware para capturar erros de tipo no JSON (ex: enviar texto em campo numérico)

@@ -680,8 +680,11 @@ export default function PlanoDetalhe({ glassStyle }) {
                   startIcon={<RestoreOutlinedIcon />}
                   disabled={
                     salvando ||
-                    restaurarOrdemDoPlano(diasEdicao, indiceDia, plano.dias || []) ===
-                      diasEdicao
+                    restaurarOrdemDoPlano(
+                      diasEdicao,
+                      indiceDia,
+                      plano.dias || [],
+                    ) === diasEdicao
                   }
                   onClick={() =>
                     setDiasEdicao((lista) =>
@@ -824,7 +827,12 @@ export default function PlanoDetalhe({ glassStyle }) {
                                 disabled={salvando || indiceEx === 0}
                                 onClick={() =>
                                   setDiasEdicao((lista) =>
-                                    moverItemNoPlano(lista, indiceDia, indiceEx, -1),
+                                    moverItemNoPlano(
+                                      lista,
+                                      indiceDia,
+                                      indiceEx,
+                                      -1,
+                                    ),
                                   )
                                 }
                                 sx={{ bgcolor: "action.hover" }}
@@ -837,11 +845,17 @@ export default function PlanoDetalhe({ glassStyle }) {
                                 title="Mover para baixo"
                                 aria-label={`Mover ${ex.nome} para baixo em ${dia.nome}`}
                                 disabled={
-                                  salvando || indiceEx === dia.exercicios.length - 1
+                                  salvando ||
+                                  indiceEx === dia.exercicios.length - 1
                                 }
                                 onClick={() =>
                                   setDiasEdicao((lista) =>
-                                    moverItemNoPlano(lista, indiceDia, indiceEx, 1),
+                                    moverItemNoPlano(
+                                      lista,
+                                      indiceDia,
+                                      indiceEx,
+                                      1,
+                                    ),
                                   )
                                 }
                                 sx={{ bgcolor: "action.hover" }}
@@ -977,7 +991,10 @@ export default function PlanoDetalhe({ glassStyle }) {
               Dicas para {plano.objetivo}
             </Typography>
             {dicas.map((dica, indice) => (
-              <Typography key={indice} sx={{ mb: indice < dicas.length - 1 ? 1.5 : 0 }}>
+              <Typography
+                key={indice}
+                sx={{ mb: indice < dicas.length - 1 ? 1.5 : 0 }}
+              >
                 {indice + 1}. {dica}
               </Typography>
             ))}

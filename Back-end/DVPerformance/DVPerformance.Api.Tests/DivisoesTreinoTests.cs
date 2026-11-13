@@ -10,26 +10,27 @@ internal static class DivisoesTreinoTests
 {
     public static void Executar(Action<string, Action> testar, Action<bool, string> exigir)
     {
-        string[] full = ["Peito", "Costas", "Ombros", "Quadríceps", "Posterior de Coxa", "Glúteos", "Panturrilha"];
+        string[] fullA = ["Peito", "Costas", "Quadríceps", "Posterior de Coxa", "Panturrilha", "Adutores / Abdutores"];
+        string[] fullB = ["Peito", "Costas", "Ombros", "Glúteos", "Panturrilha", "Adutores / Abdutores"];
         string[] upper = ["Peito", "Costas", "Ombros", "Bíceps", "Tríceps"];
-        string[] lower = ["Quadríceps", "Posterior de Coxa", "Glúteos", "Panturrilha"];
+        string[] lower = ["Quadríceps", "Posterior de Coxa", "Glúteos", "Panturrilha", "Adutores / Abdutores"];
         string[] push = ["Peito", "Ombros", "Tríceps"];
         string[] pull = ["Costas", "Trapézio", "Bíceps"];
         var esperados = new Dictionary<string, string[][]>
         {
-            ["full-body-ab"] = [full, full],
+            ["full-body-ab"] = [fullA, fullB],
             ["ppl"] = [push, pull, lower],
             ["upper-lower"] = [upper, lower, upper, lower],
             ["abcd"] = [["Peito", "Tríceps"], ["Costas", "Bíceps"], lower, ["Ombros", "Abdômen"]],
-            ["abcde"] = [["Peito", "Tríceps"], ["Costas", "Bíceps"], ["Quadríceps", "Panturrilha"],
-                ["Ombros", "Trapézio", "Abdômen"], ["Posterior de Coxa", "Glúteos"]],
+            ["abcde"] = [["Peito", "Tríceps"], ["Costas", "Bíceps"], ["Quadríceps", "Panturrilha", "Adutores / Abdutores"],
+                ["Ombros", "Trapézio", "Abdômen"], ["Posterior de Coxa", "Glúteos", "Adutores / Abdutores"]],
             ["ulppl"] = [["Peito", "Costas", "Ombros", "Trapézio", "Bíceps", "Tríceps"], lower, push, pull, lower],
             ["bro-split-5"] = [["Peito"], ["Costas"], ["Ombros", "Trapézio"], lower, ["Bíceps", "Tríceps", "Antebraço"]],
             ["ppl-2x"] = [push, pull, lower, push, pull, lower],
             ["arnold"] = [["Peito", "Costas"], ["Ombros", "Bíceps", "Tríceps"], lower,
                 ["Peito", "Costas"], ["Ombros", "Bíceps", "Tríceps"], lower],
-            ["bro-split-6"] = [["Costas"], ["Peito", "Abdômen"], ["Quadríceps", "Panturrilha"],
-                ["Ombros", "Trapézio"], ["Posterior de Coxa", "Glúteos"], ["Bíceps", "Tríceps"]]
+            ["bro-split-6"] = [["Costas"], ["Peito", "Abdômen"], ["Quadríceps", "Panturrilha", "Adutores / Abdutores"],
+                ["Ombros", "Trapézio"], ["Posterior de Coxa", "Glúteos", "Adutores / Abdutores"], ["Bíceps", "Tríceps"]]
         };
 
         testar("opções por frequência e distribuição correspondem às tabelas do personal", () =>
@@ -93,15 +94,35 @@ internal static class DivisoesTreinoTests
                     exigir(itens.All(i => i.ExercicioId.HasValue ^ i.MaquinaId.HasValue), "Cada item tem exatamente um vínculo.");
                     exigir(itens.Select(i => i.OrdemExercicio).SequenceEqual(Enumerable.Range(1, itens.Length)),
                         "Manter ordem contínua por dia.");
-                    var prioridades = grupoIds.Select(id => grupos.Single(g => g.Id == id).OrdemPrioridade).ToArray();
-                    exigir(prioridades.SequenceEqual(prioridades.Order()), "Ordenar músculos grandes antes dos auxiliares.");
-                    var volume = nivel == "Iniciante" ? 5 : nivel == "Intermediário" ? 6 : 7;
-                    exigir(itens.Length == Math.Max(volume, esperados[config.Id][dia].Length),
-                        "Preservar a meta de volume sem cortar grupos obrigatórios.");
+                    var prioridades = grupoIds.Select(id => grupos.Single(g => g.Id == id))
+                        .Select(g => (g.OrdemPrioridade, g.OrdemNaPrioridade)).ToArray();
+                    exigir(prioridades.SequenceEqual(prioridades.Order()), "Respeitar prioridade e desempate dos braços.");
+                    var volume = nivel == "Iniciante" ? 6 : nivel == "Intermediário" ? 7 : 8;
+                    var gruposDia = esperados[config.Id][dia];
+                    var capacidadeDia = gruposDia.Sum(nome =>
+                    {
+                        var grupo = grupos.Single(g => g.Nome == nome);
+                        if (nome == "Adutores / Abdutores")
+                            return config.Sessoes[dia].FocosAdutoresAbdutores.Length;
+                        var focos = FocosMusculares.Opcoes[nome].Count(f => f.Id != "geral");
+                        return grupo.OrdemPrioridade <= 2 ? focos * 2 : Math.Min(2, focos);
+                    });
+                    exigir(itens.Length == Math.Min(volume, capacidadeDia),
+                        "Preencher a meta somente até a capacidade permitida de cada grupo e foco.");
+                    foreach (var grupoDia in itens.GroupBy(i => Grupo(i, exercicios, maquinas)))
+                    {
+                        var grupo = grupos.Single(g => g.Id == grupoDia.Key);
+                        exigir(grupo.OrdemPrioridade <= 2 || grupoDia.Count() <= 2,
+                            "Auxiliares/finalizadores nunca passam de dois exercícios no dia.");
+                        exigir(grupoDia.GroupBy(i => Foco(i, exercicios, maquinas))
+                            .All(f => f.Count() <= (grupo.OrdemPrioridade <= 2 ? 2 : 1)),
+                            "Respeitar o limite de foco entre exercícios livres e máquinas.");
+                    }
                     foreach (var item in itens)
                     {
-                        var prioridade = grupos.Single(g => g.Id == Grupo(item, exercicios, maquinas)).OrdemPrioridade;
-                        var series = nivel == "Iniciante" ? 3 : nivel == "Intermediário" && prioridade >= 3 ? 3 : 4;
+                        var nome = grupos.Single(g => g.Id == Grupo(item, exercicios, maquinas)).Nome;
+                        var auxiliar = nome is "Bíceps" or "Tríceps" or "Panturrilha" or "Antebraço" or "Abdômen" or "Lombar";
+                        var series = nivel == "Iniciante" ? 3 : nivel == "Intermediário" && auxiliar ? 3 : 4;
                         exigir(item.Series == series, "Preservar séries por experiência e grupo.");
                         exigir(item.Repeticao == (nivel == "Iniciante" ? "12-15" : nivel == "Intermediário" ? "10-12" : "8-12"),
                             "Preservar faixa de repetições.");
@@ -130,8 +151,8 @@ internal static class DivisoesTreinoTests
             var bro = DivisoesTreino.Obter("bro-split-5", 5)!;
             var treino = Gerar(AlunoPara(5, "M", "Avançado"), bro, grupos, exercicios, maquinas);
             var peito = treino.Itens.Where(i => i.DivisaoTreino == bro.Sessoes[0].Titulo).ToArray();
-            exigir(peito.Length == 2 && peito.Select(Identidade).Distinct().Count() == 2,
-                "Exercício e máquina com mesmo ID são diferentes; não duplicar nenhum deles para completar volume.");
+            exigir(peito.Length == 2,
+                "O mesmo foco pode ocupar duas vagas com movimentos distintos nos dois catálogos.");
             foreach (var dia in treino.Itens.GroupBy(i => i.DivisaoTreino))
                 exigir(dia.Select(Identidade).Distinct().Count() == dia.Count(), "Catálogo curto não permite duplicação no dia.");
 
@@ -140,7 +161,7 @@ internal static class DivisoesTreinoTests
             exigir(variado.Itens.Select(Identidade).Distinct().Count() == variado.Itens.Count,
                 "Escolher opção inédita do outro catálogo antes de repetir o equipamento preferido.");
             var reduzido = Gerar(AlunoPara(2), full, grupos, exercicios, new());
-            exigir(reduzido.Itens.Count == 14 && reduzido.Itens.Select(Identidade).Distinct().Count() == 7,
+            exigir(reduzido.Itens.Count == 12 && reduzido.Itens.Select(Identidade).Distinct().Count() == 9,
                 "Após esgotar alternativas, reutilizar entre sessões e manter ambos os dias.");
         });
 
@@ -204,23 +225,46 @@ internal static class DivisoesTreinoTests
         item.ExercicioId is int id ? exercicios.Single(e => e.Id == id).GrupoMuscularId
             : maquinas.Single(m => m.Id == item.MaquinaId).GrupoMuscularId;
 
-    private static (List<GrupoMuscular>, List<Exercicio>, List<Maquina>) Catalogo(int porGrupo = 8)
+    private static string Foco(ItemTreino item, List<Exercicio> exercicios, List<Maquina> maquinas) =>
+        item.ExercicioId is int id ? exercicios.Single(e => e.Id == id).FocoMuscular
+            : maquinas.Single(m => m.Id == item.MaquinaId).FocoMuscular;
+
+    internal static List<GrupoMuscular> GruposPadrao()
     {
         string[] nomes = ["Peito", "Costas", "Quadríceps", "Posterior de Coxa", "Glúteos",
-            "Ombros", "Trapézio", "Bíceps", "Tríceps", "Panturrilha", "Antebraço", "Abdômen"];
-        var grupos = nomes.Select((nome, indice) => new GrupoMuscular
+            "Ombros", "Trapézio", "Adutores / Abdutores", "Bíceps", "Tríceps", "Panturrilha",
+            "Antebraço", "Abdômen", "Lombar"];
+        return nomes.Select((nome, indice) => new GrupoMuscular
         {
             Id = indice + 1, Nome = nome,
-            Regiao = nome is "Quadríceps" or "Posterior de Coxa" or "Glúteos" or "Panturrilha"
-                ? "Membros Inferiores" : "Membros Superiores",
-            OrdemPrioridade = indice < 5 ? 1 : indice < 7 ? 2 : indice < 10 ? 3 : 4
+            Regiao = nome is "Quadríceps" or "Posterior de Coxa" or "Glúteos" or "Panturrilha" or "Adutores / Abdutores"
+                ? "Membros Inferiores" : nome is "Abdômen" or "Lombar" ? "Core / Tronco" : "Membros Superiores",
+            OrdemPrioridade = nome switch
+            {
+                "Peito" or "Costas" or "Quadríceps" or "Posterior de Coxa" or "Glúteos" => 1,
+                "Bíceps" or "Tríceps" or "Ombros" or "Adutores / Abdutores" => 2,
+                "Trapézio" or "Panturrilha" => 3,
+                _ => 4
+            }
         }).ToList();
-        var exercicios = grupos.SelectMany(g => Enumerable.Range(1, porGrupo).Select(i =>
+    }
+
+    private static (List<GrupoMuscular>, List<Exercicio>, List<Maquina>) Catalogo(int porGrupo = 8)
+    {
+        var grupos = GruposPadrao();
+        string FocoPara(GrupoMuscular grupo, int indice)
+        {
+            var focos = FocosMusculares.Opcoes[grupo.Nome].Where(f => f.Id != "geral").ToArray();
+            return focos[(indice - 1) % focos.Length].Id;
+        }
+        var exercicios = grupos.SelectMany(g => Enumerable.Range(1, g.Nome == "Adutores / Abdutores" ? Math.Max(2, porGrupo) : porGrupo).Select(i =>
             new Exercicio { Id = g.Id * 100 + i, Nome = $"{g.Nome} livre {i}",
-                GrupoMuscularId = g.Id, GrupoMuscular = g, UsuarioId = 1 })).ToList();
-        var maquinas = grupos.SelectMany(g => Enumerable.Range(1, porGrupo).Select(i =>
+                GrupoMuscularId = g.Id, GrupoMuscular = g, UsuarioId = 1,
+                FocoMuscular = FocoPara(g, i) })).ToList();
+        var maquinas = grupos.SelectMany(g => Enumerable.Range(1, g.Nome == "Adutores / Abdutores" ? Math.Max(2, porGrupo) : porGrupo).Select(i =>
             new Maquina { Id = g.Id * 100 + i, Nome = $"{g.Nome} máquina {i}",
-                GrupoMuscularId = g.Id, GrupoMuscular = g, UsuarioId = 1 })).ToList();
+                GrupoMuscularId = g.Id, GrupoMuscular = g, UsuarioId = 1,
+                FocoMuscular = FocoPara(g, i) })).ToList();
         return (grupos, exercicios, maquinas);
     }
 }

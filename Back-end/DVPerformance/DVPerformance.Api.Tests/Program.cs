@@ -217,7 +217,7 @@ Testar("regras etárias passam a valer após completar 66 anos", () =>
         "Aceitar o perfil ajustado para a idade atual.");
 });
 
-Testar("API serializa a data ISO e banco mantém somente nascimento e legado privado", () =>
+Testar("API serializa a data ISO e banco mantém somente nascimento", () =>
 {
     var aluno = new Aluno { DataDeNascimento = new DateOnly(2000, 11, 9) };
     var json = JsonSerializer.SerializeToElement(aluno, new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -229,25 +229,30 @@ Testar("API serializa a data ISO e banco mantém somente nascimento e legado pri
     Exigir(propriedade.GetColumnName() == "data_de_nascimento" && propriedade.GetColumnType() == "date"
         && propriedade.IsNullable, "Permitir nascimento pendente apenas nos registros migrados.");
     Exigir(entidade.FindProperty(nameof(Aluno.Idade)) is null, "Idade calculada não é persistida.");
-    Exigir(entidade.FindProperty("IdadeLegada")!.IsShadowProperty(), "Guardar o histórico sem expor na entidade.");
+    Exigir(entidade.FindProperty("IdadeLegada") is null, "Não mapear a antiga coluna de idade.");
 });
 
-Testar("migração preserva idade anterior e não inventa aniversário para alunos antigos", () =>
+Testar("migração remove somente a idade antiga e atualiza focos e prioridades", () =>
 {
-    var migracao = new SubstituirIdadePorDataDeNascimento();
-    Exigir(migracao.UpOperations.OfType<RenameColumnOperation>()
-        .Any(op => op.Name == "idade" && op.NewName == "idade_legada"), "Preservar a coluna histórica.");
-    Exigir(!migracao.UpOperations.OfType<DropColumnOperation>().Any(), "Não perder o dado anterior.");
-    var coluna = migracao.UpOperations.OfType<AddColumnOperation>().Single();
-    Exigir(coluna.Name == "data_de_nascimento" && coluna.IsNullable && coluna.DefaultValue is null
-        && coluna.DefaultValueSql is null, "Manter os aniversários desconhecidos em branco.");
-    Exigir(!migracao.UpOperations.OfType<SqlOperation>().Any(), "Não estimar datas com base na idade.");
+    var migracao = new RemoverIdadeLegadaEAdicionarFocosMusculares();
+    var removida = migracao.UpOperations.OfType<DropColumnOperation>().Single();
+    Exigir(removida.Table == "alunos" && removida.Name == "idade_legada",
+        "Remover apenas a idade antiga, preservando data de nascimento.");
+    var colunas = migracao.UpOperations.OfType<AddColumnOperation>().ToArray();
+    Exigir(colunas.Length == 2 && colunas.All(c => c.Name == "foco_muscular" && !c.IsNullable)
+        && colunas.Select(c => c.Table).ToHashSet().SetEquals(["exercicios", "maquinas"]),
+        "Persistir o foco nas duas modalidades.");
     var script = db.GetService<IMigrator>().GenerateScript(
-        "20261108160000_AdicionarSegundaDicaAoTreino",
-        "20261109235000_SubstituirIdadePorDataDeNascimento");
-    Exigir(script.Contains("RENAME COLUMN idade TO idade_legada")
-        && script.Contains("ADD data_de_nascimento date"), "Gerar SQL da migração sem conexão.");
+        "20261109235000_SubstituirIdadePorDataDeNascimento",
+        "20261111222146_RemoverIdadeLegadaEAdicionarFocosMusculares");
+    Exigir(script.Contains("DROP COLUMN idade_legada") && script.Contains("ADD foco_muscular"),
+        "Gerar SQL válido da remoção e dos focos.");
+    Exigir(!script.Contains("DROP COLUMN data_de_nascimento"), "Preservar aniversários cadastrados.");
+    Exigir(!db.GetService<IMigrator>().HasPendingModelChanges(), "Snapshot acompanha o modelo atual.");
 });
+
+DVPerformance.Api.Tests.FocosMuscularesTests.Executar(Testar, Exigir);
+DVPerformance.Api.Tests.AdutoresAbdutoresTests.Executar(Testar, Exigir);
 
 DVPerformance.Api.Tests.DivisoesTreinoTests.Executar(Testar, Exigir);
 

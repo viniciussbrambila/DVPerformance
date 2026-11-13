@@ -10,6 +10,9 @@ public class Exercicio
 
     public string Nome { get; set; } = string.Empty;
 
+    // Ênfase/padrão compartilhado entre equipamentos para variar a sessão.
+    public string FocoMuscular { get; set; } = string.Empty;
+
     // Chave estrangeira unificada apontando para a tabela grupos_musculares (elimina redundância com Máquinas)
     public int GrupoMuscularId { get; set; }
 

@@ -148,6 +148,7 @@ public static class MaquinaEndpoints
                 mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
                 mesmoNomeExistente.GrupoMuscular = grupoMuscular;
                 mesmoNomeExistente.Descricao = descricaoLimpa;
+                mesmoNomeExistente.FocoMuscular = novaMaquina.FocoMuscular;
                 mesmoNomeExistente.Ativo = true;
 
                 await db.SaveChangesAsync();
@@ -264,6 +265,7 @@ public static class MaquinaEndpoints
             maquinaExistente.Nome = dadosAtualizados.Nome.Trim();
             maquinaExistente.GrupoMuscularId = grupoMuscular!.Id;
             maquinaExistente.GrupoMuscular = grupoMuscular;
+            maquinaExistente.FocoMuscular = dadosAtualizados.FocoMuscular;
             maquinaExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
             await db.SaveChangesAsync();
@@ -346,6 +348,15 @@ public static class MaquinaEndpoints
         if (exigirUsuarioId && (!maquina.UsuarioId.HasValue || maquina.UsuarioId.Value <= 0))
         {
             erros.Add("Informe o ID do usuário (usuarioId) responsável pelo cadastro da máquina.");
+        }
+
+        if (grupoEncontrado is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(maquina.FocoMuscular)
+                && !FocosMusculares.Valido(grupoEncontrado.Nome, maquina.FocoMuscular))
+                erros.Add("Selecione um foco muscular válido para o grupo informado.");
+            else
+                maquina.FocoMuscular = FocosMusculares.Resolver(grupoEncontrado.Nome, nome, maquina.FocoMuscular);
         }
 
         return (erros, grupoEncontrado);

@@ -397,6 +397,7 @@ public static class CatalogoPadraoService
                 {
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
+                    FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = usuarioId,
                     Ativo = true
@@ -453,6 +454,7 @@ public static class CatalogoPadraoService
                 {
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
+                    FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = usuarioId,
                     Ativo = true
@@ -492,6 +494,7 @@ public static class CatalogoPadraoService
                 {
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
+                    FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = conta.Id,
                     Ativo = true
@@ -514,6 +517,7 @@ public static class CatalogoPadraoService
                 {
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
+                    FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = conta.Id,
                     Ativo = true
@@ -522,6 +526,20 @@ public static class CatalogoPadraoService
         }
 
         conta.CatalogoInicializado = true;
+    }
+
+    public static async Task ClassificarFocosPendentesAsync(AppDbContext db)
+    {
+        var exercicios = await db.Exercicios.Include(e => e.GrupoMuscular)
+            .Where(e => e.FocoMuscular == "").ToListAsync();
+        var maquinas = await db.Maquinas.Include(m => m.GrupoMuscular)
+            .Where(m => m.FocoMuscular == "").ToListAsync();
+        foreach (var item in exercicios)
+            item.FocoMuscular = FocosMusculares.Inferir(item.Grupo, item.Nome);
+        foreach (var item in maquinas)
+            item.FocoMuscular = FocosMusculares.Inferir(item.Grupo, item.Nome);
+        if (exercicios.Count > 0 || maquinas.Count > 0)
+            await db.SaveChangesAsync();
     }
 
     public static string NormalizarNome(string? nome)

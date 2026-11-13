@@ -14,11 +14,14 @@ public static class ExercicioEndpoints
             var grupos = await db.GruposMusculares
                 .AsNoTracking()
                 .OrderBy(g => g.OrdemPrioridade)
+                .ThenBy(g => g.Nome == "Bíceps" ? 0 : g.Nome == "Tríceps" ? 1 : g.Nome == "Ombros" ? 2 : 3)
                 .ThenBy(g => g.Nome)
                 .ToListAsync();
 
             return Results.Ok(grupos);
         });
+
+        app.MapGet("/exercicios/focos-musculares", () => Results.Ok(FocosMusculares.Opcoes));
 
         // Cria um grupo de rotas com o prefixo "/exercicios"
         var grupo = app.MapGroup("/exercicios");
@@ -150,6 +153,7 @@ public static class ExercicioEndpoints
                 mesmoNomeExistente.GrupoMuscularId = grupoMuscular!.Id;
                 mesmoNomeExistente.GrupoMuscular = grupoMuscular;
                 mesmoNomeExistente.Descricao = descricaoLimpa;
+                mesmoNomeExistente.FocoMuscular = novoExercicio.FocoMuscular;
                 mesmoNomeExistente.Ativo = true;
 
                 await db.SaveChangesAsync();
@@ -225,6 +229,7 @@ public static class ExercicioEndpoints
             exercicioExistente.Nome = dadosAtualizados!.Nome.Trim();
             exercicioExistente.GrupoMuscularId = grupoMuscular!.Id;
             exercicioExistente.GrupoMuscular = grupoMuscular;
+            exercicioExistente.FocoMuscular = dadosAtualizados.FocoMuscular;
             exercicioExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
             if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
@@ -311,6 +316,15 @@ public static class ExercicioEndpoints
         if (exigirUsuarioId && (!exercicio.UsuarioId.HasValue || exercicio.UsuarioId.Value <= 0))
         {
             erros.Add("Informe o ID do Personal (usuarioId) responsável pelo cadastro do exercício.");
+        }
+
+        if (grupoEncontrado is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(exercicio.FocoMuscular)
+                && !FocosMusculares.Valido(grupoEncontrado.Nome, exercicio.FocoMuscular))
+                erros.Add("Selecione um foco muscular válido para o grupo informado.");
+            else
+                exercicio.FocoMuscular = FocosMusculares.Resolver(grupoEncontrado.Nome, nome, exercicio.FocoMuscular);
         }
 
         return (erros, grupoEncontrado);

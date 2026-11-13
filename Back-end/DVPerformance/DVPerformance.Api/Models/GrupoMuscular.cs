@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace DVPerformance.Api.Models;
 
 public class GrupoMuscular
@@ -11,6 +13,15 @@ public class GrupoMuscular
     public string Regiao { get; set; } = string.Empty;
 
     // Prioridade na montagem do treino:
-    // 1 = Músculo Grande (vem primeiro) | 2 = Músculo Médio | 3 = Músculo Pequeno | 4 = Core / Finalizador (vem por último)
+    // 1 = Grandes | 2 = Braços, ombros e adutores/abdutores | 3 = Trapézio e panturrilha | 4 = Finalizadores
     public int OrdemPrioridade { get; set; }
+
+    [NotMapped]
+    public int OrdemNaPrioridade => Nome switch
+    {
+        "Bíceps" => 0,
+        "Tríceps" => 1,
+        "Ombros" => 2,
+        _ => 3
+    };
 }

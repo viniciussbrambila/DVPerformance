@@ -1,6 +1,19 @@
 namespace DVPerformance.Api.Data;
 
-public sealed record SessaoDivisaoTreino(string Titulo, string[] Grupos);
+public sealed record SessaoDivisaoTreino(string Titulo, string[] Grupos)
+{
+    // O catálogo mantém um grupo conjunto, mas a sessão exige movimentos específicos.
+    public string[] FocosAdutoresAbdutores => !Grupos.Contains("Adutores / Abdutores") ? [] :
+        [
+            .. (Grupos.Contains("Quadríceps") ? new[] { "aducao" } : []),
+            .. (Grupos.Contains("Glúteos") ? new[] { "abducao" } : [])
+        ];
+
+    public string[] GruposExibicao => Grupos.SelectMany(grupo =>
+        grupo == "Adutores / Abdutores" && FocosAdutoresAbdutores.Length > 0
+            ? FocosAdutoresAbdutores.Select(foco => foco == "aducao" ? "Adutores" : "Abdutores")
+            : [grupo]).ToArray();
+}
 
 public sealed record DivisaoTreinoConfiguracao(
     string Id,
@@ -11,14 +24,16 @@ public sealed record DivisaoTreinoConfiguracao(
 
 public static class DivisoesTreino
 {
-    private static readonly string[] FullBody =
-        ["Peito", "Costas", "Ombros", "Quadríceps", "Posterior de Coxa", "Glúteos", "Panturrilha"];
+    private static readonly string[] FullBodyA =
+        ["Peito", "Costas", "Quadríceps", "Posterior de Coxa", "Panturrilha", "Adutores / Abdutores"];
+    private static readonly string[] FullBodyB =
+        ["Peito", "Costas", "Ombros", "Glúteos", "Panturrilha", "Adutores / Abdutores"];
     private static readonly string[] Upper =
         ["Peito", "Costas", "Ombros", "Bíceps", "Tríceps"];
     private static readonly string[] UpperCompleto =
         ["Peito", "Costas", "Ombros", "Trapézio", "Bíceps", "Tríceps"];
     private static readonly string[] Lower =
-        ["Quadríceps", "Posterior de Coxa", "Glúteos", "Panturrilha"];
+        ["Quadríceps", "Posterior de Coxa", "Glúteos", "Panturrilha", "Adutores / Abdutores"];
     private static readonly string[] Push = ["Peito", "Ombros", "Tríceps"];
     private static readonly string[] Pull = ["Costas", "Trapézio", "Bíceps"];
 
@@ -32,9 +47,9 @@ public static class DivisoesTreino
     public static IReadOnlyList<DivisaoTreinoConfiguracao> Todas { get; } =
     [
         Divisao("full-body-ab", "Full Body A/B", 2,
-            "Corpo inteiro nas duas sessões, com variação de exercícios.",
-            Sessao('A', "Full Body A", FullBody),
-            Sessao('B', "Full Body B", FullBody)),
+            "Grupos alternados entre A e B, com adutores junto de quadríceps e abdutores junto de glúteos.",
+            Sessao('A', "Full Body A", FullBodyA),
+            Sessao('B', "Full Body B", FullBodyB)),
         Divisao("ppl", "PPL", 3,
             "Push, Pull e Legs: empurrar, puxar e pernas.",
             Sessao('A', "Push", Push),
@@ -56,9 +71,9 @@ public static class DivisoesTreino
             "Cinco sessões com quadríceps separados de posteriores e glúteos.",
             Sessao('A', "Peito e tríceps", ["Peito", "Tríceps"]),
             Sessao('B', "Costas e bíceps", ["Costas", "Bíceps"]),
-            Sessao('C', "Quadríceps e panturrilhas", ["Quadríceps", "Panturrilha"]),
+            Sessao('C', "Quadríceps e panturrilhas", ["Quadríceps", "Panturrilha", "Adutores / Abdutores"]),
             Sessao('D', "Ombros, trapézio e abdômen", ["Ombros", "Trapézio", "Abdômen"]),
-            Sessao('E', "Posteriores e glúteos", ["Posterior de Coxa", "Glúteos"])),
+            Sessao('E', "Posteriores e glúteos", ["Posterior de Coxa", "Glúteos", "Adutores / Abdutores"])),
         Divisao("ulppl", "ULPPL", 5,
             "Upper e Lower seguidos de Push, Pull e Legs.",
             Sessao('A', "Upper", UpperCompleto),
@@ -93,9 +108,9 @@ public static class DivisoesTreino
             "Seis sessões, separando quadríceps de posteriores e glúteos.",
             Sessao('A', "Costas", ["Costas"]),
             Sessao('B', "Peito e abdômen", ["Peito", "Abdômen"]),
-            Sessao('C', "Quadríceps e panturrilhas", ["Quadríceps", "Panturrilha"]),
+            Sessao('C', "Quadríceps e panturrilhas", ["Quadríceps", "Panturrilha", "Adutores / Abdutores"]),
             Sessao('D', "Ombros e trapézio", ["Ombros", "Trapézio"]),
-            Sessao('E', "Posteriores e glúteos", ["Posterior de Coxa", "Glúteos"]),
+            Sessao('E', "Posteriores e glúteos", ["Posterior de Coxa", "Glúteos", "Adutores / Abdutores"]),
             Sessao('F', "Bíceps e tríceps", ["Bíceps", "Tríceps"]))
     ];
 

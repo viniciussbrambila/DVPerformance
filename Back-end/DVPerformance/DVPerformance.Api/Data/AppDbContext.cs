@@ -92,10 +92,6 @@ public class AppDbContext : DbContext
                   .HasColumnName("data_de_nascimento")
                   .HasColumnType("date");
 
-            // Guarda o dado histórico sem expor ou utilizar uma idade desatualizada.
-            entity.Property<int?>("IdadeLegada")
-                  .HasColumnName("idade_legada");
-
             entity.Property(a => a.Experiencia)
                   .HasColumnName("experiencia")
                   .HasMaxLength(20)
@@ -165,7 +161,7 @@ public class AppDbContext : DbContext
                   .IsRequired();
 
             // Carga padrão dos 14 grupos musculares com prioridade anatômica:
-            // 1 = Músculo Grande (Base) | 2 = Médio (Sinergista) | 3 = Pequeno (Auxiliar) | 4 = Core / Finalizador
+            // 1 = Grandes | 2 = Bíceps, tríceps, ombros e adutores/abdutores | 3 = Trapézio e panturrilha | 4 = Finalizadores
             entity.HasData(
                 new GrupoMuscular { Id = 1, Nome = "Peito", Regiao = "Membros Superiores", OrdemPrioridade = 1 },
                 new GrupoMuscular { Id = 2, Nome = "Costas", Regiao = "Membros Superiores", OrdemPrioridade = 1 },
@@ -173,10 +169,10 @@ public class AppDbContext : DbContext
                 new GrupoMuscular { Id = 4, Nome = "Posterior de Coxa", Regiao = "Membros Inferiores", OrdemPrioridade = 1 },
                 new GrupoMuscular { Id = 5, Nome = "Glúteos", Regiao = "Membros Inferiores", OrdemPrioridade = 1 },
                 new GrupoMuscular { Id = 6, Nome = "Ombros", Regiao = "Membros Superiores", OrdemPrioridade = 2 },
-                new GrupoMuscular { Id = 7, Nome = "Trapézio", Regiao = "Membros Superiores", OrdemPrioridade = 2 },
+                new GrupoMuscular { Id = 7, Nome = "Trapézio", Regiao = "Membros Superiores", OrdemPrioridade = 3 },
                 new GrupoMuscular { Id = 8, Nome = "Adutores / Abdutores", Regiao = "Membros Inferiores", OrdemPrioridade = 2 },
-                new GrupoMuscular { Id = 9, Nome = "Bíceps", Regiao = "Membros Superiores", OrdemPrioridade = 3 },
-                new GrupoMuscular { Id = 10, Nome = "Tríceps", Regiao = "Membros Superiores", OrdemPrioridade = 3 },
+                new GrupoMuscular { Id = 9, Nome = "Bíceps", Regiao = "Membros Superiores", OrdemPrioridade = 2 },
+                new GrupoMuscular { Id = 10, Nome = "Tríceps", Regiao = "Membros Superiores", OrdemPrioridade = 2 },
                 new GrupoMuscular { Id = 11, Nome = "Panturrilha", Regiao = "Membros Inferiores", OrdemPrioridade = 3 },
                 new GrupoMuscular { Id = 12, Nome = "Antebraço", Regiao = "Membros Superiores", OrdemPrioridade = 4 },
                 new GrupoMuscular { Id = 13, Nome = "Abdômen", Regiao = "Core / Tronco", OrdemPrioridade = 4 },
@@ -201,6 +197,11 @@ public class AppDbContext : DbContext
 
             entity.Property(e => e.GrupoMuscularId)
                   .HasColumnName("grupo_muscular_id")
+                  .IsRequired();
+
+            entity.Property(e => e.FocoMuscular)
+                  .HasColumnName("foco_muscular")
+                  .HasMaxLength(60)
                   .IsRequired();
 
             entity.Property(e => e.Descricao)
@@ -245,6 +246,11 @@ public class AppDbContext : DbContext
 
             entity.Property(m => m.GrupoMuscularId)
                   .HasColumnName("grupo_muscular_id")
+                  .IsRequired();
+
+            entity.Property(m => m.FocoMuscular)
+                  .HasColumnName("foco_muscular")
+                  .HasMaxLength(60)
                   .IsRequired();
 
             entity.Property(m => m.Descricao)

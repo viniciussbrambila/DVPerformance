@@ -11,6 +11,9 @@ public class Maquina
     // Dicionário de Dados (Tabela Maquina): varchar(100), obrigatório (Não Nulo)
     public string Nome { get; set; } = string.Empty;
 
+    // Ênfase/padrão compartilhado entre equipamentos para variar a sessão.
+    public string FocoMuscular { get; set; } = string.Empty;
+
     // Chave estrangeira unificada apontando para a tabela grupos_musculares (elimina redundância com Exercícios)
     public int GrupoMuscularId { get; set; }
 

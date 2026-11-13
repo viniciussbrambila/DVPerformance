@@ -166,7 +166,7 @@ export default function EscolhaDivisaoTreino({
                       <Box component="span" sx={{ fontWeight: 700 }}>
                         {sessao.titulo.replace(/^Treino /, "")}:
                       </Box>{" "}
-                      {sessao.grupos.join(", ")}
+                      {(sessao.gruposExibicao || sessao.grupos).join(", ")}
                     </Typography>
                   ))}
                 </Box>

@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import FocoMuscularSelect, {
+  FocoMuscularLabel,
+  useFocosMusculares,
+} from "../components/FocoMuscularSelect";
 import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
 import { normalizarTextoBusca } from "../utils/busca";
 import {
@@ -86,7 +90,7 @@ const obterUsuarioLogado = () => {
   }
 };
 
-const formVazio = { nome: "", grupo: "", descricao: "" };
+const formVazio = { nome: "", grupo: "", focoMuscular: "", descricao: "" };
 
 const obterChaveExercicios = () => {
   const usuarioLogado = obterUsuarioLogado();
@@ -116,6 +120,7 @@ export default function Exercicios({
   const [tentouSalvar, setTentouSalvar] = useState(false);
   const [errosApi, setErrosApi] = useState([]);
   const [erroCarregamento, setErroCarregamento] = useState("");
+  const catalogoFocos = useFocosMusculares();
 
   const carregarExercicios = async () => {
     const usuarioLogado = obterUsuarioLogado();
@@ -158,8 +163,16 @@ export default function Exercicios({
         : b.nome.localeCompare(a.nome, "pt-BR", { sensitivity: "base" }),
     );
 
-  const handleChange = (campo) => (e) =>
-    setForm((anterior) => ({ ...anterior, [campo]: e.target.value }));
+  const handleChange = (campo) => (e) => {
+    const valor = e.target.value;
+    setForm((anterior) => ({
+      ...anterior,
+      [campo]: valor,
+      ...((campo === "nome" || campo === "grupo") && valor !== anterior[campo]
+        ? { focoMuscular: "" }
+        : {}),
+    }));
+  };
 
   const abrirNovo = () => {
     setForm(formVazio);
@@ -173,6 +186,7 @@ export default function Exercicios({
     setForm({
       nome: exercicio.nome,
       grupo: exercicio.grupo,
+      focoMuscular: exercicio.focoMuscular || "",
       descricao: exercicio.descricao || "",
     });
     setEditandoId(exercicio.id);
@@ -203,6 +217,7 @@ export default function Exercicios({
     const payload = {
       nome: form.nome.trim(),
       grupo: form.grupo.trim(),
+      focoMuscular: form.focoMuscular || "",
       descricao: form.descricao?.trim() || "",
       usuarioId: usuarioLogado?.id || null,
     };
@@ -405,6 +420,15 @@ export default function Exercicios({
               </Grid>
 
               <Grid size={12}>
+                <FocoMuscularSelect
+                  grupo={form.grupo}
+                  value={form.focoMuscular}
+                  onChange={handleChange("focoMuscular")}
+                  catalogo={catalogoFocos}
+                />
+              </Grid>
+
+              <Grid size={12}>
                 <TextField
                   fullWidth
                   label="Descrição / Equipamento"
@@ -529,6 +553,11 @@ export default function Exercicios({
                         size="small"
                         variant="outlined"
                         sx={{ fontWeight: 500 }}
+                      />
+                      <FocoMuscularLabel
+                        grupo={ex.grupo}
+                        value={ex.focoMuscular}
+                        catalogo={catalogoFocos}
                       />
                     </Box>
                   </TableCell>

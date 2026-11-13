@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import FocoMuscularSelect, {
+  FocoMuscularLabel,
+  useFocosMusculares,
+} from "../components/FocoMuscularSelect";
 import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
 import { normalizarTextoBusca } from "../utils/busca";
 import {
@@ -86,7 +90,7 @@ const obterUsuarioLogado = () => {
   }
 };
 
-const formVazio = { nome: "", grupo: "", descricao: "" };
+const formVazio = { nome: "", grupo: "", focoMuscular: "", descricao: "" };
 
 const obterChaveMaquinas = () => {
   const usuarioLogado = obterUsuarioLogado();
@@ -116,6 +120,7 @@ export default function Maquinas({
   const [tentouSalvar, setTentouSalvar] = useState(false);
   const [errosApi, setErrosApi] = useState([]);
   const [erroCarregamento, setErroCarregamento] = useState("");
+  const catalogoFocos = useFocosMusculares();
 
   const carregarMaquinas = async () => {
     const usuarioLogado = obterUsuarioLogado();
@@ -158,8 +163,16 @@ export default function Maquinas({
         : b.nome.localeCompare(a.nome, "pt-BR", { sensitivity: "base" }),
     );
 
-  const handleChange = (campo) => (e) =>
-    setForm((anterior) => ({ ...anterior, [campo]: e.target.value }));
+  const handleChange = (campo) => (e) => {
+    const valor = e.target.value;
+    setForm((anterior) => ({
+      ...anterior,
+      [campo]: valor,
+      ...((campo === "nome" || campo === "grupo") && valor !== anterior[campo]
+        ? { focoMuscular: "" }
+        : {}),
+    }));
+  };
 
   const abrirNovo = () => {
     setForm(formVazio);
@@ -173,6 +186,7 @@ export default function Maquinas({
     setForm({
       nome: maquina.nome,
       grupo: maquina.grupo,
+      focoMuscular: maquina.focoMuscular || "",
       descricao: maquina.descricao || "",
     });
     setEditandoId(maquina.id);
@@ -203,6 +217,7 @@ export default function Maquinas({
     const payload = {
       nome: form.nome.trim(),
       grupo: form.grupo.trim(),
+      focoMuscular: form.focoMuscular || "",
       descricao: form.descricao?.trim() || "",
       usuarioId: usuarioLogado?.id || null,
     };
@@ -406,6 +421,15 @@ export default function Maquinas({
               </Grid>
 
               <Grid size={12}>
+                <FocoMuscularSelect
+                  grupo={form.grupo}
+                  value={form.focoMuscular}
+                  onChange={handleChange("focoMuscular")}
+                  catalogo={catalogoFocos}
+                />
+              </Grid>
+
+              <Grid size={12}>
                 <TextField
                   fullWidth
                   label="Descrição / Especificação da Máquina"
@@ -542,6 +566,11 @@ export default function Maquinas({
                         size="small"
                         variant="outlined"
                         sx={{ fontWeight: 500 }}
+                      />
+                      <FocoMuscularLabel
+                        grupo={maq.grupo}
+                        value={maq.focoMuscular}
+                        catalogo={catalogoFocos}
                       />
                     </Box>
                   </TableCell>
