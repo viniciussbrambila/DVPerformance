@@ -19,6 +19,8 @@ internal static class AdutoresAbdutoresTests
 
         string Grupo(ItemTreino item) => item.ExercicioId is int id
             ? exercicios.Single(e => e.Id == id).Grupo : maquinas.Single(m => m.Id == item.MaquinaId).Grupo;
+        string NomeItem(ItemTreino item) => item.ExercicioId is int id
+            ? exercicios.Single(e => e.Id == id).Nome : maquinas.Single(m => m.Id == item.MaquinaId).Nome;
         string Foco(ItemTreino item) => item.ExercicioId is int id
             ? FocosMusculares.Resolver(Grupo(item), exercicios.Single(e => e.Id == id).Nome,
                 exercicios.Single(e => e.Id == id).FocoMuscular)
@@ -30,7 +32,7 @@ internal static class AdutoresAbdutoresTests
                 DataDeNascimento = Aluno.ObterDataAtual().AddYears(-30), Objetivo = "Hipertrofia"
             }, 1, 1, 2, grupos, livres ?? exercicios, equipamentos ?? maquinas, config);
 
-        testar("todas as divisões respeitam 6/7/8 e incluem o foco correto junto de quadríceps e glúteos", () =>
+        testar("todas as divisões completam 6/7/8 sem faltar exercícios e incluem o foco correto junto de quadríceps e glúteos", () =>
         {
             foreach (var config in DivisoesTreino.Todas)
             foreach (var (nivel, meta) in new[] { ("Iniciante", 6), ("Intermediário", 7), ("Avançado", 8) })
@@ -42,9 +44,7 @@ internal static class AdutoresAbdutoresTests
                 foreach (var sessao in config.Sessoes)
                 {
                     var itens = treino.Itens.Where(i => i.DivisaoTreino == sessao.Titulo).ToArray();
-                    exigir(itens.Length <= meta, $"{config.Id} / {sessao.Titulo} excedeu {meta}.");
-                    if (nivel == "Iniciante")
-                        exigir(itens.Length == 6, $"{config.Id} / {sessao.Titulo}: catálogo padrão deve completar seis.");
+                    exigir(itens.Length == meta, $"{config.Id} / {sessao.Titulo} ({nivel}) gerou {itens.Length} em vez de {meta}.");
                     var focos = itens.Where(i => Grupo(i) == "Adutores / Abdutores").Select(Foco).ToArray();
                     exigir(focos.Count(f => f == "aducao") == (sessao.Grupos.Contains("Quadríceps") ? 1 : 0),
                         "Exatamente um adutor no dia de quadríceps.");
@@ -54,6 +54,11 @@ internal static class AdutoresAbdutoresTests
                         "Não substituir um movimento específico por um foco geral.");
                     exigir(itens.Select(i => (i.ExercicioId, i.MaquinaId)).Distinct().Count() == itens.Length,
                         "Não repetir o mesmo cadastro para completar a meta.");
+                    if (nivel == "Iniciante")
+                    {
+                        exigir(itens.All(i => FocosMusculares.CompativelComExperiencia(NomeItem(i), "Iniciante")),
+                            $"Iniciante não deve receber exercícios avançados em {config.Id} / {sessao.Titulo}.");
+                    }
                 }
             }
         });
@@ -78,15 +83,18 @@ internal static class AdutoresAbdutoresTests
             }
         });
 
-        testar("catálogo curto permite intermediário e avançado abaixo da meta sem exceder limites", () =>
+        testar("Bro Split 5 completa as metas 6/7/8 respeitando no máximo dois exercícios por foco e nos auxiliares", () =>
         {
             var config = DivisoesTreino.Obter("bro-split-5", 5)!;
-            foreach (var nivel in new[] { "Intermediário", "Avançado" })
+            foreach (var (nivel, meta) in new[] { ("Iniciante", 6), ("Intermediário", 7), ("Avançado", 8) })
             {
                 var treino = Gerar(config, nivel);
-                var peito = treino.Itens.Where(i => Grupo(i) == "Peito").ToArray();
-                exigir(peito.Length == 6 && peito.GroupBy(Foco).All(g => g.Count() <= 2),
-                    "Peito com três focos permite seis movimentos, mesmo quando a meta é sete ou oito.");
+                var sessaoA = treino.Itens.Where(i => i.DivisaoTreino == config.Sessoes[0].Titulo).ToArray();
+                var peito = sessaoA.Where(i => Grupo(i) == "Peito").ToArray();
+                var abdomen = sessaoA.Where(i => Grupo(i) == "Abdômen").ToArray();
+                exigir(sessaoA.Length == meta && abdomen.Length == 2 && peito.Length == meta - 2
+                    && peito.GroupBy(Foco).All(g => g.Count() <= 2),
+                    "Peito e abdômen completam a meta da sessão sem exceder limites de foco.");
             }
         });
 

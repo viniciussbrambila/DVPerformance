@@ -33,8 +33,8 @@ public static class TreinoEndpoints
     {
         var grupo = app.MapGroup("/treinos");
 
-        // GET /treinos/divisoes?dias=4 -> Opções compatíveis com a frequência do aluno.
-        grupo.MapGet("/divisoes", (int? dias) =>
+        // GET /treinos/divisoes?dias=4&experiencia=Iniciante -> Opções compatíveis com a frequência e experiência do aluno.
+        grupo.MapGet("/divisoes", (int? dias, string? experiencia) =>
         {
             if (dias is null or < 2 or > 6)
             {
@@ -44,7 +44,7 @@ public static class TreinoEndpoints
                 });
             }
 
-            return Results.Ok(DivisoesTreino.ObterDisponiveis(dias.Value));
+            return Results.Ok(DivisoesTreino.ObterDisponiveis(dias.Value, experiencia));
         });
 
         // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos já enriquecidos com dados do aluno, dica sorteada, status e dias agrupados
@@ -140,7 +140,7 @@ public static class TreinoEndpoints
             return Results.Ok(treinos.Select(FormatarPlanoResposta));
         });
 
-        // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha usando os exercícios e máquinas ativos da conta do Personal
+        // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha (automática ou manual em branco)
         grupo.MapPost("/gerar/{alunoId:int}", async (int alunoId, int? usuarioId, string? divisao, AppDbContext db) =>
         {
             if (alunoId <= 0)
@@ -164,13 +164,18 @@ public static class TreinoEndpoints
                 });
             }
 
-            var divisaoSelecionada = DivisoesTreino.Obter(divisao, aluno.FrequenciaSemanal);
-            if (divisaoSelecionada is null)
+            var ehManual = DivisoesTreino.EhManual(divisao);
+            DivisaoTreinoConfiguracao? divisaoSelecionada = null;
+            if (!ehManual)
             {
-                return Results.BadRequest(new
+                divisaoSelecionada = DivisoesTreino.Obter(divisao, aluno.FrequenciaSemanal, aluno.Experiencia);
+                if (divisaoSelecionada is null)
                 {
-                    mensagem = $"Selecione uma divisão compatível com os {aluno.FrequenciaSemanal} dias de treino do aluno."
-                });
+                    return Results.BadRequest(new
+                    {
+                        mensagem = $"Selecione uma divisão compatível com os {aluno.FrequenciaSemanal} dias de treino e o nível {aluno.Experiencia} do aluno."
+                    });
+                }
             }
 
             // Identifica o Personal dono da ficha (pelo query param ou pelo vínculo do próprio aluno)
@@ -181,53 +186,6 @@ public static class TreinoEndpoints
             if (donoId.HasValue && donoId.Value > 0)
             {
                 await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, donoId.Value);
-            }
-
-            var gruposMusculares = await db.GruposMusculares.AsNoTracking().ToListAsync();
-
-            var exerciciosDisponiveis = await db.Exercicios
-                .AsNoTracking()
-                .Include(e => e.GrupoMuscular)
-                .Where(e => e.Ativo && (donoId == null || e.UsuarioId == donoId))
-                .ToListAsync();
-
-            var maquinasDisponiveis = await db.Maquinas
-                .AsNoTracking()
-                .Include(m => m.GrupoMuscular)
-                .Where(m => m.Ativo && (donoId == null || m.UsuarioId == donoId))
-                .ToListAsync();
-
-            if (donoId is null)
-            {
-                exerciciosDisponiveis = exerciciosDisponiveis
-                    .GroupBy(e => (e.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(e.Nome)))
-                    .Select(g => g.First())
-                    .ToList();
-
-                maquinasDisponiveis = maquinasDisponiveis
-                    .GroupBy(m => (m.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(m.Nome)))
-                    .Select(g => g.First())
-                    .ToList();
-            }
-
-            if (exerciciosDisponiveis.Count == 0 && maquinasDisponiveis.Count == 0)
-            {
-                return Results.BadRequest(new
-                {
-                    mensagem = "Não há exercícios nem máquinas ativos na sua conta para gerar o treino.",
-                    erros = new[] { "Cadastre ou restaure exercícios e máquinas no catálogo antes de gerar uma ficha automática." }
-                });
-            }
-
-            var errosCatalogo = ValidarCatalogoDivisao(
-                divisaoSelecionada, gruposMusculares, exerciciosDisponiveis, maquinasDisponiveis);
-            if (errosCatalogo.Count > 0)
-            {
-                return Results.BadRequest(new
-                {
-                    mensagem = "O catálogo não possui todos os grupos musculares necessários para esta divisão.",
-                    erros = errosCatalogo
-                });
             }
 
             // Busca todo o histórico cronológico de dicas já recebidas por este aluno (ativos e inativos)
@@ -250,24 +208,83 @@ public static class TreinoEndpoints
                 });
             }
 
-            // Gera a ficha conforme a divisão escolhida e os parâmetros do aluno
-            var novoTreino = GerarTreinoPersonalizado(
-                aluno,
-                donoId,
-                dicasSorteadas[0].Id,
-                dicasSorteadas[1].Id,
-                gruposMusculares,
-                exerciciosDisponiveis,
-                maquinasDisponiveis,
-                divisaoSelecionada);
-
-            if (novoTreino.Itens.Count == 0)
+            Treino novoTreino;
+            if (ehManual)
             {
-                return Results.BadRequest(new
+                novoTreino = GerarTreinoManual(
+                    aluno,
+                    donoId,
+                    dicasSorteadas[0].Id,
+                    dicasSorteadas[1].Id);
+            }
+            else
+            {
+                var gruposMusculares = await db.GruposMusculares.AsNoTracking().ToListAsync();
+
+                var exerciciosDisponiveis = await db.Exercicios
+                    .AsNoTracking()
+                    .Include(e => e.GrupoMuscular)
+                    .Where(e => e.Ativo && (donoId == null || e.UsuarioId == donoId))
+                    .ToListAsync();
+
+                var maquinasDisponiveis = await db.Maquinas
+                    .AsNoTracking()
+                    .Include(m => m.GrupoMuscular)
+                    .Where(m => m.Ativo && (donoId == null || m.UsuarioId == donoId))
+                    .ToListAsync();
+
+                if (donoId is null)
                 {
-                    mensagem = "Não foi possível montar os itens do treino com o catálogo atual.",
-                    erros = new[] { "Cadastre exercícios ou máquinas compatíveis com os grupos musculares do treino." }
-                });
+                    exerciciosDisponiveis = exerciciosDisponiveis
+                        .GroupBy(e => (e.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(e.Nome)))
+                        .Select(g => g.First())
+                        .ToList();
+
+                    maquinasDisponiveis = maquinasDisponiveis
+                        .GroupBy(m => (m.GrupoMuscularId, Nome: CatalogoPadraoService.NormalizarNome(m.Nome)))
+                        .Select(g => g.First())
+                        .ToList();
+                }
+
+                if (exerciciosDisponiveis.Count == 0 && maquinasDisponiveis.Count == 0)
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Não há exercícios nem máquinas ativos na sua conta para gerar o treino.",
+                        erros = new[] { "Cadastre ou restaure exercícios e máquinas no catálogo antes de gerar uma ficha automática." }
+                    });
+                }
+
+                var errosCatalogo = ValidarCatalogoDivisao(
+                    divisaoSelecionada!, gruposMusculares, exerciciosDisponiveis, maquinasDisponiveis);
+                if (errosCatalogo.Count > 0)
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "O catálogo não possui todos os grupos musculares necessários para esta divisão.",
+                        erros = errosCatalogo
+                    });
+                }
+
+                // Gera a ficha conforme a divisão escolhida e os parâmetros do aluno
+                novoTreino = GerarTreinoPersonalizado(
+                    aluno,
+                    donoId,
+                    dicasSorteadas[0].Id,
+                    dicasSorteadas[1].Id,
+                    gruposMusculares,
+                    exerciciosDisponiveis,
+                    maquinasDisponiveis,
+                    divisaoSelecionada!);
+
+                if (novoTreino.Itens.Count == 0)
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Não foi possível montar os itens do treino com o catálogo atual.",
+                        erros = new[] { "Cadastre exercícios ou máquinas compatíveis com os grupos musculares do treino." }
+                    });
+                }
             }
 
             // Desativa treinos anteriores ativos desse aluno para que o novo seja o principal (mantendo histórico)
@@ -317,11 +334,21 @@ public static class TreinoEndpoints
                 });
             }
 
-            var treino = await db.Treinos.FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
+            var treino = await db.Treinos
+                .Include(t => t.Itens)
+                .FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
 
             if (treino is null)
             {
                 return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou desativada." });
+            }
+
+            if (novoStatus is "Validado" or "Exportado" && treino.Itens.Count == 0)
+            {
+                return Results.BadRequest(new
+                {
+                    mensagem = "Adicione pelo menos um exercício ou máquina ao plano antes de validá-lo ou exportá-lo."
+                });
             }
 
             treino.Status = novoStatus;
@@ -369,9 +396,7 @@ public static class TreinoEndpoints
                 });
             }
 
-            var diasOriginais = treino.Itens
-                .GroupBy(i => i.DivisaoTreino)
-                .ToDictionary(g => g.Key, g => g.OrderBy(i => i.OrdemExercicio).ThenBy(i => i.Id).First().TempoAerobico);
+            var diasOriginais = ObterDiasPermitidosPlano(treino);
             var idsExercicios = entradas.Where(i => i!.ExercicioId.HasValue).Select(i => i!.ExercicioId!.Value).Distinct().ToList();
             var idsMaquinas = entradas.Where(i => i!.MaquinaId.HasValue).Select(i => i!.MaquinaId!.Value).Distinct().ToList();
             var exercicios = await db.Exercicios.Include(e => e.GrupoMuscular)
@@ -445,25 +470,37 @@ public static class TreinoEndpoints
                 }
 
                 if (atualizacao.ExercicioId.HasValue
-                    && (item is null || atualizacao.ExercicioId != item.ExercicioId)
-                    && (!exercicios.TryGetValue(atualizacao.ExercicioId.Value, out var exercicio)
-                        || !exercicio.Ativo || exercicio.UsuarioId != donoId))
+                    && (item is null || atualizacao.ExercicioId != item.ExercicioId))
                 {
-                    return Results.BadRequest(new
+                    if (!exercicios.TryGetValue(atualizacao.ExercicioId.Value, out var exercicio)
+                        || !exercicio.Ativo || exercicio.UsuarioId != donoId)
                     {
-                        mensagem = "Selecione um exercício ativo do catálogo da conta responsável pelo plano."
-                    });
+                        return Results.BadRequest(new
+                        {
+                            mensagem = "Selecione um exercício ativo do catálogo da conta responsável pelo plano."
+                        });
+                    }
+                    if (ValidarNivelItemParaAluno(treino.Aluno, exercicio.Nome, exercicio.NivelMinimo, "exercício") is string erroNivelExercicio)
+                    {
+                        return Results.BadRequest(new { mensagem = erroNivelExercicio });
+                    }
                 }
 
                 if (atualizacao.MaquinaId.HasValue
-                    && (item is null || atualizacao.MaquinaId != item.MaquinaId)
-                    && (!maquinas.TryGetValue(atualizacao.MaquinaId.Value, out var maquina)
-                        || !maquina.Ativo || maquina.UsuarioId != donoId))
+                    && (item is null || atualizacao.MaquinaId != item.MaquinaId))
                 {
-                    return Results.BadRequest(new
+                    if (!maquinas.TryGetValue(atualizacao.MaquinaId.Value, out var maquina)
+                        || !maquina.Ativo || maquina.UsuarioId != donoId)
                     {
-                        mensagem = "Selecione uma máquina ativa do catálogo da conta responsável pelo plano."
-                    });
+                        return Results.BadRequest(new
+                        {
+                            mensagem = "Selecione uma máquina ativa do catálogo da conta responsável pelo plano."
+                        });
+                    }
+                    if (ValidarNivelItemParaAluno(treino.Aluno, maquina.Nome, maquina.NivelMinimo, "máquina") is string erroNivelMaquina)
+                    {
+                        return Results.BadRequest(new { mensagem = erroNivelMaquina });
+                    }
                 }
 
                 ordensPorDia.TryGetValue(divisao, out var ordem);
@@ -887,6 +924,30 @@ public static class TreinoEndpoints
         return erros;
     }
 
+    public static Treino GerarTreinoManual(
+        Aluno aluno,
+        int? usuarioId,
+        int? dicaObjetivoId,
+        int? segundaDicaObjetivoId)
+    {
+        var (_, _, _, tempoAerobicoGeral, _) = CalcularParametrosFisiologicos(aluno);
+        var sufixoSexo = aluno.Sexo == "F" ? "Feminino" : "Masculino";
+
+        return new Treino
+        {
+            AlunoId = aluno.Id,
+            UsuarioId = usuarioId,
+            DicaObjetivoId = dicaObjetivoId,
+            SegundaDicaObjetivoId = segundaDicaObjetivoId,
+            NomePlano = $"Protocolo {sufixoSexo} ({aluno.Experiencia}) - {DivisoesTreino.NomeManual}",
+            Divisao = DivisoesTreino.NomeManual,
+            TempoAerobico = tempoAerobicoGeral,
+            Status = "Rascunho",
+            DataCriacao = DateTime.UtcNow,
+            Ativo = true
+        };
+    }
+
     public static Treino GerarTreinoPersonalizado(
         Aluno aluno,
         int? usuarioId,
@@ -953,7 +1014,7 @@ public static class TreinoEndpoints
             var usadosNoDiaMaquina = new HashSet<int>();
             var usosDeFocoNoDia = new Dictionary<(int GrupoId, string Foco), int>();
             var quantidadePorGrupo = gruposObrigatorios.ToDictionary(g => g.Id, _ => 0);
-            var selecionadosDoDia = new List<(GrupoMuscular Grupo, Exercicio? Exercicio, Maquina? Maquina)>();
+            var selecionadosDoDia = new List<(GrupoMuscular Grupo, Exercicio? Exercicio, Maquina? Maquina, int OcorrenciaFoco)>();
             int metaMaquinasDia = (int)Math.Round(quantidadeDesejada * proporcaoMaquinas);
             int maquinasEscolhidasNoDia = 0;
 
@@ -971,17 +1032,18 @@ public static class TreinoEndpoints
                 if (grupoMuscular.OrdemPrioridade >= 3 && quantidadePorGrupo[grupoMuscular.Id] >= 2)
                     return false;
 
-                var (exercicioEscolhido, maquinaEscolhida) = SelecionarMovimentoParaGrupo(
+                var (exercicioEscolhido, maquinaEscolhida, ocorrenciaFoco) = SelecionarMovimentoParaGrupo(
                     grupoMuscular, maquinasEscolhidasNoDia < metaMaquinasDia,
                     exercicios, maquinas,
                     usadosNoTreinoExercicio, usadosNoTreinoMaquina,
-                    usadosNoDiaExercicio, usadosNoDiaMaquina, usosDeFocoNoDia, focoObrigatorio);
+                    usadosNoDiaExercicio, usadosNoDiaMaquina, usosDeFocoNoDia,
+                    focoObrigatorio, aluno.Experiencia, aluno.Idade);
                 if (exercicioEscolhido is null && maquinaEscolhida is null)
                     return false;
                 if (maquinaEscolhida is not null)
                     maquinasEscolhidasNoDia++;
                 quantidadePorGrupo[grupoMuscular.Id]++;
-                selecionadosDoDia.Add((grupoMuscular, exercicioEscolhido, maquinaEscolhida));
+                selecionadosDoDia.Add((grupoMuscular, exercicioEscolhido, maquinaEscolhida, ocorrenciaFoco));
                 return true;
             }
 
@@ -1000,18 +1062,30 @@ public static class TreinoEndpoints
                     TentarAdicionar(grupo);
             }
 
+            int tetoSecundario = aluno.Experiencia == "Iniciante" ? 2 : 3;
+            bool temGrupoPrincipal = gruposOrdenados.Any(g => g.OrdemPrioridade == 1);
+
             while (selecionadosDoDia.Count < quantidadeDesejada)
             {
-                // Equilibra a quantidade e desempata a favor dos músculos prioritários.
-                // Se um grupo atingiu seu limite, a vaga pode ir para outro grupo do dia.
-                var candidatos = gruposOrdenados.OrderBy(g => quantidadePorGrupo[g.Id]).ToList();
+                // Equilibra a quantidade e direciona o volume extra aos músculos grandes (Prioridade 1)
+                // quando braços/ombros já atingiram sua cota recomendada na sessão.
+                var candidatos = gruposOrdenados
+                    .OrderBy(g => temGrupoPrincipal && g.OrdemPrioridade == 2 && quantidadePorGrupo[g.Id] >= tetoSecundario ? 1 : 0)
+                    .ThenBy(g => quantidadePorGrupo[g.Id])
+                    .ToList();
                 if (!candidatos.Any(grupo => TentarAdicionar(grupo)))
                     break;
             }
 
             int ordem = 1;
-            foreach (var selecionado in selecionadosDoDia.OrderBy(item => item.Grupo.OrdemPrioridade)
-                .ThenBy(item => item.Grupo.OrdemNaPrioridade))
+            foreach (var selecionado in selecionadosDoDia
+                .OrderBy(item => item.Grupo.OrdemPrioridade)
+                .ThenBy(item => item.Grupo.OrdemNaPrioridade)
+                .ThenBy(item => item.OcorrenciaFoco)
+                .ThenBy(item => FocosMusculares.OrdemBiomecanica(
+                    item.Grupo.Nome,
+                    item.Exercicio?.Nome ?? item.Maquina?.Nome,
+                    item.Exercicio?.FocoMuscular ?? item.Maquina?.FocoMuscular)))
             {
                 int seriesItem = seriesBase;
                 bool auxiliar = selecionado.Grupo.Nome is "Bíceps" or "Tríceps" or "Panturrilha" or "Antebraço" or "Abdômen" or "Lombar";
@@ -1034,7 +1108,7 @@ public static class TreinoEndpoints
     }
 
     private static (int series, string repeticoes, string descanso, string aerobicoGeral, int aerobicoDia)
-        CalcularParametrosFisiologicos(Aluno aluno)
+        CalcularParametrosFisiologicos(Aluno? aluno)
     {
         int series;
         string repeticoes;
@@ -1042,7 +1116,7 @@ public static class TreinoEndpoints
         string aerobicoGeral;
         int aerobicoDia;
 
-        switch (aluno.Experiencia)
+        switch (aluno?.Experiencia)
         {
             case "Iniciante":
                 series = 3;
@@ -1070,7 +1144,7 @@ public static class TreinoEndpoints
                 break;
         }
 
-        if (aluno.Idade > 65)
+        if (aluno?.Idade > 65)
         {
             series = Math.Min(series, 3);
             descansoSegundos += 15;
@@ -1081,7 +1155,7 @@ public static class TreinoEndpoints
         return (series, repeticoes, $"{descansoSegundos}s", aerobicoGeral, aerobicoDia);
     }
 
-    private static (Exercicio? exercicio, Maquina? maquina) SelecionarMovimentoParaGrupo(
+    private static (Exercicio? exercicio, Maquina? maquina, int ocorrenciaFoco) SelecionarMovimentoParaGrupo(
         GrupoMuscular grupoAlvo,
         bool preferirMaquina,
         List<Exercicio> exercicios,
@@ -1091,7 +1165,9 @@ public static class TreinoEndpoints
         HashSet<int> usadosNoDiaExercicio,
         HashSet<int> usadosNoDiaMaquina,
         Dictionary<(int GrupoId, string Foco), int> usosDeFocoNoDia,
-        string? focoObrigatorio = null)
+        string? focoObrigatorio = null,
+        string? experiencia = null,
+        int? idade = null)
     {
         string Foco(string nome, string foco) => FocosMusculares.Resolver(grupoAlvo.Nome, nome, foco);
         int Usos(string foco) => usosDeFocoNoDia.GetValueOrDefault((grupoAlvo.Id, foco));
@@ -1106,13 +1182,16 @@ public static class TreinoEndpoints
         var exerciciosDoGrupo = exercicios
             .Where(e => e.Ativo && e.GrupoMuscularId == grupoAlvo.Id
                 && !usadosNoDiaExercicio.Contains(e.Id)
-                && FocoDisponivel(Foco(e.Nome, e.FocoMuscular)))
+                && FocoDisponivel(Foco(e.Nome, e.FocoMuscular))
+                && FocosMusculares.CompativelComExperiencia(e.Nome, experiencia, idade, e.NivelMinimo))
             .ToList();
         var maquinasDoGrupo = maquinas
             .Where(m => m.Ativo && m.GrupoMuscularId == grupoAlvo.Id
                 && !usadosNoDiaMaquina.Contains(m.Id)
-                && FocoDisponivel(Foco(m.Nome, m.FocoMuscular)))
+                && FocoDisponivel(Foco(m.Nome, m.FocoMuscular))
+                && FocosMusculares.CompativelComExperiencia(m.Nome, experiencia, idade, m.NivelMinimo))
             .ToList();
+
         // Foco geral/desconhecido só participa se não houver uma opção classificada.
         if (exerciciosDoGrupo.Any(e => Foco(e.Nome, e.FocoMuscular) != "geral")
             || maquinasDoGrupo.Any(m => Foco(m.Nome, m.FocoMuscular) != "geral"))
@@ -1120,13 +1199,15 @@ public static class TreinoEndpoints
             exerciciosDoGrupo = exerciciosDoGrupo.Where(e => Foco(e.Nome, e.FocoMuscular) != "geral").ToList();
             maquinasDoGrupo = maquinasDoGrupo.Where(m => Foco(m.Nome, m.FocoMuscular) != "geral").ToList();
         }
+
         // Usa primeiro focos ainda ausentes; só depois admite a segunda ocorrência.
         // A diversidade tem precedência sobre equipamento e ineditismo na semana.
+        int menorUso = 0;
         var contagens = exerciciosDoGrupo.Select(e => Usos(Foco(e.Nome, e.FocoMuscular)))
             .Concat(maquinasDoGrupo.Select(m => Usos(Foco(m.Nome, m.FocoMuscular)))).ToList();
         if (contagens.Count > 0)
         {
-            int menorUso = contagens.Min();
+            menorUso = contagens.Min();
             exerciciosDoGrupo = exerciciosDoGrupo
                 .Where(e => Usos(Foco(e.Nome, e.FocoMuscular)) == menorUso).ToList();
             maquinasDoGrupo = maquinasDoGrupo
@@ -1154,21 +1235,79 @@ public static class TreinoEndpoints
         else if (maquinasDoGrupo.Count > 0)
             maquina = maquinasDoGrupo[Random.Shared.Next(maquinasDoGrupo.Count)];
 
+        int ocorrenciaFoco = menorUso + 1;
         if (exercicio is not null)
         {
             var foco = Foco(exercicio.Nome, exercicio.FocoMuscular);
-            usosDeFocoNoDia[(grupoAlvo.Id, foco)] = Usos(foco) + 1;
+            ocorrenciaFoco = Usos(foco) + 1;
+            usosDeFocoNoDia[(grupoAlvo.Id, foco)] = ocorrenciaFoco;
             usadosNoDiaExercicio.Add(exercicio.Id);
             usadosNoTreinoExercicio.Add(exercicio.Id);
         }
         if (maquina is not null)
         {
             var foco = Foco(maquina.Nome, maquina.FocoMuscular);
-            usosDeFocoNoDia[(grupoAlvo.Id, foco)] = Usos(foco) + 1;
+            ocorrenciaFoco = Usos(foco) + 1;
+            usosDeFocoNoDia[(grupoAlvo.Id, foco)] = ocorrenciaFoco;
             usadosNoDiaMaquina.Add(maquina.Id);
             usadosNoTreinoMaquina.Add(maquina.Id);
         }
-        return (exercicio, maquina);
+        return (exercicio, maquina, ocorrenciaFoco);
+    }
+
+    public static string? ValidarNivelItemParaAluno(
+        Aluno? aluno,
+        string nomeMovimento,
+        string? nivelMinimoItem,
+        string tipoItem = "exercício")
+    {
+        if (aluno is null || !FocosMusculares.NivelValido(aluno.Experiencia))
+            return null;
+
+        if (FocosMusculares.CompativelComExperiencia(
+            nomeMovimento,
+            aluno.Experiencia,
+            nivelMinimoItem: nivelMinimoItem))
+        {
+            return null;
+        }
+
+        var nivelExigido = FocosMusculares.ResolverNivelMinimo(nomeMovimento, nivelMinimoItem);
+        var artigo = tipoItem == "máquina" ? "A" : "O";
+        return $"{artigo} {tipoItem} \"{nomeMovimento}\" exige nível {nivelExigido}, acima do nível do aluno ({aluno.Experiencia}).";
+    }
+
+    private static string[] ObterTitulosDiasEsperados(Treino treino)
+    {
+        if (string.Equals(treino.Divisao, DivisoesTreino.NomeManual, StringComparison.OrdinalIgnoreCase)
+            || DivisoesTreino.EhManual(treino.Divisao))
+        {
+            return DivisoesTreino.ObterTitulosDiasManuais(treino.Aluno?.FrequenciaSemanal ?? 3);
+        }
+
+        var config = DivisoesTreino.Todas.FirstOrDefault(d =>
+            string.Equals(d.Nome, treino.Divisao, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(d.Id, treino.Divisao, StringComparison.OrdinalIgnoreCase));
+
+        return config?.Sessoes.Select(s => s.Titulo).ToArray() ?? [];
+    }
+
+    private static Dictionary<string, int> ObterDiasPermitidosPlano(Treino treino)
+    {
+        var (_, _, _, _, aerobicoPadrao) = CalcularParametrosFisiologicos(treino.Aluno);
+        var dias = (treino.Itens ?? [])
+            .GroupBy(i => i.DivisaoTreino)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(i => i.OrdemExercicio).ThenBy(i => i.Id).First().TempoAerobico,
+                StringComparer.Ordinal);
+
+        foreach (var titulo in ObterTitulosDiasEsperados(treino))
+        {
+            dias.TryAdd(titulo, aerobicoPadrao);
+        }
+
+        return dias;
     }
 
     // Monta o objeto completo do plano já com dados do Aluno, Dica do Objetivo, Status e Dias agrupados/ordenados para o Front-end
@@ -1178,8 +1317,26 @@ public static class TreinoEndpoints
             .OrderBy(i => i.Id)
             .ToList();
 
-        var dias = itensOrdenados
+        var gruposPorDia = itensOrdenados
             .GroupBy(i => string.IsNullOrWhiteSpace(i.DivisaoTreino) ? "Treino" : i.DivisaoTreino)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        bool ehManual = string.Equals(treino.Divisao, DivisoesTreino.NomeManual, StringComparison.OrdinalIgnoreCase)
+            || DivisoesTreino.EhManual(treino.Divisao);
+        if (ehManual || itensOrdenados.Count == 0)
+        {
+            foreach (var titulo in ObterTitulosDiasEsperados(treino))
+            {
+                if (!gruposPorDia.ContainsKey(titulo))
+                {
+                    gruposPorDia[titulo] = [];
+                }
+            }
+        }
+
+        var (_, _, _, _, aerobicoPadraoDia) = CalcularParametrosFisiologicos(treino.Aluno);
+
+        var dias = gruposPorDia
             .OrderBy(grupoDia =>
             {
                 // Mantém A/B/C e A1/B1/C1/A2/B2/C2 mesmo após substituir todos os itens de um dia.
@@ -1193,8 +1350,8 @@ public static class TreinoEndpoints
             .Select(grupoDia => new
             {
                 nome = grupoDia.Key,
-                tempoAerobico = grupoDia.FirstOrDefault()?.TempoAerobico ?? 0,
-                exercicios = grupoDia
+                tempoAerobico = grupoDia.Value.FirstOrDefault()?.TempoAerobico ?? (ehManual ? aerobicoPadraoDia : 0),
+                exercicios = grupoDia.Value
                     .OrderBy(i => i.OrdemExercicio)
                     .ThenBy(i => i.Id)
                     .Select(item =>

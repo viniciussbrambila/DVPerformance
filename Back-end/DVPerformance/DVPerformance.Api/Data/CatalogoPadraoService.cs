@@ -62,7 +62,7 @@ public static class CatalogoPadraoService
         new(2, "Remada no Banco Inclinado com Halteres", "Remada bilateral com peito apoiado no banco a 30°–45°, isolando dorsais e romboides sem sobrecarga lombar."),
         new(2, "Pullover para Dorsais com Halter", "Extensão de ombros deitado com foco na depressão escapular e alongamento máximo das fibras do grande dorsal."),
 
-        // ==================== 3. QUADRÍCEPS (8 Exercícios Livres / Peso Corporal) ====================
+        // ==================== 3. QUADRÍCEPS (9 Exercícios Livres / Peso Corporal) ====================
         new(3, "Agachamento Livre com Barra", "Exercício multiarticular base com barra apoiada no trapézio para força e hipertrofia global de quadríceps e glúteos."),
         new(3, "Agachamento Frontal com Barra", "Front Squat com barra apoiada nos deltoides anteriores e tronco vertical, maximizando a demanda sobre o quadríceps."),
         new(3, "Agachamento Goblet com Halter", "Agachamento segurando halter ou kettlebell junto ao peito, excelente para postura, mobilidade profunda e controle motor."),
@@ -70,6 +70,7 @@ public static class CatalogoPadraoService
         new(3, "Passada (Avanço) com Halteres", "Deslocamento dinâmico em passadas alternadas, gerando alto estímulo metabólico e recrutamento de coxas e glúteos."),
         new(3, "Agachamento Búlgaro (Ênfase Quadríceps)", "Agachamento unilateral com pé traseiro elevado no banco e tronco ereto para máxima flexão de joelho com halteres."),
         new(3, "Subida no Banco (Step-up) com Halteres", "Extensão unilateral de joelho e quadril subindo em banco ou caixa para força funcional e correção de assimetrias."),
+        new(3, "Extensão de Joelho Sentado com Caneleira", "Isolamento articular de extensão de joelho sentado no banco com caneleira, seguro e acessível para todos os níveis."),
         new(3, "Agachamento Sissy Livre", "Flexão de joelhos projetando as tíbias à frente com quadril estendido, isolando intensamente o reto femoral."),
 
         // ==================== 4. POSTERIOR DE COXA (6 Exercícios Livres / Peso Corporal) ====================
@@ -174,7 +175,7 @@ public static class CatalogoPadraoService
         new(1, "Crossover Polia Baixa", "Adução ascendente nos cabos partindo da polia baixa, focando na porção clavicular (superior) do peitoral."),
         new(1, "Supino Inclinado no Smith (Barra Guiada)", "Empurrão inclinado nos trilhos da máquina Smith, unindo alta sobrecarga e travas de segurança para isolamento peitoral."),
 
-        // ==================== 2. COSTAS (9 Máquinas / Polias) ====================
+        // ==================== 2. COSTAS (10 Máquinas / Polias) ====================
         new(2, "Puxada Alta Aberta (Pulley Frente)", "Puxada vertical na polia alta com barra longa pronada para desenvolvimento da largura do grande dorsal."),
         new(2, "Puxada Alta com Triângulo (Pegada Neutra)", "Puxada vertical fechada na polia alta, favorecendo o alongamento e recrutamento das fibras inferiores do dorsal."),
         new(2, "Puxada Alta Supinada no Pulley", "Variação na polia alta com palmas voltadas para o rosto, aumentando a amplitude de extensão dos ombros."),
@@ -183,15 +184,17 @@ public static class CatalogoPadraoService
         new(2, "Remada Máquina Articulada (Apoio no Peito)", "Equipamento convergente com suporte torácico que estabiliza a coluna e permite cargas elevadas nos dorsais."),
         new(2, "Puxada Alta Máquina Articulada", "Máquina plate-loaded de alavancas independentes superiores para trabalho simétrico e pesado do grande dorsal."),
         new(2, "Pulldown na Polia Alta com Corda ou Barra", "Extensão de ombros em pé com cotovelos semiestendidos no cabo, isolando o grande dorsal sem ação dos bíceps."),
+        new(2, "Pulldown Unilateral na Polia Alta", "Extensão de ombro unilateral no cabo alto para alongamento profundo e ativação isolada do grande dorsal."),
         new(2, "Barra Fixa Assistida no Gráviton", "Máquina contrabalançada por bateria de pesos que auxilia a puxada vertical para progressão técnica segura."),
 
-        // ==================== 3. QUADRÍCEPS (8 Máquinas / Polias) ====================
+        // ==================== 3. QUADRÍCEPS (9 Máquinas / Polias) ====================
         new(3, "Leg Press 45°", "Prensa inclinada guiada por trilhos para alta sobrecarga mecânica em quadríceps e glúteos com coluna totalmente apoiada."),
         new(3, "Leg Press Horizontal (Sentado)", "Máquina seletorizada horizontal ergonômica e segura, excelente para iniciantes, idosos e execuções unilaterais."),
         new(3, "Cadeira Extensora", "Aparelho isolador de extensão de joelhos para recrutamento direto dos quatro ventres do músculo quadríceps."),
+        new(3, "Cadeira Extensora Unilateral", "Execução unilateral na máquina extensora para correção de assimetrias de força e isolamento seguro do quadríceps."),
         new(3, "Agachamento Hack (Hack Machine)", "Máquina inclinada sobre trilhos com suporte dorsal completo, permitindo agachar profundo com foco estrito em quadríceps."),
         new(3, "Agachamento no Smith (Barra Guiada)", "Agachamento guiado em trilhos com travas de segurança, versátil para ajuste de base dos pés e estabilidade."),
-        new(3, "Agachamento Pêndulo (Pendulum Squat)", "Máquina articulada em arco biomecânico que alivia a lombar e maximiza a amplitude de flexão do joelho."),
+        new(3, "Agachamento Pêndulo (Pendulum Squat)", "Máquina articulada em arco biomecânica que alivia a lombar e maximiza a amplitude de flexão do joelho."),
         new(3, "V-Squat Articulado", "Equipamento de alavanca com apoio acolchoado nos ombros para agachamento pesado em trajetória guiada."),
         new(3, "Belt Squat (Agachamento no Cinto)", "Máquina onde a carga traciona pelo quadril via cinturão, treinando pernas intensamente sem compressão na coluna."),
 
@@ -204,7 +207,7 @@ public static class CatalogoPadraoService
         new(4, "Glute Ham Raise no Banco GHD", "Extensão combinada de quadril e flexão de joelhos no aparelho GHD para força integrada da cadeia posterior."),
 
         // ==================== 5. GLÚTEOS (7 Máquinas / Polias) ====================
-        new(5, "Elevação Pélvica Máquina (Hip Thrust Machine)", "Equipamento dedicado com cinto ou rolo acolchoado que facilita o posicionamento e a progressão segura de carga no glúteo."),
+        new(5, "Elevação Pélvica Máquina (Hip Thrust Machine)", "Equipamento dedicado com cinto ou rolo acolchoado que facilita o posicionar e a progressão segura de carga no glúteo."),
         new(5, "Glúteo Máquina 4 Apoios (Coice Guiado)", "Aparelho específico de extensão de quadril para trás, isolando o glúteo máximo com tronco e lombar estabilizados."),
         new(5, "Glúteo em Pé Máquina (Chute Traseiro)", "Máquina seletorizada vertical para extensão unilateral do quadril com suporte peitoral ergonômico."),
         new(5, "Coice de Glúteo na Polia Baixa (Apolete)", "Extensão de quadril com tornozeleira presa ao cabo inferior, mantendo tensão contínua do alongamento ao pico."),
@@ -398,6 +401,7 @@ public static class CatalogoPadraoService
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
                     FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
+                    NivelMinimo = FocosMusculares.InferirNivelMinimo(item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = usuarioId,
                     Ativo = true
@@ -455,6 +459,7 @@ public static class CatalogoPadraoService
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
                     FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
+                    NivelMinimo = FocosMusculares.InferirNivelMinimo(item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = usuarioId,
                     Ativo = true
@@ -495,6 +500,7 @@ public static class CatalogoPadraoService
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
                     FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
+                    NivelMinimo = FocosMusculares.InferirNivelMinimo(item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = conta.Id,
                     Ativo = true
@@ -518,6 +524,7 @@ public static class CatalogoPadraoService
                     Nome = item.Nome,
                     GrupoMuscularId = item.GrupoMuscularId,
                     FocoMuscular = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome),
+                    NivelMinimo = FocosMusculares.InferirNivelMinimo(item.Nome),
                     Descricao = item.Descricao,
                     UsuarioId = conta.Id,
                     Ativo = true
@@ -530,15 +537,40 @@ public static class CatalogoPadraoService
 
     public static async Task ClassificarFocosPendentesAsync(AppDbContext db)
     {
-        var exercicios = await db.Exercicios.Include(e => e.GrupoMuscular)
-            .Where(e => e.FocoMuscular == "").ToListAsync();
-        var maquinas = await db.Maquinas.Include(m => m.GrupoMuscular)
-            .Where(m => m.FocoMuscular == "").ToListAsync();
+        var exercicios = await db.Exercicios.Include(e => e.GrupoMuscular).ToListAsync();
+        var maquinas = await db.Maquinas.Include(m => m.GrupoMuscular).ToListAsync();
+        bool alterou = false;
         foreach (var item in exercicios)
-            item.FocoMuscular = FocosMusculares.Inferir(item.Grupo, item.Nome);
+        {
+            var inferido = FocosMusculares.Inferir(item.Grupo, item.Nome);
+            if (item.FocoMuscular == "" || (item.FocoMuscular == "dominante_joelho" && inferido == "unilateral_joelho"))
+            {
+                item.FocoMuscular = inferido;
+                alterou = true;
+            }
+            var nivelInferido = FocosMusculares.InferirNivelMinimo(item.Nome);
+            if (string.IsNullOrWhiteSpace(item.NivelMinimo) || (item.NivelMinimo == "Iniciante" && nivelInferido != "Iniciante"))
+            {
+                item.NivelMinimo = nivelInferido;
+                alterou = true;
+            }
+        }
         foreach (var item in maquinas)
-            item.FocoMuscular = FocosMusculares.Inferir(item.Grupo, item.Nome);
-        if (exercicios.Count > 0 || maquinas.Count > 0)
+        {
+            var inferido = FocosMusculares.Inferir(item.Grupo, item.Nome);
+            if (item.FocoMuscular == "" || (item.FocoMuscular == "dominante_joelho" && inferido == "unilateral_joelho"))
+            {
+                item.FocoMuscular = inferido;
+                alterou = true;
+            }
+            var nivelInferido = FocosMusculares.InferirNivelMinimo(item.Nome);
+            if (string.IsNullOrWhiteSpace(item.NivelMinimo) || (item.NivelMinimo == "Iniciante" && nivelInferido != "Iniciante"))
+            {
+                item.NivelMinimo = nivelInferido;
+                alterou = true;
+            }
+        }
+        if (alterou)
             await db.SaveChangesAsync();
     }
 

@@ -204,6 +204,12 @@ public class AppDbContext : DbContext
                   .HasMaxLength(60)
                   .IsRequired();
 
+            entity.Property(e => e.NivelMinimo)
+                  .HasColumnName("nivel_minimo")
+                  .HasMaxLength(20)
+                  .HasDefaultValue("Iniciante")
+                  .IsRequired();
+
             entity.Property(e => e.Descricao)
                   .HasColumnName("descricao")
                   .HasMaxLength(255);
@@ -251,6 +257,12 @@ public class AppDbContext : DbContext
             entity.Property(m => m.FocoMuscular)
                   .HasColumnName("foco_muscular")
                   .HasMaxLength(60)
+                  .IsRequired();
+
+            entity.Property(m => m.NivelMinimo)
+                  .HasColumnName("nivel_minimo")
+                  .HasMaxLength(20)
+                  .HasDefaultValue("Iniciante")
                   .IsRequired();
 
             entity.Property(m => m.Descricao)

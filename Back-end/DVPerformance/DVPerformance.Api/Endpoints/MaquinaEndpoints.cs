@@ -149,6 +149,7 @@ public static class MaquinaEndpoints
                 mesmoNomeExistente.GrupoMuscular = grupoMuscular;
                 mesmoNomeExistente.Descricao = descricaoLimpa;
                 mesmoNomeExistente.FocoMuscular = novaMaquina.FocoMuscular;
+                mesmoNomeExistente.NivelMinimo = novaMaquina.NivelMinimo;
                 mesmoNomeExistente.Ativo = true;
 
                 await db.SaveChangesAsync();
@@ -266,6 +267,7 @@ public static class MaquinaEndpoints
             maquinaExistente.GrupoMuscularId = grupoMuscular!.Id;
             maquinaExistente.GrupoMuscular = grupoMuscular;
             maquinaExistente.FocoMuscular = dadosAtualizados.FocoMuscular;
+            maquinaExistente.NivelMinimo = dadosAtualizados.NivelMinimo;
             maquinaExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
             await db.SaveChangesAsync();
@@ -354,9 +356,30 @@ public static class MaquinaEndpoints
         {
             if (!string.IsNullOrWhiteSpace(maquina.FocoMuscular)
                 && !FocosMusculares.Valido(grupoEncontrado.Nome, maquina.FocoMuscular))
+            {
                 erros.Add("Selecione um foco muscular válido para o grupo informado.");
+            }
             else
-                maquina.FocoMuscular = FocosMusculares.Resolver(grupoEncontrado.Nome, nome, maquina.FocoMuscular);
+            {
+                var focoResolvido = FocosMusculares.Resolver(grupoEncontrado.Nome, nome, maquina.FocoMuscular);
+                if (focoResolvido == "geral")
+                {
+                    erros.Add("Selecione um foco muscular específico (padrão de movimento) para que a máquina se encaixe corretamente na geração de treinos.");
+                }
+                else
+                {
+                    maquina.FocoMuscular = focoResolvido;
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(maquina.NivelMinimo) && !FocosMusculares.NivelValido(maquina.NivelMinimo))
+        {
+            erros.Add("Selecione um nível mínimo de experiência válido (Iniciante, Intermediário ou Avançado).");
+        }
+        else
+        {
+            maquina.NivelMinimo = FocosMusculares.ResolverNivelMinimo(nome, maquina.NivelMinimo);
         }
 
         return (erros, grupoEncontrado);

@@ -14,6 +14,8 @@ public static class FocosMusculares
 
     public const string Geral = "geral";
 
+    public static readonly string[] NiveisExperiencia = ["Iniciante", "Intermediário", "Avançado"];
+
     public static IReadOnlyDictionary<string, OpcaoFoco[]> Opcoes { get; } =
         new Dictionary<string, OpcaoFoco[]>(StringComparer.OrdinalIgnoreCase)
         {
@@ -34,6 +36,7 @@ public static class FocosMusculares
             ["Quadríceps"] =
             [
                 new("dominante_joelho", "Agachamento / pressão de pernas"),
+                new("unilateral_joelho", "Unilateral / afundo, passada e búlgaro"),
                 new("extensao_joelho", "Extensão de joelho"),
                 new(Geral, "Geral / sem classificação específica")
             ],
@@ -176,8 +179,9 @@ public static class FocosMusculares
             "costas" when Tem("puxada", "barra fixa", "pull-up", "chin-up") => "puxada_vertical",
 
             "quadriceps" when Tem("extensora", "extensao de joelho", "sissy") => "extensao_joelho",
-            "quadriceps" when Tem("agachamento", "leg press", "afundo", "passada",
-                "avanco", "step-up", "step up", "subida no banco", "v-squat",
+            "quadriceps" when Tem("afundo", "passada", "avanco", "bulgaro", "bulgara",
+                "step-up", "step up", "subida no banco") => "unilateral_joelho",
+            "quadriceps" when Tem("agachamento", "leg press", "v-squat",
                 "belt squat", "pendulum squat") => "dominante_joelho",
 
             "posterior de coxa" when Tem("flexora", "flexor", "nordica", "nordico",
@@ -236,6 +240,106 @@ public static class FocosMusculares
             "lombar" when Tem("levantamento terra", "rack pull", "bom dia", "good morning") => "dobradica_quadril",
             "lombar" when Tem("superman", "hiperextensao", "extensao lombar") => "extensao_tronco",
             _ => Geral
+        };
+    }
+
+    /// <summary>
+    /// Classifica a complexidade biomecânica do movimento:
+    /// 1 = Iniciante / Geral, 2 = Intermediário+, 3 = Avançado.
+    /// </summary>
+    public static int NivelComplexidade(string? nome)
+    {
+        var texto = Normalizar(nome);
+        if (texto.Length == 0)
+        {
+            return 1;
+        }
+
+        bool Tem(params string[] termos) => termos.Any(texto.Contains);
+
+        if (Tem("nordica", "nordico", "nordic", "sissy", "copenhague",
+            "glute ham", "ghd", "roda abdominal", "ab wheel"))
+        {
+            return 3;
+        }
+
+        if ((Tem("barra fixa") && !Tem("graviton", "assistid"))
+            || (Tem("paralela", "mergulho") && !Tem("graviton", "assistid", "maquina"))
+            || Tem("agachamento frontal", "bom dia com barra", "good morning",
+                "levantamento terra convencional", "levantamento terra sumo",
+                "terra romeno", "rdl", "remada cavalinho livre"))
+        {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    public static bool NivelValido(string? nivel) =>
+        Normalizar(nivel) is "iniciante" or "intermediario" or "avancado";
+
+    public static string InferirNivelMinimo(string? nome) =>
+        NivelComplexidade(nome) switch
+        {
+            3 => "Avançado",
+            2 => "Intermediário",
+            _ => "Iniciante"
+        };
+
+    public static string ResolverNivelMinimo(string? nome, string? nivelInformado) =>
+        Normalizar(nivelInformado) switch
+        {
+            "iniciante" => "Iniciante",
+            "intermediario" => "Intermediário",
+            "avancado" => "Avançado",
+            _ => InferirNivelMinimo(nome)
+        };
+
+    public static bool CompativelComExperiencia(
+        string? nome,
+        string? experiencia,
+        int? idade = null,
+        string? nivelMinimoItem = null)
+    {
+        int limite = idade > 65 ? 1 : Normalizar(experiencia) switch
+        {
+            "iniciante" => 1,
+            "avancado" => 3,
+            _ => 2
+        };
+
+        int exigido = ResolverNivelMinimo(nome, nivelMinimoItem) switch
+        {
+            "Avançado" => 3,
+            "Intermediário" => 2,
+            _ => 1
+        };
+
+        return exigido <= limite;
+    }
+
+    /// <summary>
+    /// Define a ordem biomecânica dentro do mesmo grupo muscular:
+    /// 0 = Multiarticulares / Compostos base, 1 = Unilaterais / Intermediários, 2 = Isoladores / Finalizadores.
+    /// </summary>
+    public static int OrdemBiomecanica(string grupo, string? nome, string? foco = null)
+    {
+        var texto = Normalizar(nome);
+        var focoResolvido = Resolver(grupo, nome, foco);
+        bool Tem(params string[] termos) => termos.Any(texto.Contains);
+
+        return Normalizar(grupo) switch
+        {
+            "peito" => Tem("crucifixo", "voador", "peck deck", "pec deck", "crossover", "pullover", "pull-over") ? 2 : 0,
+            "costas" => focoResolvido == "extensao_ombro" || Tem("pullover", "pull-over", "pulldown", "pull-down") ? 2 : 0,
+            "quadriceps" => focoResolvido == "extensao_joelho" ? 2 : focoResolvido == "unilateral_joelho" ? 1 : 0,
+            "posterior de coxa" => focoResolvido == "flexao_joelho" ? 1 : 0,
+            "gluteos" => Tem("coice", "4 apoios", "chute traseiro", "gluteo em pe", "extensao diagonal", "caneleira") ? 2
+                : focoResolvido == "extensao_quadril_alongado" ? 1 : 0,
+            "ombros" => Tem("desenvolvimento", "shoulder press", "militar") ? 0 : 2,
+            "triceps" => focoResolvido == "empurrao_composto" ? 0 : focoResolvido == "braco_atras" ? 2 : 1,
+            "biceps" => focoResolvido is "ombro_neutro" or "pegada_neutra" ? 0 : 1,
+            _ => 1
         };
     }
 

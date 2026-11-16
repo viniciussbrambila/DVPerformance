@@ -10,6 +10,7 @@ import {
   Route,
   Navigate,
   useParams,
+  useNavigate,
 } from "react-router-dom";
 import { styled, ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box, Switch } from "@mui/material";
@@ -105,7 +106,8 @@ const lerTemaSalvo = () => {
   return true;
 };
 
-export default function App() {
+function AppConteudo() {
+  const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(lerTemaSalvo);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Começa como false (bloqueado na tela de Login)
   const [telaAuth, setTelaAuth] = useState("login"); // 'login' ou 'cadastro'
@@ -132,150 +134,162 @@ export default function App() {
   const glassStyle = isDarkMode ? darkGlassStyle : lightGlassStyle;
 
   return (
-    <Router>
-      <ThemeProvider theme={isDarkMode ? Darktheme : Lighttheme}>
-        <CssBaseline />
+    <ThemeProvider theme={isDarkMode ? Darktheme : Lighttheme}>
+      <CssBaseline />
 
-        <Box
-          className="no-print"
-          sx={{
-            position: "fixed",
-            top: 16,
-            right: 24,
-            zIndex: 1200,
-            display: "flex",
-            alignItems: "center",
+      <Box
+        className="no-print"
+        sx={{
+          position: "fixed",
+          top: 16,
+          right: 24,
+          zIndex: 1200,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <MaterialUISwitch
+          checked={isDarkMode}
+          onChange={handleThemeChange}
+          slotProps={{
+            input: { "aria-label": "Alternar entre tema claro e escuro" },
           }}
-        >
-          <MaterialUISwitch
-            checked={isDarkMode}
-            onChange={handleThemeChange}
-            slotProps={{
-              input: { "aria-label": "Alternar entre tema claro e escuro" },
+        />
+      </Box>
+
+      {!isLoggedIn ? (
+        telaAuth === "login" ? (
+          <Login
+            glassStyle={glassStyle}
+            onLogin={(dados) => {
+              limparCacheSessao();
+              const usuario = {
+                ...dados,
+                nome: dados.nome || dados.usuario,
+              };
+              localStorage.setItem("usuarioLogado", JSON.stringify(usuario));
+              setUsuarioLogado(usuario);
+              setIsLoggedIn(true);
+              navigate("/dashboard", { replace: true });
+            }}
+            onIrCadastro={() => setTelaAuth("cadastro")}
+            onIrEsqueciSenha={() => setTelaAuth("esqueci")}
+          />
+        ) : telaAuth === "cadastro" ? (
+          <Cadastro
+            glassStyle={glassStyle}
+            onCadastro={() => {
+              setTelaAuth("login");
+            }}
+            onVoltarLogin={() => setTelaAuth("login")}
+          />
+        ) : (
+          <EsqueciSenha
+            glassStyle={glassStyle}
+            onVoltarLogin={() => setTelaAuth("login")}
+          />
+        )
+      ) : (
+        <Box sx={{ display: "flex" }}>
+          <Sidebar
+            drawerWidth={drawerWidth}
+            glassStyle={glassStyle}
+            usuarioLogado={usuarioLogado}
+            onSair={() => {
+              limparCacheSessao();
+              localStorage.removeItem("usuarioLogado");
+              setIsLoggedIn(false);
+              setUsuarioLogado(null);
+              setTelaAuth("login");
+              navigate("/", { replace: true });
             }}
           />
-        </Box>
 
-        {!isLoggedIn ? (
-          telaAuth === "login" ? (
-            <Login
-              glassStyle={glassStyle}
-              onLogin={(dados) => {
-                limparCacheSessao();
-                const usuario = {
-                  ...dados,
-                  nome: dados.nome || dados.usuario,
-                };
-                localStorage.setItem("usuarioLogado", JSON.stringify(usuario));
-                setUsuarioLogado(usuario);
-                setIsLoggedIn(true);
-              }}
-              onIrCadastro={() => setTelaAuth("cadastro")}
-              onIrEsqueciSenha={() => setTelaAuth("esqueci")}
-            />
-          ) : telaAuth === "cadastro" ? (
-            <Cadastro
-              glassStyle={glassStyle}
-              onCadastro={() => {
-                setTelaAuth("login");
-              }}
-              onVoltarLogin={() => setTelaAuth("login")}
-            />
-          ) : (
-            <EsqueciSenha
-              glassStyle={glassStyle}
-              onVoltarLogin={() => setTelaAuth("login")}
-            />
-          )
-        ) : (
-          <Box sx={{ display: "flex" }}>
-            <Sidebar
-              drawerWidth={drawerWidth}
-              glassStyle={glassStyle}
-              usuarioLogado={usuarioLogado}
-              onSair={() => {
-                limparCacheSessao();
-                localStorage.removeItem("usuarioLogado");
-                setIsLoggedIn(false);
-                setUsuarioLogado(null);
-                setTelaAuth("login");
-              }}
-            />
-
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                minWidth: 0,
-                minHeight: "100vh",
-                overflow: "auto",
-                p: 3,
-                pt: 10,
-                color: "text.primary",
-              }}
-            >
-              <Routes>
-                <Route
-                  path="/dashboard"
-                  element={<Dashboard glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/"
-                  element={<Navigate to="/dashboard" replace />}
-                />
-                <Route
-                  path="/treinos"
-                  element={<Treinos glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/exercicios"
-                  element={<Exercicios glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/maquinas"
-                  element={<Maquinas glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/planos"
-                  element={<PlanosExportados glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/planos/:id"
-                  element={<PlanoDetalhe glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/alunos"
-                  element={<Alunos glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/alunos/:id/caracteristicas"
-                  element={<RelatorioAluno glassStyle={glassStyle} />}
-                />
-                <Route
-                  path="/relatorios"
-                  element={<Navigate to="/alunos" replace />}
-                />
-                <Route
-                  path="/relatorios/caracteristicas"
-                  element={<Navigate to="/alunos" replace />}
-                />
-                <Route
-                  path="/relatorios/caracteristicas/:id"
-                  element={<RedirecionarCaracteristicasAluno />}
-                />
-                <Route
-                  path="/relatorios/planos"
-                  element={<Navigate to="/planos" replace />}
-                />
-                <Route
-                  path="/relatorios/alunos"
-                  element={<Navigate to="/alunos" replace />}
-                />
-              </Routes>
-            </Box>
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              minWidth: 0,
+              minHeight: "100vh",
+              overflow: "auto",
+              p: 3,
+              pt: 10,
+              color: "text.primary",
+            }}
+          >
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={<Dashboard glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/"
+                element={<Navigate to="/dashboard" replace />}
+              />
+              <Route
+                path="/treinos"
+                element={<Treinos glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/exercicios"
+                element={<Exercicios glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/maquinas"
+                element={<Maquinas glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/planos"
+                element={<PlanosExportados glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/planos/:id"
+                element={<PlanoDetalhe glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/alunos"
+                element={<Alunos glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/alunos/:id/caracteristicas"
+                element={<RelatorioAluno glassStyle={glassStyle} />}
+              />
+              <Route
+                path="/relatorios"
+                element={<Navigate to="/alunos" replace />}
+              />
+              <Route
+                path="/relatorios/caracteristicas"
+                element={<Navigate to="/alunos" replace />}
+              />
+              <Route
+                path="/relatorios/caracteristicas/:id"
+                element={<RedirecionarCaracteristicasAluno />}
+              />
+              <Route
+                path="/relatorios/planos"
+                element={<Navigate to="/planos" replace />}
+              />
+              <Route
+                path="/relatorios/alunos"
+                element={<Navigate to="/alunos" replace />}
+              />
+              <Route
+                path="*"
+                element={<Navigate to="/dashboard" replace />}
+              />
+            </Routes>
           </Box>
-        )}
-      </ThemeProvider>
+        </Box>
+      )}
+    </ThemeProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppConteudo />
     </Router>
   );
 }

@@ -1,3 +1,5 @@
+import { normalizarTextoBusca } from "./busca.js";
+
 export function obterUsuarioRelatorio() {
   try {
     return JSON.parse(localStorage.getItem("usuarioLogado") || "null");
@@ -90,6 +92,70 @@ export function filtrarAlunosCadastrados(
       return (
         (ordem === "antigos" ? diferenca : -diferenca) ||
         a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
+      );
+    });
+}
+
+export function obterDataPlano(plano) {
+  const valor = plano?.data || plano?.dataCriacao;
+  if (!valor) return null;
+  const data = /^\d{4}-\d{2}-\d{2}$/.test(valor)
+    ? new Date(`${valor}T12:00:00`)
+    : new Date(valor);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+export function filtrarPlanosTreino(
+  planos,
+  { busca = "", status = "Todos", dataInicio, dataFim, ordem = "recentes" } = {},
+) {
+  const termo = normalizarTextoBusca(busca).trim();
+  const inicio = normalizarDataFiltro(dataInicio, false);
+  const fim = normalizarDataFiltro(dataFim, true);
+
+  return (planos || [])
+    .filter((plano) => {
+      const bateNome =
+        !termo || normalizarTextoBusca(plano.aluno).includes(termo);
+      const bateStatus = status === "Todos" || plano.status === status;
+      const data = obterDataPlano(plano);
+      const dentroDoIntervalo =
+        (!inicio || (data && data.getTime() >= inicio.getTime())) &&
+        (!fim || (data && data.getTime() <= fim.getTime()));
+
+      return bateNome && bateStatus && dentroDoIntervalo;
+    })
+    .sort((a, b) => {
+      if (ordem === "az" || ordem === "za") {
+        const compNome = String(a.aluno || "").localeCompare(
+          String(b.aluno || ""),
+          "pt-BR",
+          { sensitivity: "base" },
+        );
+        if (compNome !== 0) {
+          return ordem === "az" ? compNome : -compNome;
+        }
+      }
+
+      const dataA = obterDataPlano(a);
+      const dataB = obterDataPlano(b);
+      if (!dataA && dataB) return 1;
+      if (dataA && !dataB) return -1;
+
+      const diferencaData = (dataA?.getTime() || 0) - (dataB?.getTime() || 0);
+      if (diferencaData !== 0) {
+        return ordem === "antigos" ? diferencaData : -diferencaData;
+      }
+
+      const diferencaId = (Number(a.id) || 0) - (Number(b.id) || 0);
+      if (diferencaId !== 0) {
+        return ordem === "antigos" ? diferencaId : -diferencaId;
+      }
+
+      return String(a.aluno || "").localeCompare(
+        String(b.aluno || ""),
+        "pt-BR",
+        { sensitivity: "base" },
       );
     });
 }

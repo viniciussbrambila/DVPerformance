@@ -13,6 +13,9 @@ public class Exercicio
     // Ênfase/padrão compartilhado entre equipamentos para variar a sessão.
     public string FocoMuscular { get; set; } = string.Empty;
 
+    // Nível mínimo recomendado para prescrição ("Iniciante", "Intermediário" ou "Avançado").
+    public string NivelMinimo { get; set; } = string.Empty;
+
     // Chave estrangeira unificada apontando para a tabela grupos_musculares (elimina redundância com Máquinas)
     public int GrupoMuscularId { get; set; }
 

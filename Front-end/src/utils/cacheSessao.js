@@ -3,8 +3,34 @@
 
 const cache = new Map();
 const requisicoesEmAndamento = new Map();
+const versoesCache = new Map();
 
 const TTL_PADRAO_MS = 60_000;
+
+function incrementarVersao(chave) {
+  versoesCache.set(chave, (versoesCache.get(chave) ?? 0) + 1);
+}
+
+function invalidarPrefixoEmAndamento(prefixo) {
+  const chavesParaInvalidar = new Set();
+
+  for (const chave of cache.keys()) {
+    if (chave.startsWith(prefixo)) chavesParaInvalidar.add(chave);
+  }
+  for (const chave of requisicoesEmAndamento.keys()) {
+    if (chave.startsWith(prefixo)) chavesParaInvalidar.add(chave);
+  }
+  for (const chave of versoesCache.keys()) {
+    if (chave.startsWith(prefixo)) chavesParaInvalidar.add(chave);
+  }
+
+  for (const chave of chavesParaInvalidar) {
+    incrementarVersao(chave);
+    requisicoesEmAndamento.delete(chave);
+  }
+
+  return chavesParaInvalidar;
+}
 
 export function lerCache(chave) {
   const entrada = cache.get(chave);
@@ -30,14 +56,24 @@ export function cacheEstaFresco(chave, ttlMs = TTL_PADRAO_MS) {
 }
 
 export function expirarCachePorPrefixo(prefixo) {
-  for (const [chave, entrada] of cache.entries()) {
-    if (chave.startsWith(prefixo)) {
+  const chaves = invalidarPrefixoEmAndamento(prefixo);
+  for (const chave of chaves) {
+    const entrada = cache.get(chave);
+    if (entrada) {
       entrada.atualizadoEm = 0;
     }
   }
 }
 
+export function removerCachePorPrefixo(prefixo) {
+  const chaves = invalidarPrefixoEmAndamento(prefixo);
+  for (const chave of chaves) {
+    cache.delete(chave);
+  }
+}
+
 export function atualizarItemEmListasCache(prefixo, idItem, parcialOuFn) {
+  invalidarPrefixoEmAndamento(prefixo);
   for (const [chave, entrada] of cache.entries()) {
     if (chave.startsWith(prefixo) && Array.isArray(entrada.dados)) {
       entrada.dados = entrada.dados.map((item) => {
@@ -52,10 +88,14 @@ export function atualizarItemEmListasCache(prefixo, idItem, parcialOuFn) {
 }
 
 export function removerCache(chave) {
+  incrementarVersao(chave);
+  requisicoesEmAndamento.delete(chave);
   cache.delete(chave);
 }
 
 export function limparCacheSessao() {
+  for (const chave of cache.keys()) incrementarVersao(chave);
+  for (const chave of requisicoesEmAndamento.keys()) incrementarVersao(chave);
   cache.clear();
   requisicoesEmAndamento.clear();
 }
@@ -69,17 +109,27 @@ export async function buscarComCache(
     return lerCache(chave);
   }
 
-  if (requisicoesEmAndamento.has(chave)) {
+  if (!forcar && requisicoesEmAndamento.has(chave)) {
     return requisicoesEmAndamento.get(chave);
   }
+
+  if (forcar) {
+    incrementarVersao(chave);
+  }
+
+  const versaoInicial = versoesCache.get(chave) ?? 0;
 
   const promessa = (async () => {
     try {
       const dados = await buscarDaApi();
-      salvarCache(chave, dados);
+      if ((versoesCache.get(chave) ?? 0) === versaoInicial) {
+        salvarCache(chave, dados);
+      }
       return dados;
     } finally {
-      requisicoesEmAndamento.delete(chave);
+      if (requisicoesEmAndamento.get(chave) === promessa) {
+        requisicoesEmAndamento.delete(chave);
+      }
     }
   })();
 
@@ -93,7 +143,7 @@ export function preCarregarSessao(usuarioId) {
   const base = "http://localhost:5011";
 
   const buscarJson = async (url) => {
-    const resp = await fetch(url);
+    const resp = await fetch(url, { cache: "no-store" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
   };

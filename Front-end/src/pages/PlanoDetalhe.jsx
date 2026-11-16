@@ -121,6 +121,11 @@ function validarCampo(campo, valor) {
   return numero < min || numero > max ? `${min} a ${max}` : "";
 }
 
+const planoSemExercicios = (dados) =>
+  Array.isArray(dados?.dias) &&
+  dados.dias.length > 0 &&
+  dados.dias.every((dia) => (dia.exercicios || []).length === 0);
+
 export default function PlanoDetalhe({ glassStyle }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -248,6 +253,8 @@ export default function PlanoDetalhe({ glassStyle }) {
       });
     });
   }
+  const ehTreinoManual = plano.divisao === "Treino Manual";
+  const planoSalvoVazio = planoSemExercicios(plano);
   const planoVazio =
     editando && diasEdicao.every((dia) => dia.exercicios.length === 0);
   const temErros = Object.keys(erros).length > 0 || planoVazio;
@@ -504,6 +511,7 @@ export default function PlanoDetalhe({ glassStyle }) {
                   size="large"
                   startIcon={<CheckCircleOutlinedIcon />}
                   onClick={validar}
+                  disabled={planoSalvoVazio}
                 >
                   Validar Plano
                 </Button>
@@ -550,9 +558,18 @@ export default function PlanoDetalhe({ glassStyle }) {
         </Alert>
       )}
 
+      {!editando && planoSalvoVazio && (
+        <Alert severity="info" className="no-print" sx={{ mb: 3 }}>
+          Ficha em branco: clique em <strong>Editar</strong> no topo da página
+          para habilitar o botão de adicionar exercícios ou máquinas em cada dia.
+        </Alert>
+      )}
+
       {planoVazio && (
-        <Alert severity="warning" className="no-print" sx={{ mb: 3 }}>
-          O plano precisa manter pelo menos um exercício ou máquina.
+        <Alert severity={ehTreinoManual ? "info" : "warning"} className="no-print" sx={{ mb: 3 }}>
+          {ehTreinoManual
+            ? "Ficha em branco: clique em Adicionar em cada dia do treino abaixo para escolher exercícios ou máquinas e depois clique em Salvar."
+            : "O plano precisa manter pelo menos um exercício ou máquina."}
         </Alert>
       )}
 
@@ -725,11 +742,14 @@ export default function PlanoDetalhe({ glassStyle }) {
                 </TableHead>
 
                 <TableBody>
-                  {editando && dia.exercicios.length === 0 && (
+                  {(dia.exercicios || []).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                        Nenhum item neste dia. Ao salvar, ele será removido do
-                        plano.
+                      <TableCell colSpan={editando ? 5 : 4} align="center" sx={{ py: 3, color: "text.secondary" }}>
+                        {ehTreinoManual
+                          ? editando
+                            ? "Nenhum exercício neste dia ainda. Clique em Adicionar abaixo para incluir exercícios ou máquinas."
+                            : "Nenhum exercício neste dia ainda. Clique em Editar no topo da página para adicionar exercícios ou máquinas."
+                          : "Nenhum item neste dia. Ao salvar, ele será removido do plano."}
                       </TableCell>
                     </TableRow>
                   )}
@@ -894,25 +914,27 @@ export default function PlanoDetalhe({ glassStyle }) {
                       )}
                     </TableRow>
                   ))}
-                  <TableRow className="no-print">
-                    <TableCell
-                      colSpan={editando ? 5 : 4}
-                      align="left"
-                      sx={{ py: 3, px: 0 }}
-                    >
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<FitnessCenterIcon />}
-                        disabled={salvando}
-                        onClick={() => abrirAdicao(indiceDia)}
-                        aria-label={`Adicionar exercício ou máquina em ${dia.nome}`}
-                        sx={{ whiteSpace: "nowrap" }}
+                  {editando && (
+                    <TableRow className="no-print">
+                      <TableCell
+                        colSpan={5}
+                        align="left"
+                        sx={{ py: 3, px: 0 }}
                       >
-                        Adicionar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          startIcon={<FitnessCenterIcon />}
+                          disabled={salvando}
+                          onClick={() => abrirAdicao(indiceDia)}
+                          aria-label={`Adicionar exercício ou máquina em ${dia.nome}`}
+                          sx={{ whiteSpace: "nowrap" }}
+                        >
+                          Adicionar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -967,7 +989,7 @@ export default function PlanoDetalhe({ glassStyle }) {
                   </Box>
                 )}
               </Box>
-            ) : (
+            ) : editando ? (
               <Box className="no-print" sx={{ mt: 2 }}>
                 <Button
                   variant="contained"
@@ -980,7 +1002,7 @@ export default function PlanoDetalhe({ glassStyle }) {
                   Aeróbico+
                 </Button>
               </Box>
-            )}
+            ) : null}
           </Box>
         ))}
 
@@ -1084,6 +1106,7 @@ export default function PlanoDetalhe({ glassStyle }) {
               itemAtualId={selecaoItem.itemAtual?.maquinaId}
               diaTreino={diasEdicao[selecaoItem.indiceDia]}
               modoSelecao={selecaoItem.itemAtual ? "substituir" : "adicionar"}
+              experienciaAluno={plano.experiencia}
             />
           ) : selecaoItem?.tipoCatalogo === "exercicio" ? (
             <Exercicios
@@ -1093,6 +1116,7 @@ export default function PlanoDetalhe({ glassStyle }) {
               itemAtualId={selecaoItem.itemAtual?.exercicioId}
               diaTreino={diasEdicao[selecaoItem.indiceDia]}
               modoSelecao={selecaoItem.itemAtual ? "substituir" : "adicionar"}
+              experienciaAluno={plano.experiencia}
             />
           ) : null}
         </Box>

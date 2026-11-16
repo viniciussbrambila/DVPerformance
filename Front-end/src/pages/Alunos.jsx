@@ -27,10 +27,12 @@ import {
   converterDataNascimentoParaISO,
   dataNascimentoValida,
   formatarDataNascimento,
+  limitesDataNascimento,
 } from "../utils/dataNascimento";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
+import DesktopDatePicker from "../components/DesktopDatePicker";
 import DesktopDateRangePicker from "../components/DesktopDateRangePicker";
 import {
   obterDataCadastro,
@@ -51,6 +53,7 @@ import {
   salvarCache,
   temCache,
   expirarCachePorPrefixo,
+  removerCachePorPrefixo,
 } from "../utils/cacheSessao";
 
 const API_URL = "http://localhost:5011/alunos";
@@ -132,6 +135,7 @@ export default function Alunos({ glassStyle }) {
       const dados = await buscarComCache(chave, async () => {
         const response = await fetch(
           `${API_URL}?usuarioId=${usuarioLogado.id}`,
+          { cache: "no-store" },
         );
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
@@ -173,16 +177,6 @@ export default function Alunos({ glassStyle }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    if (name === "dataDeNascimento") {
-      const dataDigitada = value
-        .replace(/\D/g, "")
-        .slice(0, 8)
-        .replace(/^(\d{2})(\d)/, "$1/$2")
-        .replace(/^(\d{2}\/\d{2})(\d)/, "$1/$2");
-      setFormData({ ...formData, [name]: dataDigitada });
-      return;
-    }
 
     // Peso e altura aceitam decimais com vírgula ou ponto.
     if (name === "peso" || name === "altura") {
@@ -243,7 +237,7 @@ export default function Alunos({ glassStyle }) {
         expirarCachePorPrefixo("dashboard:");
         expirarCachePorPrefixo("planos:");
         expirarCachePorPrefixo("planoDetalhe:");
-        expirarCachePorPrefixo("alunosSemTreino:");
+        removerCachePorPrefixo("alunosSemTreino:");
       }
     } catch (erro) {
       console.error("Erro ao excluir aluno:", erro);
@@ -253,6 +247,7 @@ export default function Alunos({ glassStyle }) {
   };
 
   // Valida os campos obrigatórios e os limites de peso e altura
+  const limitesNascimento = limitesDataNascimento();
   const nascimentoISO = converterDataNascimentoParaISO(formData.dataDeNascimento);
   const formularioValido =
     formData.nome.trim() !== "" &&
@@ -327,7 +322,7 @@ export default function Alunos({ glassStyle }) {
       });
 
       expirarCachePorPrefixo("alunos:");
-      expirarCachePorPrefixo("alunosSemTreino:");
+      removerCachePorPrefixo("alunosSemTreino:");
 
       if (editingId) {
         expirarCachePorPrefixo("planos:");
@@ -603,30 +598,26 @@ export default function Alunos({ glassStyle }) {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
+              <DesktopDatePicker
                 required
-                type="text"
                 label="Data de nascimento"
                 placeholder="DD/MM/AAAA"
                 name="dataDeNascimento"
                 value={formData.dataDeNascimento}
-                onChange={handleChange}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                  htmlInput: {
-                    inputMode: "numeric",
-                    maxLength: 10,
-                    autoComplete: "bday",
-                  },
-                }}
-                error={
-                  tentouGravar && !dataNascimentoValida(nascimentoISO)
+                onChange={(novaData) =>
+                  setFormData((anterior) => ({
+                    ...anterior,
+                    dataDeNascimento: novaData,
+                  }))
                 }
+                minDate={limitesNascimento.min}
+                maxDate={limitesNascimento.max}
+                htmlInputProps={{ autoComplete: "bday" }}
+                error={tentouGravar && !dataNascimentoValida(nascimentoISO)}
                 helperText={
                   tentouGravar && !dataNascimentoValida(nascimentoISO)
                     ? "Informe uma data válida para alunos de 13 a 120 anos"
-                    : "Digite no formato DD/MM/AAAA"
+                    : "Digite no formato DD/MM/AAAA ou selecione no calendário"
                 }
               />
             </Grid>

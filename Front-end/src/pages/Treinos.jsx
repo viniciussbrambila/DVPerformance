@@ -1,4 +1,4 @@
-  import {
+import {
   Box,
   Paper,
   Typography,
@@ -21,6 +21,7 @@ import {
   lerCache,
   salvarCache,
   expirarCachePorPrefixo,
+  removerCachePorPrefixo,
 } from "../utils/cacheSessao";
 
 const ALUNOS_API_URL = "http://localhost:5011/alunos";
@@ -46,17 +47,22 @@ export default function Treinos({ glassStyle }) {
         lerCache(`alunosSemTreino:${usuarioInicial.id}`)) ||
       [],
   );
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(() => Boolean(usuarioInicial?.id));
   const [erros, setErros] = useState([]);
   const [escolhendoDivisao, setEscolhendoDivisao] = useState(false);
   const geracaoEmAndamento = useRef(false);
   const alunoSelecionado = alunos.find((aluno) => String(aluno.id) === String(alunoId));
 
   useEffect(() => {
+    let ativo = true;
+
     const carregarAlunos = async () => {
       const usuarioLogado = obterUsuarioLogado();
       if (!usuarioLogado?.id) {
-        setErros(["Usuário logado não identificado. Faça login novamente."]);
+        if (ativo) {
+          setCarregando(false);
+          setErros(["Usuário logado não identificado. Faça login novamente."]);
+        }
         return;
       }
 
@@ -64,19 +70,31 @@ export default function Treinos({ glassStyle }) {
       setCarregando(true);
 
       try {
-        const dados = await buscarComCache(chave, async () => {
-          const response = await fetch(
-            `${ALUNOS_API_URL}/sem-treino?usuarioId=${usuarioLogado.id}`,
-          );
-          if (!response.ok) {
-            throw new Error(`Não foi possível carregar os alunos sem treino (HTTP ${response.status}).`);
-          }
-          return response.json();
-        });
-        setAlunos(dados);
+        const dados = await buscarComCache(
+          chave,
+          async () => {
+            const response = await fetch(
+              `${ALUNOS_API_URL}/sem-treino?usuarioId=${usuarioLogado.id}`,
+              { cache: "no-store" },
+            );
+            if (!response.ok) {
+              throw new Error(
+                `Não foi possível carregar os alunos sem treino (HTTP ${response.status}).`,
+              );
+            }
+            return response.json();
+          },
+          { forcar: true },
+        );
+        if (!ativo) return;
+        const lista = Array.isArray(dados) ? dados : [];
+        setAlunos(lista);
+        setAlunoId((atual) =>
+          atual && !lista.some((a) => String(a.id) === String(atual)) ? "" : atual,
+        );
       } catch (erro) {
         console.error("Erro ao conectar com a API:", erro);
-        if (!lerCache(chave)) {
+        if (ativo && !lerCache(chave)) {
           setErros([
             erro instanceof TypeError
               ? "Não foi possível conectar ao servidor. Verifique se a API está rodando em http://localhost:5011."
@@ -84,11 +102,21 @@ export default function Treinos({ glassStyle }) {
           ]);
         }
       } finally {
-        setCarregando(false);
+        if (ativo) setCarregando(false);
       }
     };
 
     carregarAlunos();
+
+    const aoFocarJanela = () => {
+      carregarAlunos();
+    };
+    window.addEventListener("focus", aoFocarJanela);
+
+    return () => {
+      ativo = false;
+      window.removeEventListener("focus", aoFocarJanela);
+    };
   }, []);
 
   const abrirEscolhaDivisao = () => {
@@ -145,7 +173,7 @@ export default function Treinos({ glassStyle }) {
       salvarCache("planoDetalhe:" + dados.id, dados);
       expirarCachePorPrefixo("planos:");
       expirarCachePorPrefixo("dashboard:");
-      expirarCachePorPrefixo("alunosSemTreino:");
+      removerCachePorPrefixo("alunosSemTreino:");
       navigate("/planos/" + dados.id);
     } catch (erro) {
       console.error("Erro ao gerar treino:", erro);
@@ -159,7 +187,7 @@ export default function Treinos({ glassStyle }) {
   return (
     <Box sx={{ maxWidth: 672, mx: "auto" }}>
       <Typography variant="h4" sx={{ fontWeight: "bold", mb: 3 }}>
-        Gerar Plano Automático
+        Gerar Plano de Treino
       </Typography>
 
       <Paper

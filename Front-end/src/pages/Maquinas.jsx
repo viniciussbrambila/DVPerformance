@@ -1,8 +1,20 @@
 import { useState, useEffect } from "react";
 import FocoMuscularSelect, {
   FocoMuscularLabel,
+  OPCOES_NIVEL_MINIMO,
+  nivelPermitidoParaAluno,
+  normalizarNivelExperiencia,
+  obterNiveisPermitidos,
+  sugerirFocoMuscular,
+  sugerirNivelMinimo,
   useFocosMusculares,
 } from "../components/FocoMuscularSelect";
+import FiltroNivelExercicio from "../components/FiltroNivelExercicio";
+import FiltroGrupoMuscular, {
+  CATEGORIAS_GRUPOS,
+  TODOS_GRUPOS_MUSCULARES,
+  itemPertenceAosGrupos,
+} from "../components/FiltroGrupoMuscular";
 import { filtrarCatalogoDoDia } from "../utils/edicaoTreino";
 import { normalizarTextoBusca } from "../utils/busca";
 import {
@@ -48,39 +60,6 @@ import {
 
 const API_URL = "http://localhost:5011/maquinas";
 
-// Grupos musculares organizados por Subtítulo (Região do Corpo)
-const CATEGORIAS_GRUPOS = [
-  {
-    subtitulo: "Membros Superiores (Parte de Cima)",
-    regiao: "Membros Superiores",
-    grupos: [
-      "Peito",
-      "Costas",
-      "Trapézio",
-      "Ombros",
-      "Bíceps",
-      "Tríceps",
-      "Antebraço",
-    ],
-  },
-  {
-    subtitulo: "Membros Inferiores (Parte de Baixo)",
-    regiao: "Membros Inferiores",
-    grupos: [
-      "Quadríceps",
-      "Posterior de Coxa",
-      "Glúteos",
-      "Adutores / Abdutores",
-      "Panturrilha",
-    ],
-  },
-  {
-    subtitulo: "Core / Tronco (Centro do Corpo)",
-    regiao: "Core / Tronco",
-    grupos: ["Abdômen", "Lombar"],
-  },
-];
-
 const obterUsuarioLogado = () => {
   try {
     const salvo = localStorage.getItem("usuarioLogado");
@@ -90,7 +69,13 @@ const obterUsuarioLogado = () => {
   }
 };
 
-const formVazio = { nome: "", grupo: "", focoMuscular: "", descricao: "" };
+const formVazio = {
+  nome: "",
+  grupo: "",
+  focoMuscular: "",
+  nivelMinimo: "Iniciante",
+  descricao: "",
+};
 
 const obterChaveMaquinas = () => {
   const usuarioLogado = obterUsuarioLogado();
@@ -104,6 +89,7 @@ export default function Maquinas({
   itemAtualId,
   diaTreino,
   modoSelecao = "substituir",
+  experienciaAluno = null,
 }) {
   const [maquinas, setMaquinas] = useState(
     () => lerCache(obterChaveMaquinas()) || [],
@@ -113,10 +99,18 @@ export default function Maquinas({
   );
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState("asc");
+  const [gruposFiltro, setGruposFiltro] = useState(
+    () => [...TODOS_GRUPOS_MUSCULARES],
+  );
+  const [niveisFiltro, setNiveisFiltro] = useState(() =>
+    obterNiveisPermitidos(experienciaAluno),
+  );
   const [formAberto, setFormAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [idParaExcluir, setIdParaExcluir] = useState(null);
   const [form, setForm] = useState(formVazio);
+  const [focoAutomatico, setFocoAutomatico] = useState(false);
+  const [nivelManual, setNivelManual] = useState(false);
   const [tentouSalvar, setTentouSalvar] = useState(false);
   const [errosApi, setErrosApi] = useState([]);
   const [erroCarregamento, setErroCarregamento] = useState("");
@@ -149,13 +143,28 @@ export default function Maquinas({
     carregarMaquinas();
   }, []);
 
+  useEffect(() => {
+    setNiveisFiltro(obterNiveisPermitidos(experienciaAluno));
+  }, [experienciaAluno]);
+
+  const nivelAluno = normalizarNivelExperiencia(experienciaAluno);
   const termoBusca = normalizarTextoBusca(busca).trim();
   const maquinasDisponiveis = onSelecionar
     ? filtrarCatalogoDoDia(maquinas, diaTreino, "maquina")
     : maquinas;
-  const maquinasFiltradas = maquinasDisponiveis
-    .filter((maq) =>
-      normalizarTextoBusca(maq.nome).includes(termoBusca),
+  const maquinasCompatibilidade = nivelAluno
+    ? maquinasDisponiveis.filter((maq) =>
+        nivelPermitidoParaAluno(maq.nivelMinimo, nivelAluno),
+      )
+    : maquinasDisponiveis;
+  const maquinasFiltradas = maquinasCompatibilidade
+    .filter(
+      (maq) =>
+        itemPertenceAosGrupos(maq, gruposFiltro) &&
+        niveisFiltro.includes(
+          normalizarNivelExperiencia(maq.nivelMinimo) || "Iniciante",
+        ) &&
+        normalizarTextoBusca(maq.nome).includes(termoBusca),
     )
     .sort((a, b) =>
       ordem === "asc"
@@ -165,17 +174,40 @@ export default function Maquinas({
 
   const handleChange = (campo) => (e) => {
     const valor = e.target.value;
-    setForm((anterior) => ({
-      ...anterior,
-      [campo]: valor,
-      ...((campo === "nome" || campo === "grupo") && valor !== anterior[campo]
-        ? { focoMuscular: "" }
-        : {}),
-    }));
+    if (campo === "focoMuscular") {
+      setFocoAutomatico(false);
+      setForm((anterior) => ({ ...anterior, focoMuscular: valor }));
+      return;
+    }
+    if (campo === "nivelMinimo") {
+      setNivelManual(true);
+      setForm((anterior) => ({ ...anterior, nivelMinimo: valor }));
+      return;
+    }
+
+    setForm((anterior) => {
+      const proximo = { ...anterior, [campo]: valor };
+      if (campo === "nome" || campo === "grupo") {
+        const focoSugerido = sugerirFocoMuscular(proximo.grupo, proximo.nome);
+        if (campo === "grupo" && valor !== anterior.grupo) {
+          proximo.focoMuscular = focoSugerido;
+          setFocoAutomatico(Boolean(focoSugerido));
+        } else if (focoSugerido && (!anterior.focoMuscular || focoAutomatico)) {
+          proximo.focoMuscular = focoSugerido;
+          setFocoAutomatico(true);
+        }
+        if (campo === "nome" && !nivelManual) {
+          proximo.nivelMinimo = sugerirNivelMinimo(proximo.nome);
+        }
+      }
+      return proximo;
+    });
   };
 
   const abrirNovo = () => {
     setForm(formVazio);
+    setFocoAutomatico(false);
+    setNivelManual(false);
     setEditandoId(null);
     setTentouSalvar(false);
     setErrosApi([]);
@@ -183,12 +215,20 @@ export default function Maquinas({
   };
 
   const abrirEdicao = (maquina) => {
+    const focoExistente =
+      maquina.focoMuscular && maquina.focoMuscular !== "geral"
+        ? maquina.focoMuscular
+        : sugerirFocoMuscular(maquina.grupo, maquina.nome);
     setForm({
       nome: maquina.nome,
       grupo: maquina.grupo,
-      focoMuscular: maquina.focoMuscular || "",
+      focoMuscular: focoExistente || "",
+      nivelMinimo:
+        maquina.nivelMinimo || sugerirNivelMinimo(maquina.nome) || "Iniciante",
       descricao: maquina.descricao || "",
     });
+    setFocoAutomatico(false);
+    setNivelManual(Boolean(maquina.nivelMinimo));
     setEditandoId(maquina.id);
     setTentouSalvar(false);
     setErrosApi([]);
@@ -199,6 +239,8 @@ export default function Maquinas({
     setFormAberto(false);
     setEditandoId(null);
     setForm(formVazio);
+    setFocoAutomatico(false);
+    setNivelManual(false);
     setTentouSalvar(false);
     setErrosApi([]);
   };
@@ -207,7 +249,13 @@ export default function Maquinas({
     e.preventDefault();
     setTentouSalvar(true);
 
-    if (!form.nome.trim() || !form.grupo.trim()) {
+    if (
+      !form.nome.trim() ||
+      !form.grupo.trim() ||
+      !form.focoMuscular ||
+      form.focoMuscular === "geral" ||
+      !form.nivelMinimo
+    ) {
       return;
     }
 
@@ -217,7 +265,8 @@ export default function Maquinas({
     const payload = {
       nome: form.nome.trim(),
       grupo: form.grupo.trim(),
-      focoMuscular: form.focoMuscular || "",
+      focoMuscular: form.focoMuscular,
+      nivelMinimo: form.nivelMinimo || "Iniciante",
       descricao: form.descricao?.trim() || "",
       usuarioId: usuarioLogado?.id || null,
     };
@@ -300,6 +349,11 @@ export default function Maquinas({
     }
   };
 
+  const focoInvalido =
+    tentouSalvar &&
+    Boolean(form.grupo.trim()) &&
+    (!form.focoMuscular || form.focoMuscular === "geral");
+
   return (
     <Box>
       {onSelecionar && (
@@ -322,6 +376,9 @@ export default function Maquinas({
           {modoSelecao === "adicionar"
             ? "Escolha uma máquina para adicionar ao plano."
             : "Escolha uma máquina para substituir o item do plano."}{" "}
+          {nivelAluno
+            ? `Nível do aluno: ${nivelAluno} (opções acima desse nível ficam desabilitadas). `
+            : ""}
           A alteração será gravada ao salvar o plano.
         </Alert>
       )}
@@ -426,7 +483,31 @@ export default function Maquinas({
                   value={form.focoMuscular}
                   onChange={handleChange("focoMuscular")}
                   catalogo={catalogoFocos}
+                  error={focoInvalido}
+                  sugeridoAutomaticamente={focoAutomatico}
+                  helperText={
+                    focoInvalido
+                      ? "Selecione o padrão biomecânico da máquina para que ela encaixe na geração de treinos."
+                      : ""
+                  }
                 />
+              </Grid>
+
+              <Grid size={12}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Nível de Experiência Mínimo"
+                  value={form.nivelMinimo || "Iniciante"}
+                  onChange={handleChange("nivelMinimo")}
+                  helperText="Define a partir de qual nível de aluno esta máquina entra na geração automática (máquinas costumam ser ideais desde o Iniciante, salvo equipamentos específicos avançados)."
+                >
+                  {OPCOES_NIVEL_MINIMO.map((opcao) => (
+                    <MenuItem key={opcao.valor} value={opcao.valor}>
+                      {opcao.rotulo}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Grid>
 
               <Grid size={12}>
@@ -462,7 +543,7 @@ export default function Maquinas({
         </Box>
       </Dialog>
 
-      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap", alignItems: "center" }}>
         <TextField
           placeholder="Pesquisar por nome da máquina"
           value={busca}
@@ -478,6 +559,15 @@ export default function Maquinas({
               ),
             },
           }}
+        />
+        <FiltroGrupoMuscular
+          gruposSelecionados={gruposFiltro}
+          onChange={setGruposFiltro}
+        />
+        <FiltroNivelExercicio
+          niveisSelecionados={niveisFiltro}
+          onChange={setNiveisFiltro}
+          experienciaAluno={nivelAluno}
         />
         <TextField
           select
@@ -537,94 +627,109 @@ export default function Maquinas({
                       ? "Nenhuma máquina cadastrada."
                       : onSelecionar && maquinasDisponiveis.length === 0
                         ? "Todas as máquinas deste catálogo já estão neste dia do treino."
-                        : "Nenhuma máquina encontrada."}
+                        : onSelecionar && maquinasCompatibilidade.length === 0
+                          ? `Nenhuma máquina compatível com o nível ${nivelAluno} disponível.`
+                          : gruposFiltro.length === 0
+                            ? "Selecione pelo menos um grupo muscular no filtro para exibir as máquinas."
+                            : niveisFiltro.length === 0
+                              ? "Selecione pelo menos um nível no filtro para exibir as máquinas."
+                              : "Nenhuma máquina encontrada."}
                   </TableCell>
                 </TableRow>
               )}
 
-              {maquinasFiltradas.map((maq) => (
-                <TableRow key={maq.id} hover>
-                  <TableCell sx={{ fontWeight: 500 }}>{maq.nome}</TableCell>
-                  <TableCell>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        gap: 0.3,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontWeight: 600 }}
-                      >
-                        {maq.regiao}
-                      </Typography>
-                      <Chip
-                        label={maq.grupo}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontWeight: 500 }}
-                      />
-                      <FocoMuscularLabel
-                        grupo={maq.grupo}
-                        value={maq.focoMuscular}
-                        catalogo={catalogoFocos}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ color: "text.secondary" }}>
-                    {maq.descricao}
-                  </TableCell>
-                  <TableCell align="right">
-                    {onSelecionar ? (
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<CheckCircleOutlinedIcon />}
-                        disabled={maq.id === itemAtualId}
-                        onClick={() => onSelecionar(maq)}
-                        aria-label={
-                          (modoSelecao === "adicionar" ? "Adicionar " : "Substituir por ") + maq.nome
-                        }
-                      >
-                        {maq.id === itemAtualId
-                          ? "Atual"
-                          : modoSelecao === "adicionar"
-                            ? "Adicionar"
-                            : "Substituir"}
-                      </Button>
-                    ) : (
+              {maquinasFiltradas.map((maq) => {
+                const nivelPermitido =
+                  !nivelAluno ||
+                  nivelPermitidoParaAluno(maq.nivelMinimo, nivelAluno);
+
+                return (
+                  <TableRow key={maq.id} hover>
+                    <TableCell sx={{ fontWeight: 500 }}>{maq.nome}</TableCell>
+                    <TableCell>
                       <Box
                         sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 1,
-                          flexWrap: "nowrap",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          gap: 0.3,
                         }}
                       >
-                        <IconButton
-                          size="small"
-                          aria-label="Editar máquina"
-                          onClick={() => abrirEdicao(maq)}
-                          sx={{ bgcolor: "action.hover" }}
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontWeight: 600 }}
                         >
-                          <EditOutlinedIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
+                          {maq.regiao}
+                        </Typography>
+                        <Chip
+                          label={maq.grupo}
                           size="small"
-                          aria-label="Excluir máquina"
-                          onClick={() => excluir(maq.id)}
-                          sx={{ bgcolor: "action.hover" }}
-                        >
-                          <DeleteOutlinedIcon fontSize="small" />
-                        </IconButton>
+                          variant="outlined"
+                          sx={{ fontWeight: 500 }}
+                        />
+                        <FocoMuscularLabel
+                          grupo={maq.grupo}
+                          value={maq.focoMuscular}
+                          nivelMinimo={maq.nivelMinimo}
+                          catalogo={catalogoFocos}
+                        />
                       </Box>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell sx={{ color: "text.secondary" }}>
+                      {maq.descricao}
+                    </TableCell>
+                    <TableCell align="right">
+                      {onSelecionar ? (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<CheckCircleOutlinedIcon />}
+                          disabled={maq.id === itemAtualId || !nivelPermitido}
+                          onClick={() => onSelecionar(maq)}
+                          aria-label={
+                            (modoSelecao === "adicionar" ? "Adicionar " : "Substituir por ") + maq.nome
+                          }
+                        >
+                          {maq.id === itemAtualId
+                            ? "Atual"
+                            : !nivelPermitido
+                              ? "Acima do nível"
+                              : modoSelecao === "adicionar"
+                                ? "Adicionar"
+                                : "Substituir"}
+                        </Button>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 1,
+                            flexWrap: "nowrap",
+                          }}
+                        >
+                          <IconButton
+                            size="small"
+                            aria-label="Editar máquina"
+                            onClick={() => abrirEdicao(maq)}
+                            sx={{ bgcolor: "action.hover" }}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            aria-label="Excluir máquina"
+                            onClick={() => excluir(maq.id)}
+                            sx={{ bgcolor: "action.hover" }}
+                          >
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

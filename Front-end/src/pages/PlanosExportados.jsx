@@ -22,10 +22,15 @@ import {
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
-import { exportarPdfRelatorio } from "../utils/relatorios";
+import DesktopDateRangePicker from "../components/DesktopDateRangePicker";
+import {
+  exportarPdfRelatorio,
+  filtrarPlanosTreino,
+} from "../utils/relatorios";
 import { formatarTempoAerobico } from "../utils/edicaoTreino";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
@@ -37,6 +42,7 @@ import {
   temCache,
   removerCache,
   expirarCachePorPrefixo,
+  removerCachePorPrefixo,
 } from "../utils/cacheSessao";
 
 const API_URL = "http://localhost:5011/treinos";
@@ -109,11 +115,15 @@ export default function PlanosExportados({ glassStyle }) {
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const [intervaloData, setIntervaloData] = useState([null, null]);
+  const [ordem, setOrdem] = useState("recentes");
   const [planoParaExcluir, setPlanoParaExcluir] = useState(null);
   const [planoParaValidar, setPlanoParaValidar] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
+    let ativo = true;
+
     const carregar = async () => {
       setErro("");
       const usuarioLogado = obterUsuarioLogado();
@@ -125,39 +135,51 @@ export default function PlanosExportados({ glassStyle }) {
       }
 
       try {
-        const dados = await buscarComCache(chave, async () => {
-          const response = await fetch(`${API_URL}${query}`);
-          if (!response.ok) {
-            throw new Error("Não foi possível carregar os planos de treino.");
-          }
-          const lista = await response.json();
-          if (Array.isArray(lista)) {
-            lista.forEach((p) => {
-              if (p?.id != null) salvarCache(`planoDetalhe:${p.id}`, p);
+        const dados = await buscarComCache(
+          chave,
+          async () => {
+            const response = await fetch(`${API_URL}${query}`, {
+              cache: "no-store",
             });
-          }
-          return lista;
-        });
-        setPlanos(dados);
+            if (!response.ok) {
+              throw new Error("Não foi possível carregar os planos de treino.");
+            }
+            const lista = await response.json();
+            if (Array.isArray(lista)) {
+              lista.forEach((p) => {
+                if (p?.id != null) salvarCache(`planoDetalhe:${p.id}`, p);
+              });
+            }
+            return lista;
+          },
+          { forcar: true },
+        );
+        if (ativo) setPlanos(dados);
       } catch (err) {
         console.error("Erro ao carregar planos:", err);
-        if (!temCache(chave)) {
+        if (ativo && !temCache(chave)) {
           setErro(
             err.message || "Não foi possível carregar os planos do servidor.",
           );
         }
       } finally {
-        setCarregando(false);
+        if (ativo) setCarregando(false);
       }
     };
 
     carregar();
+    return () => {
+      ativo = false;
+    };
   }, []);
 
-  const planosFiltrados = planos.filter((p) => {
-    const bateNome = p.aluno.toLowerCase().includes(busca.trim().toLowerCase());
-    const bateStatus = filtroStatus === "Todos" || p.status === filtroStatus;
-    return bateNome && bateStatus;
+  const [dataInicio, dataFim] = intervaloData;
+  const planosFiltrados = filtrarPlanosTreino(planos, {
+    busca,
+    status: filtroStatus,
+    dataInicio,
+    dataFim,
+    ordem,
   });
 
   const baixarTxt = async (plano) => {
@@ -185,13 +207,11 @@ export default function PlanosExportados({ glassStyle }) {
 
       if (response.ok) {
         const chave = obterChavePlanos();
-        setPlanos((lista) => {
-          const novaLista = lista.map((p) =>
-            p.id === plano.id ? { ...p, status: "Exportado" } : p,
-          );
-          salvarCache(chave, novaLista);
-          return novaLista;
-        });
+        const novaLista = planos.map((p) =>
+          p.id === plano.id ? { ...p, status: "Exportado" } : p,
+        );
+        setPlanos(novaLista);
+        salvarCache(chave, novaLista);
         const detalheAtual = lerCache(`planoDetalhe:${plano.id}`);
         if (detalheAtual) {
           salvarCache(`planoDetalhe:${plano.id}`, {
@@ -207,11 +227,12 @@ export default function PlanosExportados({ glassStyle }) {
 
   const confirmarExclusao = async () => {
     if (!planoParaExcluir) return;
+    const planoId = planoParaExcluir.id;
     setExcluindo(true);
     setErro("");
 
     try {
-      const response = await fetch(`${API_URL}/${planoParaExcluir.id}`, {
+      const response = await fetch(`${API_URL}/${planoId}`, {
         method: "DELETE",
       });
 
@@ -221,14 +242,12 @@ export default function PlanosExportados({ glassStyle }) {
       }
 
       const chave = obterChavePlanos();
-      setPlanos((lista) => {
-        const novaLista = lista.filter((p) => p.id !== planoParaExcluir.id);
-        salvarCache(chave, novaLista);
-        return novaLista;
-      });
-      removerCache(`planoDetalhe:${planoParaExcluir.id}`);
+      const novaLista = planos.filter((p) => p.id !== planoId);
+      setPlanos(novaLista);
+      salvarCache(chave, novaLista);
+      removerCache(`planoDetalhe:${planoId}`);
       expirarCachePorPrefixo("dashboard:");
-      expirarCachePorPrefixo("alunosSemTreino:");
+      removerCachePorPrefixo("alunosSemTreino:");
       setPlanoParaExcluir(null);
     } catch (err) {
       console.error("Erro ao excluir plano:", err);
@@ -270,6 +289,7 @@ export default function PlanosExportados({ glassStyle }) {
           <Button
             variant="contained"
             size="large"
+            startIcon={<AddIcon />}
             onClick={() => navigate("/treinos")}
           >
             Novo Treino
@@ -291,8 +311,9 @@ export default function PlanosExportados({ glassStyle }) {
           placeholder="Pesquisar por nome do aluno"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          sx={{ flex: "1 1 300px" }}
+          sx={{ flex: "1 1 280px" }}
           slotProps={{
+            htmlInput: { "aria-label": "Pesquisar planos por nome do aluno" },
             input: {
               startAdornment: (
                 <InputAdornment position="start">
@@ -315,6 +336,26 @@ export default function PlanosExportados({ glassStyle }) {
           <MenuItem value="Validado">Validado</MenuItem>
           <MenuItem value="Exportado">Exportado</MenuItem>
         </TextField>
+
+        <TextField
+          select
+          label="Ordenar por"
+          value={ordem}
+          onChange={(e) => setOrdem(e.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="recentes">Mais recentes</MenuItem>
+          <MenuItem value="antigos">Mais antigos</MenuItem>
+          <MenuItem value="az">A–Z</MenuItem>
+          <MenuItem value="za">Z–A</MenuItem>
+        </TextField>
+
+        <DesktopDateRangePicker
+          label="Período de criação"
+          startDate={dataInicio}
+          endDate={dataFim}
+          onChange={setIntervaloData}
+        />
       </Box>
 
       <Paper

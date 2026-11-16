@@ -445,6 +445,14 @@ namespace DVPerformance.Api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("grupo_muscular_id");
 
+                    b.Property<string>("NivelMinimo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Iniciante")
+                        .HasColumnName("nivel_minimo");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -691,6 +699,14 @@ namespace DVPerformance.Api.Migrations
                     b.Property<int>("GrupoMuscularId")
                         .HasColumnType("integer")
                         .HasColumnName("grupo_muscular_id");
+
+                    b.Property<string>("NivelMinimo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Iniciante")
+                        .HasColumnName("nivel_minimo");
 
                     b.Property<string>("Nome")
                         .IsRequired()

@@ -88,23 +88,27 @@ internal static class FocosMuscularesTests
             }
         });
 
-        testar("API e modelo persistem foco e removem a idade legada", () =>
+        testar("API e modelo persistem foco, nível mínimo e removem a idade legada", () =>
         {
             var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
             foreach (var (tipo, item) in new (Type, object)[]
             {
-                (typeof(Exercicio), new Exercicio { FocoMuscular = "superior" }),
-                (typeof(Maquina), new Maquina { FocoMuscular = "superior" })
+                (typeof(Exercicio), new Exercicio { FocoMuscular = "superior", NivelMinimo = "Intermediário" }),
+                (typeof(Maquina), new Maquina { FocoMuscular = "superior", NivelMinimo = "Iniciante" })
             })
             {
                 var json = JsonSerializer.SerializeToElement(item, tipo, jsonOptions);
                 exigir(json.GetProperty("focoMuscular").GetString() == "superior", "Expor foco nos dois contratos JSON.");
+                exigir(!string.IsNullOrWhiteSpace(json.GetProperty("nivelMinimo").GetString()), "Expor nível mínimo nos dois contratos JSON.");
                 var recebido = JsonSerializer.Deserialize(json.GetRawText(), tipo, jsonOptions)!;
                 exigir((string?)tipo.GetProperty("FocoMuscular")!.GetValue(recebido) == "superior",
                     "Aceitar foco no cadastro e na edição.");
                 var propriedade = db.Model.FindEntityType(tipo)!.FindProperty("FocoMuscular")!;
                 exigir(propriedade.GetColumnName() == "foco_muscular" && !propriedade.IsNullable,
                     "Persistir a classificação nos dois catálogos.");
+                var propriedadeNivel = db.Model.FindEntityType(tipo)!.FindProperty("NivelMinimo")!;
+                exigir(propriedadeNivel.GetColumnName() == "nivel_minimo" && !propriedadeNivel.IsNullable,
+                    "Persistir o nível mínimo nos dois catálogos.");
             }
             exigir(db.Model.FindEntityType(typeof(GrupoMuscular))!.FindProperty(nameof(GrupoMuscular.OrdemNaPrioridade)) is null,
                 "O desempate da prioridade é calculado e não cria coluna.");
@@ -118,6 +122,26 @@ internal static class FocosMuscularesTests
                 exigir((string)semente["Nome"]! == grupo.Nome
                     && (int)semente["OrdemPrioridade"]! == grupo.OrdemPrioridade,
                     $"Manter identidade e nova prioridade do grupo {grupo.Nome}.");
+            }
+        });
+
+        testar("exercícios e máquinas personalizados respeitam o nível mínimo informado pelo Personal", () =>
+        {
+            var grupoPeito = grupos.Single(g => g.Nome == "Peito");
+            var exercicios = new List<Exercicio>
+            {
+                new() { Id = 1, Nome = "Press Personalizado Base", GrupoMuscularId = grupoPeito.Id, GrupoMuscular = grupoPeito, FocoMuscular = "esternocostal", NivelMinimo = "Iniciante" },
+                new() { Id = 2, Nome = "Press Personalizado Intermediário", GrupoMuscularId = grupoPeito.Id, GrupoMuscular = grupoPeito, FocoMuscular = "esternocostal", NivelMinimo = "Intermediário" },
+                new() { Id = 3, Nome = "Press Personalizado Elite", GrupoMuscularId = grupoPeito.Id, GrupoMuscular = grupoPeito, FocoMuscular = "esternocostal", NivelMinimo = "Avançado" },
+            };
+            for (int tentativa = 0; tentativa < 30; tentativa++)
+            {
+                var treinoIniciante = Gerar(Sessao("Peito"), exercicios, [], "Iniciante");
+                exigir(treinoIniciante.Itens.All(i => i.ExercicioId == 1),
+                    "Iniciante recebe apenas o movimento personalizado classificado como Iniciante.");
+                var treinoIntermediario = Gerar(Sessao("Peito"), exercicios, [], "Intermediário");
+                exigir(treinoIntermediario.Itens.All(i => i.ExercicioId is 1 or 2) && treinoIntermediario.Itens.Count == 2,
+                    "Intermediário recebe movimentos Iniciante e Intermediário, mas não o exclusivo de Avançado.");
             }
         });
 
@@ -323,6 +347,28 @@ internal static class FocosMuscularesTests
                         $"Limite excedido em {config.Nome} / {dia.Key} / grupo {grupoDia.Key}.");
                 }
             }
+        });
+
+        testar("edição manual bloqueia adição ou substituição por movimento acima do nível do aluno", () =>
+        {
+            var iniciante = new Aluno { Experiencia = "Iniciante" };
+            var intermediario = new Aluno { Experiencia = "Intermediário" };
+            var avancado = new Aluno { Experiencia = "Avançado" };
+
+            exigir(TreinoEndpoints.ValidarNivelItemParaAluno(iniciante, "Supino Máquina", "Iniciante", "máquina") is null,
+                "Iniciante pode receber item Iniciante na edição.");
+            exigir(TreinoEndpoints.ValidarNivelItemParaAluno(iniciante, "Agachamento Búlgaro", "Intermediário", "exercício") is not null,
+                "Iniciante não pode receber item Intermediário na edição.");
+            exigir(TreinoEndpoints.ValidarNivelItemParaAluno(iniciante, "Flexão Nórdica", "Avançado", "exercício") is not null,
+                "Iniciante não pode receber item Avançado na edição.");
+
+            exigir(TreinoEndpoints.ValidarNivelItemParaAluno(intermediario, "Agachamento Búlgaro", "Intermediário", "exercício") is null,
+                "Intermediário pode receber item Intermediário na edição.");
+            exigir(TreinoEndpoints.ValidarNivelItemParaAluno(intermediario, "Flexão Nórdica", "Avançado", "exercício") is not null,
+                "Intermediário não pode receber item Avançado na edição.");
+
+            exigir(TreinoEndpoints.ValidarNivelItemParaAluno(avancado, "Flexão Nórdica", "Avançado", "exercício") is null,
+                "Avançado pode receber qualquer nível na edição.");
         });
     }
 

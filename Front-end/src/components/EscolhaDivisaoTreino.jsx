@@ -4,16 +4,24 @@ import {
   Box,
   Button,
   ButtonBase,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Typography,
 } from "@mui/material";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 
 const API_URL = "http://localhost:5011/treinos/divisoes";
+
+const obterDiasManuais = (frequencia) => {
+  const total = Math.min(6, Math.max(2, Number(frequencia) || 3));
+  return Array.from({ length: total }, (_, i) => `Treino ${String.fromCharCode(65 + i)}`);
+};
 
 export default function EscolhaDivisaoTreino({
   open,
@@ -30,6 +38,8 @@ export default function EscolhaDivisaoTreino({
   const [selecionada, setSelecionada] = useState(null);
   const alunoId = aluno?.id;
   const frequencia = aluno?.frequenciaSemanal;
+  const experiencia = aluno?.experiencia || "";
+  const diasManuais = obterDiasManuais(frequencia);
 
   useEffect(() => {
     if (!open || !alunoId) return;
@@ -41,7 +51,13 @@ export default function EscolhaDivisaoTreino({
       setOpcoes([]);
       setSelecionada(null);
       try {
-        const resposta = await fetch(API_URL + "?dias=" + frequencia, {
+        const params = new URLSearchParams({
+          dias: String(frequencia ?? ""),
+        });
+        if (experiencia) {
+          params.set("experiencia", experiencia);
+        }
+        const resposta = await fetch(`${API_URL}?${params.toString()}`, {
           signal: controller.signal,
         });
         const dados = await resposta.json().catch(() => null);
@@ -66,7 +82,7 @@ export default function EscolhaDivisaoTreino({
 
     carregar();
     return () => controller.abort();
-  }, [open, alunoId, frequencia, tentativa]);
+  }, [open, alunoId, frequencia, experiencia, tentativa]);
 
   return (
     <Dialog
@@ -87,6 +103,7 @@ export default function EscolhaDivisaoTreino({
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mb: 2 }}>
           {aluno?.nome} · {frequencia} dias por semana
+          {experiencia ? ` · Nível ${experiencia}` : ""}
         </Typography>
 
         {erros.length > 0 && (
@@ -107,77 +124,140 @@ export default function EscolhaDivisaoTreino({
             </Button>
           </Box>
         ) : (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: opcoes.length === 1 ? "1fr" : "repeat(2, minmax(0, 1fr))",
-                md: opcoes.length > 2 ? "repeat(3, minmax(0, 1fr))" : undefined,
-              },
-              gap: 2,
-              mt: 1,
-            }}
-          >
-            {opcoes.map((divisao) => (
-              <ButtonBase
-                key={divisao.id}
-                aria-label={"Gerar treino com " + divisao.nome}
-                disabled={gerando}
-                onClick={() => {
-                  setSelecionada(divisao.id);
-                  onEscolher(divisao.id);
-                }}
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-start",
-                  gap: 1,
-                  p: 3,
-                  width: "100%",
-                  border: "1px solid",
-                  borderColor: gerando && selecionada === divisao.id ? "primary.main" : "divider",
-                  borderRadius: 3,
-                  color: "text.primary",
-                  bgcolor: "action.hover",
-                  "&:hover": { borderColor: "primary.main" },
-                  "&.Mui-disabled": { opacity: 0.65 },
-                  "&.Mui-focusVisible": {
-                    outline: "2px solid",
-                    outlineColor: "primary.main",
-                    outlineOffset: 2,
-                  },
-                }}
-              >
-                {gerando && selecionada === divisao.id ? (
-                  <CircularProgress size={32} />
-                ) : (
-                  <AccountTreeOutlinedIcon sx={{ fontSize: 32, color: "primary.main" }} />
-                )}
-                <Typography component="span" variant="h6" sx={{ fontWeight: 700 }}>
-                  {divisao.nome}
+          <>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: opcoes.length === 1 ? "1fr" : "repeat(2, minmax(0, 1fr))",
+                  md: opcoes.length > 2 ? "repeat(3, minmax(0, 1fr))" : undefined,
+                },
+                gap: 2,
+                mt: 1,
+              }}
+            >
+              {opcoes.map((divisao) => (
+                <ButtonBase
+                  key={divisao.id}
+                  aria-label={"Gerar treino com " + divisao.nome}
+                  disabled={gerando}
+                  onClick={() => {
+                    setSelecionada(divisao.id);
+                    onEscolher(divisao.id);
+                  }}
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-start",
+                    gap: 1,
+                    p: 3,
+                    width: "100%",
+                    border: "1px solid",
+                    borderColor: gerando && selecionada === divisao.id ? "primary.main" : "divider",
+                    borderRadius: 3,
+                    color: "text.primary",
+                    bgcolor: "action.hover",
+                    "&:hover": { borderColor: "primary.main" },
+                    "&.Mui-disabled": { opacity: 0.65 },
+                    "&.Mui-focusVisible": {
+                      outline: "2px solid",
+                      outlineColor: "primary.main",
+                      outlineOffset: 2,
+                    },
+                  }}
+                >
+                  {gerando && selecionada === divisao.id ? (
+                    <CircularProgress size={32} />
+                  ) : (
+                    <AccountTreeOutlinedIcon sx={{ fontSize: 32, color: "primary.main" }} />
+                  )}
+                  <Typography component="span" variant="h6" sx={{ fontWeight: 700 }}>
+                    {divisao.nome}
+                  </Typography>
+                  {divisao.nivelMinimo && (
+                    <Chip
+                      size="small"
+                      label={`Recomendado: ${divisao.nivelMinimo}+`}
+                      variant="outlined"
+                      sx={{ fontSize: "0.7rem" }}
+                    />
+                  )}
+                  <Typography component="span" variant="body2" color="text.secondary">
+                    {divisao.descricao}
+                  </Typography>
+                  <Box component="span" sx={{ display: "grid", gap: 0.75, mt: 1, textAlign: "left", width: "100%" }}>
+                    {divisao.sessoes.map((sessao) => (
+                      <Typography component="span" key={sessao.titulo} variant="caption" color="text.secondary">
+                        <Box component="span" sx={{ fontWeight: 700 }}>
+                          {sessao.titulo.replace(/^Treino /, "")}:
+                        </Box>{" "}
+                        {(sessao.gruposExibicao || sessao.grupos).join(", ")}
+                      </Typography>
+                    ))}
+                  </Box>
+                </ButtonBase>
+              ))}
+            </Box>
+
+            <Divider sx={{ my: 2.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                OU MONTE DO ZERO
+              </Typography>
+            </Divider>
+
+            <ButtonBase
+              aria-label="Gerar treino manual em branco"
+              disabled={gerando}
+              onClick={() => {
+                setSelecionada("manual");
+                onEscolher("manual");
+              }}
+              sx={{
+                display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
+                alignItems: "center",
+                justifyContent: "flex-start",
+                gap: 2,
+                p: 2.5,
+                width: "100%",
+                textAlign: { xs: "center", sm: "left" },
+                border: "1px dashed",
+                borderColor: gerando && selecionada === "manual" ? "primary.main" : "divider",
+                borderRadius: 3,
+                color: "text.primary",
+                bgcolor: "action.hover",
+                "&:hover": { borderColor: "primary.main" },
+                "&.Mui-disabled": { opacity: 0.65 },
+                "&.Mui-focusVisible": {
+                  outline: "2px solid",
+                  outlineColor: "primary.main",
+                  outlineOffset: 2,
+                },
+              }}
+            >
+              {gerando && selecionada === "manual" ? (
+                <CircularProgress size={32} sx={{ flexShrink: 0 }} />
+              ) : (
+                <EditNoteOutlinedIcon sx={{ fontSize: 36, color: "primary.main", flexShrink: 0 }} />
+              )}
+              <Box sx={{ flex: 1 }}>
+                <Typography component="div" variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  Treino Manual (Em Branco)
                 </Typography>
-                <Typography component="span" variant="body2" color="text.secondary">
-                  {divisao.descricao}
+                <Typography component="div" variant="body2" color="text.secondary">
+                  Gera a ficha vazia com {diasManuais.join(", ")} para você adicionar os exercícios e máquinas um por um.
                 </Typography>
-                <Box component="span" sx={{ display: "grid", gap: 0.75, mt: 1, textAlign: "left", width: "100%" }}>
-                  {divisao.sessoes.map((sessao) => (
-                    <Typography component="span" key={sessao.titulo} variant="caption" color="text.secondary">
-                      <Box component="span" sx={{ fontWeight: 700 }}>
-                        {sessao.titulo.replace(/^Treino /, "")}:
-                      </Box>{" "}
-                      {(sessao.gruposExibicao || sessao.grupos).join(", ")}
-                    </Typography>
-                  ))}
-                </Box>
-              </ButtonBase>
-            ))}
-          </Box>
+              </Box>
+            </ButtonBase>
+          </>
         )}
 
         {gerando && (
           <Typography role="status" variant="body2" sx={{ mt: 2, textAlign: "center" }}>
-            Gerando a ficha com a divisão escolhida...
+            {selecionada === "manual"
+              ? "Criando ficha em branco para montagem manual..."
+              : "Gerando a ficha com a divisão escolhida..."}
           </Typography>
         )}
       </DialogContent>

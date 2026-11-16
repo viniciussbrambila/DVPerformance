@@ -23,6 +23,18 @@ public static class ExercicioEndpoints
 
         app.MapGet("/exercicios/focos-musculares", () => Results.Ok(FocosMusculares.Opcoes));
 
+        app.MapGet("/exercicios/sugerir-classificacao", (string? grupo, string? nome) =>
+        {
+            var focoSugerido = FocosMusculares.Inferir(grupo ?? string.Empty, nome);
+            var nivelSugerido = FocosMusculares.InferirNivelMinimo(nome);
+            return Results.Ok(new
+            {
+                focoMuscular = focoSugerido == "geral" ? string.Empty : focoSugerido,
+                nivelMinimo = nivelSugerido,
+                niveisDisponiveis = FocosMusculares.NiveisExperiencia
+            });
+        });
+
         // Cria um grupo de rotas com o prefixo "/exercicios"
         var grupo = app.MapGroup("/exercicios");
 
@@ -154,6 +166,7 @@ public static class ExercicioEndpoints
                 mesmoNomeExistente.GrupoMuscular = grupoMuscular;
                 mesmoNomeExistente.Descricao = descricaoLimpa;
                 mesmoNomeExistente.FocoMuscular = novoExercicio.FocoMuscular;
+                mesmoNomeExistente.NivelMinimo = novoExercicio.NivelMinimo;
                 mesmoNomeExistente.Ativo = true;
 
                 await db.SaveChangesAsync();
@@ -230,6 +243,7 @@ public static class ExercicioEndpoints
             exercicioExistente.GrupoMuscularId = grupoMuscular!.Id;
             exercicioExistente.GrupoMuscular = grupoMuscular;
             exercicioExistente.FocoMuscular = dadosAtualizados.FocoMuscular;
+            exercicioExistente.NivelMinimo = dadosAtualizados.NivelMinimo;
             exercicioExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
             if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
@@ -322,9 +336,30 @@ public static class ExercicioEndpoints
         {
             if (!string.IsNullOrWhiteSpace(exercicio.FocoMuscular)
                 && !FocosMusculares.Valido(grupoEncontrado.Nome, exercicio.FocoMuscular))
+            {
                 erros.Add("Selecione um foco muscular válido para o grupo informado.");
+            }
             else
-                exercicio.FocoMuscular = FocosMusculares.Resolver(grupoEncontrado.Nome, nome, exercicio.FocoMuscular);
+            {
+                var focoResolvido = FocosMusculares.Resolver(grupoEncontrado.Nome, nome, exercicio.FocoMuscular);
+                if (focoResolvido == "geral")
+                {
+                    erros.Add("Selecione um foco muscular específico (padrão de movimento) para que o exercício se encaixe corretamente na geração de treinos.");
+                }
+                else
+                {
+                    exercicio.FocoMuscular = focoResolvido;
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(exercicio.NivelMinimo) && !FocosMusculares.NivelValido(exercicio.NivelMinimo))
+        {
+            erros.Add("Selecione um nível mínimo de experiência válido (Iniciante, Intermediário ou Avançado).");
+        }
+        else
+        {
+            exercicio.NivelMinimo = FocosMusculares.ResolverNivelMinimo(nome, exercicio.NivelMinimo);
         }
 
         return (erros, grupoEncontrado);
