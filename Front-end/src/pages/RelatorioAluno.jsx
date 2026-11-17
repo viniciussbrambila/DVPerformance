@@ -16,7 +16,7 @@ import {
   exportarPdfRelatorio,
 } from "../utils/relatorios";
 
-export default function RelatorioAluno({ glassStyle }) {
+export default function RelatorioAluno() {
   const { id } = useParams();
   const { alunos, carregando, erro } = useAlunosRelatorio();
   const aluno = alunos.find((item) => String(item.id) === id);
@@ -61,10 +61,7 @@ export default function RelatorioAluno({ glassStyle }) {
           <CircularProgress />
         </Box>
       ) : aluno ? (
-        <Paper
-          elevation={0}
-          sx={{ ...glassStyle, p: { xs: 3, md: 4 }, borderRadius: 4 }}
-        >
+        <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, borderRadius: 4 }}>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
             Dados do aluno
           </Typography>

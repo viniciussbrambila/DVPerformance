@@ -1,28 +1,11 @@
-import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Link,
-  Alert,
-  IconButton,
-  InputAdornment,
-} from "@mui/material";
+import { Typography, TextField, Button, Link, Alert } from "@mui/material";
 import { useState } from "react";
-import Marca from "../components/Marca";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import { AuthCardLayout, CampoSenha } from "../components/AuthLayout";
+import { API_BASE_URL } from "../services/api";
 
-const API_LOGIN_URL = "http://localhost:5011/auth/login";
+const API_LOGIN_URL = `${API_BASE_URL}/auth/login`;
 
-export default function Login({
-  glassStyle,
-  onLogin,
-  onIrCadastro,
-  onIrEsqueciSenha,
-}) {
-  const [showPassword, setShowPassword] = useState(false);
+export default function Login({ onLogin, onIrCadastro, onIrEsqueciSenha }) {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [tentouEntrar, setTentouEntrar] = useState(false);
@@ -68,130 +51,80 @@ export default function Login({
       };
 
       onLogin(dadosUsuario);
-    } catch (erro) {
+    } catch {
       setErroApi(
-        "Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em http://localhost:5011.",
+        `Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em ${API_BASE_URL}.`,
       );
     } finally {
       setCarregando(false);
     }
   };
+
   return (
-    <Box
-      sx={{
-        minHeight: "80vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
+    <AuthCardLayout
+      subtitulo="Insira suas credenciais para acessar o sistema"
+      onSubmit={handleSubmit}
     >
-      <Paper
-        elevation={0}
-        sx={{
-          ...glassStyle,
-          p: 4,
-          width: "100%",
-          maxWidth: 400,
-          borderRadius: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+      {erroApi && <Alert severity="error">{erroApi}</Alert>}
+
+      <TextField
+        label="Usuário"
+        type="text"
+        value={usuario}
+        onChange={(e) => setUsuario(e.target.value)}
+        autoComplete="username"
+        slotProps={{
+          htmlInput: {
+            autoCapitalize: "none",
+            autoCorrect: "off",
+            spellCheck: false,
+          },
         }}
+        error={tentouEntrar && !usuario.trim()}
+        helperText={
+          tentouEntrar && !usuario.trim() ? "Informe o seu usuário" : ""
+        }
+      />
+
+      <CampoSenha
+        label="Senha"
+        value={senha}
+        onChange={(e) => setSenha(e.target.value)}
+        error={tentouEntrar && !senha.trim()}
+        helperText={tentouEntrar && !senha.trim() ? "Informe a sua senha" : ""}
+      />
+
+      <Link
+        component="button"
+        type="button"
+        underline="hover"
+        onClick={onIrEsqueciSenha}
+        sx={{ alignSelf: "flex-end", fontSize: 14 }}
       >
-        <Marca />
+        Esqueci minha senha
+      </Link>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Insira suas credenciais para acessar o sistema
-        </Typography>
-
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          sx={{
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
+      <Button
+        type="submit"
+        variant="contained"
+        fullWidth
+        size="large"
+        disabled={carregando}
+      >
+        {carregando ? "Entrando..." : "Entrar"}
+      </Button>
+      <Typography variant="body2" sx={{ textAlign: "center" }}>
+        Não tem conta?{" "}
+        <Link
+          component="button"
+          type="button"
+          underline="hover"
+          onClick={onIrCadastro}
+          sx={{ verticalAlign: "baseline" }}
         >
-          {erroApi && <Alert severity="error">{erroApi}</Alert>}
-
-          <TextField
-            label="Usuário"
-            type="text"
-            size="Normal"
-            value={usuario}
-            onChange={(e) => setUsuario(e.target.value)}
-            autoComplete="username"
-            slotProps={{ htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } }}
-            error={tentouEntrar && !usuario.trim()}
-            helperText={
-              tentouEntrar && !usuario.trim()
-                ? "Informe o seu usuário"
-                : ""
-            }
-          />
-
-          <TextField
-            label="Senha"
-            size="Normal"
-            type={showPassword ? "text" : "password"}
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            error={tentouEntrar && !senha.trim()}
-            helperText={
-              tentouEntrar && !senha.trim() ? "Informe a sua senha" : ""
-            }
-            slotProps={{
-              input: {
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                      aria-label="Mostrar ou ocultar senha"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-
-          <Link
-            component="button"
-            type="button"
-            underline="hover"
-            onClick={onIrEsqueciSenha}
-            sx={{ alignSelf: "flex-end", fontSize: 14 }}
-          >
-            Esqueci minha senha
-          </Link>
-
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            size="large"
-            disabled={carregando}
-          >
-            {carregando ? "Entrando..." : "Entrar"}
-          </Button>
-          <Typography variant="body2" sx={{ textAlign: "center" }}>
-            Não tem conta?{" "}
-            <Link
-              component="button"
-              type="button"
-              underline="hover"
-              onClick={onIrCadastro}
-              sx={{ verticalAlign: "baseline" }}
-            >
-              Criar conta
-            </Link>
-          </Typography>
-        </Box>
-      </Paper>
-    </Box>
+          Criar conta
+        </Link>
+      </Typography>
+    </AuthCardLayout>
   );
 }

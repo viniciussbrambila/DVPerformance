@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, MenuItem, TextField, Typography } from "@mui/material";
 import { buscarComCache, lerCache, temCache } from "../utils/cacheSessao";
 import { normalizarTextoBusca } from "../utils/busca";
-import { fetchAutenticado } from "../services/api";
+import { API_BASE_URL, fetchAutenticado } from "../services/api";
 
 const CHAVE_CACHE = "focosMusculares";
-const API_URL = "http://localhost:5011/exercicios/focos-musculares";
+const API_URL = `${API_BASE_URL}/exercicios/focos-musculares`;
 
 export const OPCOES_NIVEL_MINIMO = [
   {
@@ -28,7 +28,7 @@ export const OPCOES_NIVEL_MINIMO = [
   },
 ];
 
-export const NIVEL_EXPERIENCIA_ORDEM = {
+const NIVEL_EXPERIENCIA_ORDEM = {
   Iniciante: 1,
   "Intermediário": 2,
   "Avançado": 3,

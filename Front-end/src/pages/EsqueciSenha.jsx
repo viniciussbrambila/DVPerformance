@@ -1,28 +1,15 @@
-import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Link,
-  Alert,
-  IconButton,
-  InputAdornment,
-} from "@mui/material";
+import { Typography, TextField, Button, Link, Alert } from "@mui/material";
 import { useState } from "react";
-import Marca from "../components/Marca";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import { AuthCardLayout, CampoSenha } from "../components/AuthLayout";
+import { API_BASE_URL } from "../services/api";
 
-const API_RECUPERAR_SENHA_URL = "http://localhost:5011/auth/recuperar-senha";
+const API_RECUPERAR_SENHA_URL = `${API_BASE_URL}/auth/recuperar-senha`;
 
-export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
+export default function EsqueciSenha({ onVoltarLogin }) {
   const [usuario, setUsuario] = useState("");
   const [codigoRecuperacao, setCodigoRecuperacao] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
-  const [showNova, setShowNova] = useState(false);
-  const [showConfirmar, setShowConfirmar] = useState(false);
   const [tentouEnviar, setTentouEnviar] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
@@ -62,7 +49,9 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
 
       if (!response.ok) {
         setErroApi(
-          data?.erros?.[0] || data?.mensagem || "Não foi possível redefinir a senha.",
+          data?.erros?.[0] ||
+            data?.mensagem ||
+            "Não foi possível redefinir a senha.",
         );
         return;
       }
@@ -72,165 +61,117 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
           "Senha alterada com sucesso! Você já pode entrar com a nova senha.",
       );
       setEnviado(true);
-    } catch (erro) {
+    } catch {
       setErroApi(
-        "Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em http://localhost:5011.",
+        `Não foi possível conectar ao servidor. Verifique se o Back-end está rodando em ${API_BASE_URL}.`,
       );
     } finally {
       setCarregando(false);
     }
   };
 
-  const campoSenhaProps = (visivel, setVisivel) => ({
-    input: {
-      endAdornment: (
-        <InputAdornment position="end">
-          <IconButton
-            onClick={() => setVisivel(!visivel)}
-            edge="end"
-            aria-label="Mostrar ou ocultar senha"
-          >
-            {visivel ? <VisibilityOff /> : <Visibility />}
-          </IconButton>
-        </InputAdornment>
-      ),
-    },
-  });
-
   return (
-    <Box
-      sx={{
-        minHeight: "80vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
+    <AuthCardLayout
+      subtitulo="Informe seu usuário, o código de segurança da academia e crie uma nova senha!"
+      subtituloCentralizado
+      onSubmit={handleSubmit}
+      noValidate
     >
-      <Paper
-        elevation={0}
-        sx={{
-          ...glassStyle,
-          p: 4,
-          width: "100%",
-          maxWidth: 400,
-          borderRadius: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+      {erroApi && <Alert severity="error">{erroApi}</Alert>}
+
+      {enviado && (
+        <Alert severity="success">
+          {mensagemSucesso ||
+            "Senha alterada com sucesso! Você já pode entrar com a nova senha."}
+        </Alert>
+      )}
+
+      <TextField
+        label="Usuário"
+        value={usuario}
+        onChange={(e) => setUsuario(e.target.value)}
+        autoComplete="username"
+        slotProps={{
+          htmlInput: {
+            autoCapitalize: "none",
+            autoCorrect: "off",
+            spellCheck: false,
+          },
         }}
+        error={tentouEnviar && !usuario.trim()}
+        helperText={
+          tentouEnviar && !usuario.trim() ? "Informe o seu usuário" : ""
+        }
+        disabled={enviado}
+      />
+
+      <TextField
+        label="Código de recuperação"
+        placeholder="Ex.: DVP-2026"
+        value={codigoRecuperacao}
+        onChange={(e) => setCodigoRecuperacao(e.target.value)}
+        slotProps={{
+          htmlInput: {
+            autoCapitalize: "characters",
+            autoCorrect: "off",
+            spellCheck: false,
+          },
+        }}
+        error={tentouEnviar && !codigoRecuperacao.trim()}
+        helperText={
+          tentouEnviar && !codigoRecuperacao.trim()
+            ? "Informe o código de recuperação (padrão acadêmico: DVP-2026)"
+            : "Código de validação da academia (padrão: DVP-2026)"
+        }
+        disabled={enviado}
+      />
+
+      <CampoSenha
+        label="Nova senha"
+        value={novaSenha}
+        onChange={(e) => setNovaSenha(e.target.value)}
+        error={tentouEnviar && senhaCurta}
+        helperText={
+          tentouEnviar && senhaCurta
+            ? "A senha deve ter ao menos 6 caracteres"
+            : ""
+        }
+        disabled={enviado}
+      />
+
+      <CampoSenha
+        label="Confirmar senha"
+        value={confirmarSenha}
+        onChange={(e) => setConfirmarSenha(e.target.value)}
+        error={tentouEnviar && senhasDiferentes}
+        helperText={
+          tentouEnviar && senhasDiferentes ? "As senhas não coincidem" : ""
+        }
+        disabled={enviado}
+      />
+
+      <Button
+        type="submit"
+        variant="contained"
+        fullWidth
+        size="large"
+        disabled={enviado || carregando}
       >
-        <Marca />
+        {carregando ? "Salvando..." : "Salvar"}
+      </Button>
 
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mb: 3, textAlign: "center" }}
+      <Typography variant="body2" sx={{ textAlign: "center" }}>
+        Lembrou a senha?{" "}
+        <Link
+          component="button"
+          type="button"
+          underline="hover"
+          onClick={onVoltarLogin}
+          sx={{ verticalAlign: "baseline" }}
         >
-          Informe seu usuário, o código de segurança da academia e crie uma nova senha!
-        </Typography>
-
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          noValidate
-          sx={{
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
-          {erroApi && <Alert severity="error">{erroApi}</Alert>}
-
-          {enviado && (
-            <Alert severity="success">
-              {mensagemSucesso ||
-                "Senha alterada com sucesso! Você já pode entrar com a nova senha."}
-            </Alert>
-          )}
-
-          <TextField
-            label="Usuário"
-            value={usuario}
-            onChange={(e) => setUsuario(e.target.value)}
-            autoComplete="username"
-            slotProps={{ htmlInput: { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } }}
-            error={tentouEnviar && !usuario.trim()}
-            helperText={
-              tentouEnviar && !usuario.trim()
-                ? "Informe o seu usuário"
-                : ""
-            }
-            disabled={enviado}
-          />
-
-          <TextField
-            label="Código de recuperação"
-            placeholder="Ex.: DVP-2026"
-            value={codigoRecuperacao}
-            onChange={(e) => setCodigoRecuperacao(e.target.value)}
-            slotProps={{ htmlInput: { autoCapitalize: "characters", autoCorrect: "off", spellCheck: false } }}
-            error={tentouEnviar && !codigoRecuperacao.trim()}
-            helperText={
-              tentouEnviar && !codigoRecuperacao.trim()
-                ? "Informe o código de recuperação (padrão acadêmico: DVP-2026)"
-                : "Código de validação da academia (padrão: DVP-2026)"
-            }
-            disabled={enviado}
-          />
-
-          <TextField
-            label="Nova senha"
-            type={showNova ? "text" : "password"}
-            value={novaSenha}
-            onChange={(e) => setNovaSenha(e.target.value)}
-            error={tentouEnviar && senhaCurta}
-            helperText={
-              tentouEnviar && senhaCurta
-                ? "A senha deve ter ao menos 6 caracteres"
-                : ""
-            }
-            disabled={enviado}
-            slotProps={campoSenhaProps(showNova, setShowNova)}
-          />
-
-          <TextField
-            label="Confirmar senha"
-            type={showConfirmar ? "text" : "password"}
-            value={confirmarSenha}
-            onChange={(e) => setConfirmarSenha(e.target.value)}
-            error={tentouEnviar && senhasDiferentes}
-            helperText={
-              tentouEnviar && senhasDiferentes ? "As senhas não coincidem" : ""
-            }
-            disabled={enviado}
-            slotProps={campoSenhaProps(showConfirmar, setShowConfirmar)}
-          />
-
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            size="large"
-            disabled={enviado || carregando}
-          >
-            {carregando ? "Salvando..." : "Salvar"}
-          </Button>
-
-          <Typography variant="body2" sx={{ textAlign: "center" }}>
-            Lembrou a senha?{" "}
-            <Link
-              component="button"
-              type="button"
-              underline="hover"
-              onClick={onVoltarLogin}
-              sx={{ verticalAlign: "baseline" }}
-            >
-              Voltar ao login
-            </Link>
-          </Typography>
-        </Box>
-      </Paper>
-    </Box>
+          Voltar ao login
+        </Link>
+      </Typography>
+    </AuthCardLayout>
   );
 }

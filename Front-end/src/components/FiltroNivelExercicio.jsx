@@ -60,11 +60,9 @@ export default function FiltroNivelExercicio({
         aria-expanded={aberto ? "true" : undefined}
         aria-label="Filtrar por nível do exercício"
         sx={{
-          minHeight: 56,
+          minHeight: 40,
           px: 2,
-          borderRadius: 1,
           borderColor: filtroAtivo ? "primary.main" : "divider",
-          textTransform: "none",
           fontWeight: 500,
           whiteSpace: "nowrap",
         }}
@@ -103,9 +101,7 @@ export default function FiltroNivelExercicio({
               <ListItemText
                 primary={opcao.valor}
                 secondary={
-                  !permitido
-                    ? `Bloqueado (aluno ${nivelAluno})`
-                    : undefined
+                  !permitido ? `Bloqueado (aluno ${nivelAluno})` : undefined
                 }
                 slotProps={{
                   primary: { fontWeight: 500, fontSize: "0.95rem" },

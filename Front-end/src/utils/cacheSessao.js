@@ -1,7 +1,7 @@
 // Cache leve em memória de sessão para manter os dados já carregados da API
 // entre trocas de tela (padrão Stale-While-Revalidate, sem regras de negócio).
 
-import { fetchAutenticado } from "../services/api";
+import { API_BASE_URL, fetchAutenticado } from "../services/api";
 
 const cache = new Map();
 const requisicoesEmAndamento = new Map();
@@ -51,7 +51,7 @@ export function salvarCache(chave, dados) {
   return dados;
 }
 
-export function cacheEstaFresco(chave, ttlMs = TTL_PADRAO_MS) {
+function cacheEstaFresco(chave, ttlMs = TTL_PADRAO_MS) {
   const entrada = cache.get(chave);
   if (!entrada || entrada.atualizadoEm <= 0) return false;
   return Date.now() - entrada.atualizadoEm < ttlMs;
@@ -142,8 +142,6 @@ export async function buscarComCache(
 export function preCarregarSessao(usuarioId) {
   if (!usuarioId) return;
 
-  const base = "http://localhost:5011";
-
   const buscarJson = async (url) => {
     const resp = await fetchAutenticado(url, { cache: "no-store" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -151,23 +149,25 @@ export function preCarregarSessao(usuarioId) {
   };
 
   buscarComCache(`exercicios:${usuarioId}`, () =>
-    buscarJson(`${base}/exercicios?usuarioId=${usuarioId}`),
+    buscarJson(`${API_BASE_URL}/exercicios?usuarioId=${usuarioId}`),
   ).catch(() => {});
 
   buscarComCache(`maquinas:${usuarioId}`, () =>
-    buscarJson(`${base}/maquinas?usuarioId=${usuarioId}`),
+    buscarJson(`${API_BASE_URL}/maquinas?usuarioId=${usuarioId}`),
   ).catch(() => {});
 
   buscarComCache(`alunos:${usuarioId}`, () =>
-    buscarJson(`${base}/alunos?usuarioId=${usuarioId}`),
+    buscarJson(`${API_BASE_URL}/alunos?usuarioId=${usuarioId}`),
   ).catch(() => {});
 
   buscarComCache(`alunosSemTreino:${usuarioId}`, () =>
-    buscarJson(`${base}/alunos/sem-treino?usuarioId=${usuarioId}`),
+    buscarJson(`${API_BASE_URL}/alunos/sem-treino?usuarioId=${usuarioId}`),
   ).catch(() => {});
 
   buscarComCache(`planos:${usuarioId}`, async () => {
-    const planos = await buscarJson(`${base}/treinos?usuarioId=${usuarioId}`);
+    const planos = await buscarJson(
+      `${API_BASE_URL}/treinos?usuarioId=${usuarioId}`,
+    );
     if (Array.isArray(planos)) {
       planos.forEach((p) => {
         if (p?.id != null) salvarCache(`planoDetalhe:${p.id}`, p);

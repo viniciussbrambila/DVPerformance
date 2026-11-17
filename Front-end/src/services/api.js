@@ -10,7 +10,7 @@ export function lerUsuarioSessao() {
   }
 }
 
-export function obterHeadersAutenticados(headersExtras = {}) {
+function obterHeadersAutenticados(headersExtras = {}) {
   const usuario = lerUsuarioSessao();
   const headers = { ...headersExtras };
 

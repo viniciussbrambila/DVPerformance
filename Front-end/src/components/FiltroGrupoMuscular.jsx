@@ -139,11 +139,9 @@ export default function FiltroGrupoMuscular({
         aria-expanded={aberto ? "true" : undefined}
         aria-label="Filtrar por região ou grupo muscular"
         sx={{
-          minHeight: 56,
+          minHeight: 40,
           px: 2,
-          borderRadius: 1,
           borderColor: filtroAtivo ? "primary.main" : "divider",
-          textTransform: "none",
           fontWeight: 500,
           whiteSpace: "nowrap",
         }}

@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { buscarComCache, lerCache, temCache } from "../utils/cacheSessao";
+import { prepararAlunosRelatorio } from "../utils/relatorios";
 import {
-  obterUsuarioRelatorio,
-  prepararAlunosRelatorio,
-} from "../utils/relatorios";
-import { fetchAutenticado } from "../services/api";
+  API_BASE_URL,
+  fetchAutenticado,
+  lerUsuarioSessao,
+} from "../services/api";
 
 export default function useAlunosRelatorio() {
-  const usuario = obterUsuarioRelatorio();
+  const usuario = lerUsuarioSessao();
   const usuarioId = usuario?.id;
   const chave = usuarioId ? `alunos:${usuarioId}` : null;
   const [lista, setLista] = useState(() => (chave && lerCache(chave)) || []);
@@ -30,7 +31,7 @@ export default function useAlunosRelatorio() {
       try {
         const dados = await buscarComCache(chave, async () => {
           const resposta = await fetchAutenticado(
-            `http://localhost:5011/alunos?usuarioId=${usuarioId}`,
+            `${API_BASE_URL}/alunos?usuarioId=${usuarioId}`,
           );
           if (!resposta.ok)
             throw new Error("Não foi possível carregar os alunos.");

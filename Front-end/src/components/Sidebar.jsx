@@ -8,6 +8,7 @@ import {
   Box,
   Typography,
 } from "@mui/material";
+import { styled } from "@mui/material/styles";
 import { Link, useLocation } from "react-router-dom";
 import Marca from "./Marca";
 import PeopleIcon from "@mui/icons-material/People";
@@ -18,30 +19,43 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-const iconSx = { minWidth: 0, mr: 3, justifyContent: "center" };
-const itemSx = {
+const NavItemButton = styled(ListItemButton)(({ theme }) => ({
   minHeight: 48,
-  px: 2.5,
-  mx: 1,
-  mb: 0.5,
-  borderRadius: 2,
-  "&.Mui-selected": {
-    bgcolor: "primary.main",
-    color: "primary.contrastText",
-    "&:hover": { bgcolor: "primary.dark" },
-    "& .MuiListItemIcon-root": { color: "inherit" },
+  paddingInline: theme.spacing(2.5),
+  marginInline: theme.spacing(1),
+  marginBottom: theme.spacing(0.5),
+  borderRadius: theme.spacing(2),
+  "& .MuiListItemIcon-root": {
+    minWidth: 0,
+    marginRight: theme.spacing(3),
+    justifyContent: "center",
   },
-};
+  "&.Mui-selected": {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    "&:hover": {
+      backgroundColor: theme.palette.primary.dark,
+    },
+    "& .MuiListItemIcon-root": {
+      color: "inherit",
+    },
+  },
+}));
 
-export default function Sidebar({
-  drawerWidth,
-  glassStyle,
-  onSair,
-  usuarioLogado,
-}) {
+const ITENS_NAVEGACAO = [
+  { rota: "/dashboard", texto: "Dashboard", Icone: DashboardIcon },
+  { rota: "/treinos", texto: "Gerar Treino", Icone: AddTaskIcon },
+  { rota: "/alunos", texto: "Alunos", Icone: PeopleIcon },
+  { rota: "/exercicios", texto: "Exercícios", Icone: DirectionsRunIcon },
+  { rota: "/maquinas", texto: "Máquinas", Icone: FitnessCenterIcon },
+  { rota: "/planos", texto: "Planos de Treino", Icone: AssignmentIcon },
+];
+
+export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
   const { pathname } = useLocation();
   const estaAtivo = (rota) =>
     pathname === rota || pathname.startsWith(`${rota}/`);
+
   return (
     <Drawer
       variant="permanent"
@@ -54,8 +68,6 @@ export default function Sidebar({
           display: "flex",
           flexDirection: "column",
           whiteSpace: "nowrap",
-          borderRight: "none",
-          ...(glassStyle || {}),
         },
       }}
     >
@@ -63,7 +75,12 @@ export default function Sidebar({
         <Marca compacta />
         <Typography
           variant="h6"
-          sx={{ mt: 0.5, fontSize: 14, fontWeight: 500, color: "text.secondary" }}
+          sx={{
+            mt: 0.5,
+            fontSize: 14,
+            fontWeight: 500,
+            color: "text.secondary",
+          }}
           noWrap
         >
           Sistema de Geração de Treino
@@ -73,77 +90,19 @@ export default function Sidebar({
       <Divider />
 
       <List component="nav">
-        <ListItemButton
-          component={Link}
-          to="/dashboard"
-          selected={estaAtivo("/dashboard")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <DashboardIcon />
-          </ListItemIcon>
-          <ListItemText primary="Dashboard" />
-        </ListItemButton>
-
-        <ListItemButton
-          component={Link}
-          to="/treinos"
-          selected={estaAtivo("/treinos")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <AddTaskIcon />
-          </ListItemIcon>
-          <ListItemText primary="Gerar Treino" />
-        </ListItemButton>
-
-        <ListItemButton
-          component={Link}
-          to="/alunos"
-          selected={estaAtivo("/alunos")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <PeopleIcon />
-          </ListItemIcon>
-          <ListItemText primary="Alunos" />
-        </ListItemButton>
-
-        <ListItemButton
-          component={Link}
-          to="/exercicios"
-          selected={estaAtivo("/exercicios")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <DirectionsRunIcon />
-          </ListItemIcon>
-          <ListItemText primary="Exercícios" />
-        </ListItemButton>
-
-        <ListItemButton
-          component={Link}
-          to="/maquinas"
-          selected={estaAtivo("/maquinas")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <FitnessCenterIcon />
-          </ListItemIcon>
-          <ListItemText primary="Máquinas" />
-        </ListItemButton>
-
-        <ListItemButton
-          component={Link}
-          to="/planos"
-          selected={estaAtivo("/planos")}
-          sx={itemSx}
-        >
-          <ListItemIcon sx={iconSx}>
-            <AssignmentIcon />
-          </ListItemIcon>
-          <ListItemText primary="Planos de Treino" />
-        </ListItemButton>
+        {ITENS_NAVEGACAO.map(({ rota, texto, Icone }) => (
+          <NavItemButton
+            key={rota}
+            component={Link}
+            to={rota}
+            selected={estaAtivo(rota)}
+          >
+            <ListItemIcon>
+              <Icone />
+            </ListItemIcon>
+            <ListItemText primary={texto} />
+          </NavItemButton>
+        ))}
       </List>
 
       <Box sx={{ mt: "auto" }}>
@@ -158,15 +117,12 @@ export default function Sidebar({
           </Typography>
         </Box>
 
-        <ListItemButton
-          onClick={onSair}
-          sx={{ ...itemSx, mb: 1, color: "error.main" }}
-        >
-          <ListItemIcon sx={{ ...iconSx, color: "inherit" }}>
+        <NavItemButton onClick={onSair} sx={{ mb: 1, color: "error.main" }}>
+          <ListItemIcon sx={{ color: "inherit" }}>
             <LogoutIcon />
           </ListItemIcon>
           <ListItemText primary="Sair" />
-        </ListItemButton>
+        </NavItemButton>
       </Box>
     </Drawer>
   );

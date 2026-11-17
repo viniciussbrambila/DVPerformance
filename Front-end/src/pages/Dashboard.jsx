@@ -7,25 +7,19 @@ import AddTaskIcon from "@mui/icons-material/AddTask";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import { buscarComCache, lerCache } from "../utils/cacheSessao";
-import { fetchAutenticado } from "../services/api";
+import {
+  API_BASE_URL,
+  fetchAutenticado,
+  lerUsuarioSessao,
+} from "../services/api";
 
-const DASHBOARD_RESUMO_URL = "http://localhost:5011/dashboard/resumo";
+const DASHBOARD_RESUMO_URL = `${API_BASE_URL}/dashboard/resumo`;
 
-const obterUsuarioLogado = () => {
-  try {
-    const salvo = localStorage.getItem("usuarioLogado");
-    return salvo ? JSON.parse(salvo) : null;
-  } catch {
-    return null;
-  }
-};
-
-function CardContagem({ glassStyle, icone, titulo, valor }) {
+function CardContagem({ icone, titulo, valor }) {
   return (
     <Paper
       elevation={0}
       sx={{
-        ...glassStyle,
         p: 3,
         borderRadius: 4,
         display: "flex",
@@ -56,12 +50,9 @@ function CardContagem({ glassStyle, icone, titulo, valor }) {
   );
 }
 
-function BotaoAcesso({ glassStyle, icone, texto, onClick }) {
+function BotaoAcesso({ icone, texto, onClick }) {
   return (
-    <Paper
-      elevation={0}
-      sx={{ ...glassStyle, borderRadius: 3, minWidth: 0 }}
-    >
+    <Paper elevation={0} sx={{ borderRadius: 3, minWidth: 0 }}>
       <ButtonBase
         onClick={onClick}
         sx={{
@@ -84,10 +75,12 @@ function BotaoAcesso({ glassStyle, icone, texto, onClick }) {
   );
 }
 
-export default function Dashboard({ glassStyle }) {
+export default function Dashboard() {
   const navigate = useNavigate();
-  const usuarioInicial = obterUsuarioLogado();
-  const chaveCache = usuarioInicial?.id ? `dashboard:${usuarioInicial.id}` : null;
+  const usuarioInicial = lerUsuarioSessao();
+  const chaveCache = usuarioInicial?.id
+    ? `dashboard:${usuarioInicial.id}`
+    : null;
   const resumoSalvo = chaveCache ? lerCache(chaveCache) : null;
 
   const [totalAlunos, setTotalAlunos] = useState(
@@ -99,7 +92,7 @@ export default function Dashboard({ glassStyle }) {
 
   useEffect(() => {
     const carregarContagens = async () => {
-      const usuarioLogado = obterUsuarioLogado();
+      const usuarioLogado = lerUsuarioSessao();
       if (!usuarioLogado?.id) return;
 
       const chave = `dashboard:${usuarioLogado.id}`;
@@ -132,13 +125,11 @@ export default function Dashboard({ glassStyle }) {
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mb: 5 }}>
         <CardContagem
-          glassStyle={glassStyle}
           icone={<PeopleOutlinedIcon />}
           titulo="Alunos Cadastrados"
           valor={totalAlunos}
         />
         <CardContagem
-          glassStyle={glassStyle}
           icone={<DescriptionOutlinedIcon />}
           titulo="Planos Gerados"
           valor={totalPlanos}
@@ -162,31 +153,26 @@ export default function Dashboard({ glassStyle }) {
         }}
       >
         <BotaoAcesso
-          glassStyle={glassStyle}
           icone={<PeopleOutlinedIcon />}
           texto="Gerenciar Alunos"
           onClick={() => navigate("/alunos")}
         />
         <BotaoAcesso
-          glassStyle={glassStyle}
           icone={<AddTaskIcon />}
           texto="Gerar Novo Treino"
           onClick={() => navigate("/treinos")}
         />
         <BotaoAcesso
-          glassStyle={glassStyle}
           icone={<DescriptionOutlinedIcon />}
           texto="Ver Planos"
           onClick={() => navigate("/planos")}
         />
         <BotaoAcesso
-          glassStyle={glassStyle}
           icone={<DirectionsRunIcon />}
           texto="Exercícios"
           onClick={() => navigate("/exercicios")}
         />
         <BotaoAcesso
-          glassStyle={glassStyle}
           icone={<FitnessCenterIcon />}
           texto="Máquinas"
           onClick={() => navigate("/maquinas")}

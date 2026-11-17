@@ -4,7 +4,9 @@ import {
   Typography,
   Button,
   ButtonBase,
+  ButtonGroup,
   IconButton,
+  Tooltip,
   Divider,
   TextField,
   Alert,
@@ -37,7 +39,11 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import RestoreOutlinedIcon from "@mui/icons-material/RestoreOutlined";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
-import { exportarPdfRelatorio } from "../utils/relatorios";
+import { DialogoConfirmacao } from "../components/DialogoConfirmacao";
+import {
+  exportarPdfRelatorio,
+  formatarMedidaRelatorio,
+} from "../utils/relatorios";
 import Exercicios from "./Exercicios";
 import Maquinas from "./Maquinas";
 import {
@@ -59,16 +65,11 @@ import {
   removerCache,
   atualizarItemEmListasCache,
 } from "../utils/cacheSessao";
-import { fetchAutenticado } from "../services/api";
+import { API_BASE_URL, fetchAutenticado } from "../services/api";
 
-const API_URL = "http://localhost:5011/treinos";
+const API_URL = `${API_BASE_URL}/treinos`;
 
 const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
-
-const formatarMedida = (valor, unidade) =>
-  valor == null || valor === ""
-    ? "Não informado"
-    : `${Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unidade}`;
 
 const cabecalhoSx = {
   fontWeight: 700,
@@ -127,7 +128,7 @@ const planoSemExercicios = (dados) =>
   dados.dias.length > 0 &&
   dados.dias.every((dia) => (dia.exercicios || []).length === 0);
 
-export default function PlanoDetalhe({ glassStyle }) {
+export default function PlanoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -360,11 +361,14 @@ export default function PlanoDetalhe({ glassStyle }) {
     setErroApi("");
 
     try {
-      const response = await fetchAutenticado(API_URL + "/" + plano.id + "/itens", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itens: montarItensEdicao(diasEdicao) }),
-      });
+      const response = await fetchAutenticado(
+        API_URL + "/" + plano.id + "/itens",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itens: montarItensEdicao(diasEdicao) }),
+        },
+      );
 
       const dados = await response.json().catch(() => null);
       if (!response.ok) {
@@ -439,8 +443,8 @@ export default function PlanoDetalhe({ glassStyle }) {
 
   const infos = [
     ["Aluno", plano.aluno],
-    ["Peso", formatarMedida(plano.peso, "kg")],
-    ["Altura", formatarMedida(plano.altura, "m")],
+    ["Peso", formatarMedidaRelatorio(plano.peso, "kg")],
+    ["Altura", formatarMedidaRelatorio(plano.altura, "m")],
     ["Objetivo", plano.objetivo],
     ["Frequência", `${plano.frequencia} dias/semana`],
     ["Data", formatarData(plano.data)],
@@ -567,7 +571,11 @@ export default function PlanoDetalhe({ glassStyle }) {
       )}
 
       {planoVazio && (
-        <Alert severity={ehTreinoManual ? "info" : "warning"} className="no-print" sx={{ mb: 3 }}>
+        <Alert
+          severity={ehTreinoManual ? "info" : "warning"}
+          className="no-print"
+          sx={{ mb: 3 }}
+        >
           {ehTreinoManual
             ? "Ficha em branco: clique em Adicionar em cada dia do treino abaixo para escolher exercícios ou máquinas e depois clique em Salvar."
             : "O plano precisa manter pelo menos um exercício ou máquina."}
@@ -577,34 +585,8 @@ export default function PlanoDetalhe({ glassStyle }) {
       <Paper
         elevation={0}
         sx={{
-          ...glassStyle,
           p: { xs: 3, md: 5 },
           borderRadius: 4,
-          "@media print": {
-            background: "#fff !important",
-            color: "#000 !important",
-            boxShadow: "none !important",
-            border: "none !important",
-            backdropFilter: "none !important",
-            padding: "0 !important",
-            borderRadius: 0,
-            boxDecorationBreak: "clone",
-            WebkitBoxDecorationBreak: "clone",
-            "& .MuiTypography-root, & .MuiTableCell-root": {
-              color: "#000 !important",
-            },
-            "& .info-faixa": {
-              backgroundColor: "#f3f4f6 !important",
-              printColorAdjust: "exact",
-              WebkitPrintColorAdjust: "exact",
-            },
-            "& .rotulo-dia": {
-              backgroundColor: "#000 !important",
-              color: "#fff !important",
-              printColorAdjust: "exact",
-              WebkitPrintColorAdjust: "exact",
-            },
-          },
         }}
       >
         <Box sx={{ textAlign: "center", mb: 3 }}>
@@ -745,7 +727,11 @@ export default function PlanoDetalhe({ glassStyle }) {
                 <TableBody>
                   {(dia.exercicios || []).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={editando ? 5 : 4} align="center" sx={{ py: 3, color: "text.secondary" }}>
+                      <TableCell
+                        colSpan={editando ? 5 : 4}
+                        align="center"
+                        sx={{ py: 3, color: "text.secondary" }}
+                      >
                         {ehTreinoManual
                           ? editando
                             ? "Nenhum exercício neste dia ainda. Clique em Adicionar abaixo para incluir exercícios ou máquinas."
@@ -839,51 +825,57 @@ export default function PlanoDetalhe({ glassStyle }) {
                               flexWrap: "wrap",
                             }}
                           >
-                            <Box sx={{ display: "flex" }}>
-                              <IconButton
-                                size="small"
-                                color="inherit"
-                                title="Mover para cima"
-                                aria-label={`Mover ${ex.nome} para cima em ${dia.nome}`}
-                                disabled={salvando || indiceEx === 0}
-                                onClick={() =>
-                                  setDiasEdicao((lista) =>
-                                    moverItemNoPlano(
-                                      lista,
-                                      indiceDia,
-                                      indiceEx,
-                                      -1,
-                                    ),
-                                  )
-                                }
-                                sx={{ bgcolor: "action.hover" }}
-                              >
-                                <KeyboardArrowUpIcon />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                color="inherit"
-                                title="Mover para baixo"
-                                aria-label={`Mover ${ex.nome} para baixo em ${dia.nome}`}
-                                disabled={
-                                  salvando ||
-                                  indiceEx === dia.exercicios.length - 1
-                                }
-                                onClick={() =>
-                                  setDiasEdicao((lista) =>
-                                    moverItemNoPlano(
-                                      lista,
-                                      indiceDia,
-                                      indiceEx,
-                                      1,
-                                    ),
-                                  )
-                                }
-                                sx={{ bgcolor: "action.hover" }}
-                              >
-                                <KeyboardArrowDownIcon />
-                              </IconButton>
-                            </Box>
+                            <ButtonGroup size="small" variant="text">
+                              <Tooltip title="Mover para cima">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="inherit"
+                                    aria-label={`Mover ${ex.nome} para cima em ${dia.nome}`}
+                                    disabled={salvando || indiceEx === 0}
+                                    onClick={() =>
+                                      setDiasEdicao((lista) =>
+                                        moverItemNoPlano(
+                                          lista,
+                                          indiceDia,
+                                          indiceEx,
+                                          -1,
+                                        ),
+                                      )
+                                    }
+                                    sx={{ bgcolor: "action.hover" }}
+                                  >
+                                    <KeyboardArrowUpIcon />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title="Mover para baixo">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="inherit"
+                                    aria-label={`Mover ${ex.nome} para baixo em ${dia.nome}`}
+                                    disabled={
+                                      salvando ||
+                                      indiceEx === dia.exercicios.length - 1
+                                    }
+                                    onClick={() =>
+                                      setDiasEdicao((lista) =>
+                                        moverItemNoPlano(
+                                          lista,
+                                          indiceDia,
+                                          indiceEx,
+                                          1,
+                                        ),
+                                      )
+                                    }
+                                    sx={{ bgcolor: "action.hover" }}
+                                  >
+                                    <KeyboardArrowDownIcon />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </ButtonGroup>
                             <Button
                               size="small"
                               color="inherit"
@@ -1031,12 +1023,8 @@ export default function PlanoDetalhe({ glassStyle }) {
         maxWidth="sm"
         fullWidth
         aria-labelledby="escolher-catalogo-titulo"
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
       >
-        <DialogTitle
-          id="escolher-catalogo-titulo"
-          sx={{ fontWeight: "bold", fontSize: "1.35rem", textAlign: "center" }}
-        >
+        <DialogTitle id="escolher-catalogo-titulo" sx={{ textAlign: "center" }}>
           {selecaoItem?.itemAtual
             ? "Como deseja substituir este item?"
             : "O que deseja adicionar ao plano?"}
@@ -1085,7 +1073,7 @@ export default function PlanoDetalhe({ glassStyle }) {
             ))}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+        <DialogActions>
           <Button color="inherit" onClick={fecharSelecao}>
             Cancelar
           </Button>
@@ -1101,7 +1089,6 @@ export default function PlanoDetalhe({ glassStyle }) {
         <Box sx={{ p: { xs: 2, md: 4 } }}>
           {selecaoItem?.tipoCatalogo === "maquina" ? (
             <Maquinas
-              glassStyle={glassStyle}
               onSelecionar={selecionarItem}
               onVoltar={fecharSelecao}
               itemAtualId={selecaoItem.itemAtual?.maquinaId}
@@ -1111,7 +1098,6 @@ export default function PlanoDetalhe({ glassStyle }) {
             />
           ) : selecaoItem?.tipoCatalogo === "exercicio" ? (
             <Exercicios
-              glassStyle={glassStyle}
               onSelecionar={selecionarItem}
               onVoltar={fecharSelecao}
               itemAtualId={selecaoItem.itemAtual?.exercicioId}
@@ -1122,107 +1108,62 @@ export default function PlanoDetalhe({ glassStyle }) {
           ) : null}
         </Box>
 
-        <Dialog
+        <DialogoConfirmacao
           open={Boolean(substitutoSelecionado)}
           onClose={() => setSubstitutoSelecionado(null)}
-          maxWidth="xs"
-          fullWidth
-          aria-labelledby="substituir-item-titulo"
-          aria-describedby="substituir-item-descricao"
-          slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+          titulo="Confirmar substituição"
+          idTitulo="substituir-item-titulo"
+          idDescricao="substituir-item-descricao"
+          confirmarCor="primary"
+          confirmarIcone={<CheckCircleOutlinedIcon />}
+          onConfirmar={confirmarSubstituicao}
         >
-          <DialogTitle
-            id="substituir-item-titulo"
-            sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
-          >
-            Confirmar substituição
-          </DialogTitle>
-          <DialogContent>
-            <Typography id="substituir-item-descricao" color="text.secondary">
-              Confirmar a substituição{" "}
-              {selecaoItem?.itemAtual?.maquinaId != null
-                ? "da máquina"
-                : "do exercício"}{" "}
-              <Box
-                component="span"
-                sx={{ fontWeight: 700, color: "text.primary" }}
-              >
-                {selecaoItem?.itemAtual?.nome}
-              </Box>{" "}
-              {selecaoItem?.tipoCatalogo === "maquina"
-                ? "pela máquina"
-                : "pelo exercício"}{" "}
-              <Box
-                component="span"
-                sx={{ fontWeight: 700, color: "text.primary" }}
-              >
-                {substitutoSelecionado?.nome}
-              </Box>
-              ?
-            </Typography>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-            <Button
-              color="inherit"
-              onClick={() => setSubstitutoSelecionado(null)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<CheckCircleOutlinedIcon />}
-              onClick={confirmarSubstituicao}
-            >
-              Confirmar
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(itemParaExcluir)}
-        onClose={() => setItemParaExcluir(null)}
-        maxWidth="xs"
-        fullWidth
-        aria-labelledby="excluir-item-titulo"
-        aria-describedby="excluir-item-descricao"
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
-      >
-        <DialogTitle
-          id="excluir-item-titulo"
-          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
-        >
-          Confirmar exclusão
-        </DialogTitle>
-        <DialogContent>
-          <Typography id="excluir-item-descricao" color="text.secondary">
-            Tem certeza de que deseja excluir{" "}
-            {itemParaExcluir?.maquinaId != null
-              ? "esta máquina"
-              : "este exercício"}{" "}
+          <Typography id="substituir-item-descricao" color="text.secondary">
+            Confirmar a substituição{" "}
+            {selecaoItem?.itemAtual?.maquinaId != null
+              ? "da máquina"
+              : "do exercício"}{" "}
             <Box
               component="span"
               sx={{ fontWeight: 700, color: "text.primary" }}
             >
-              {itemParaExcluir?.nome}
+              {selecaoItem?.itemAtual?.nome}
             </Box>{" "}
-            do plano?
+            {selecaoItem?.tipoCatalogo === "maquina"
+              ? "pela máquina"
+              : "pelo exercício"}{" "}
+            <Box
+              component="span"
+              sx={{ fontWeight: 700, color: "text.primary" }}
+            >
+              {substitutoSelecionado?.nome}
+            </Box>
+            ?
           </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-          <Button color="inherit" onClick={() => setItemParaExcluir(null)}>
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            startIcon={<DeleteOutlinedIcon />}
-            onClick={confirmarExclusao}
-          >
-            Excluir
-          </Button>
-        </DialogActions>
+        </DialogoConfirmacao>
       </Dialog>
+
+      <DialogoConfirmacao
+        open={Boolean(itemParaExcluir)}
+        onClose={() => setItemParaExcluir(null)}
+        titulo="Confirmar exclusão"
+        idTitulo="excluir-item-titulo"
+        idDescricao="excluir-item-descricao"
+        confirmarTexto="Excluir"
+        confirmarIcone={<DeleteOutlinedIcon />}
+        onConfirmar={confirmarExclusao}
+      >
+        <Typography id="excluir-item-descricao" color="text.secondary">
+          Tem certeza de que deseja excluir{" "}
+          {itemParaExcluir?.maquinaId != null
+            ? "esta máquina"
+            : "este exercício"}{" "}
+          <Box component="span" sx={{ fontWeight: 700, color: "text.primary" }}>
+            {itemParaExcluir?.nome}
+          </Box>{" "}
+          do plano?
+        </Typography>
+      </DialogoConfirmacao>
 
       <Dialog
         open={Boolean(edicaoAerobico)}
@@ -1230,13 +1171,9 @@ export default function PlanoDetalhe({ glassStyle }) {
         maxWidth="xs"
         fullWidth
         aria-labelledby="editar-aerobico-titulo"
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
       >
         <Box component="form" onSubmit={confirmarAerobico}>
-          <DialogTitle
-            id="editar-aerobico-titulo"
-            sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
-          >
+          <DialogTitle id="editar-aerobico-titulo">
             {edicaoAerobico?.adicionando
               ? "Adicionar aeróbico"
               : "Editar aeróbico"}
@@ -1280,7 +1217,7 @@ export default function PlanoDetalhe({ glassStyle }) {
               </Typography>
             )}
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <DialogActions>
             <Button color="inherit" onClick={() => setEdicaoAerobico(null)}>
               Cancelar
             </Button>
@@ -1296,44 +1233,21 @@ export default function PlanoDetalhe({ glassStyle }) {
         </Box>
       </Dialog>
 
-      <Dialog
+      <DialogoConfirmacao
         open={diaParaRemoverAerobico !== null}
         onClose={() => setDiaParaRemoverAerobico(null)}
-        maxWidth="xs"
-        fullWidth
-        aria-labelledby="remover-aerobico-titulo"
-        aria-describedby="remover-aerobico-descricao"
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+        titulo="Remover aeróbico"
+        idTitulo="remover-aerobico-titulo"
+        idDescricao="remover-aerobico-descricao"
+        confirmarTexto="Remover"
+        confirmarIcone={<DeleteOutlinedIcon />}
+        onConfirmar={confirmarRemocaoAerobico}
       >
-        <DialogTitle
-          id="remover-aerobico-titulo"
-          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
-        >
-          Remover aeróbico
-        </DialogTitle>
-        <DialogContent>
-          <Typography id="remover-aerobico-descricao" color="text.secondary">
-            Tem certeza de que deseja remover o aeróbico de{" "}
-            {dias[diaParaRemoverAerobico]?.nome}?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-          <Button
-            color="inherit"
-            onClick={() => setDiaParaRemoverAerobico(null)}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            startIcon={<DeleteOutlinedIcon />}
-            onClick={confirmarRemocaoAerobico}
-          >
-            Remover
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Typography id="remover-aerobico-descricao" color="text.secondary">
+          Tem certeza de que deseja remover o aeróbico de{" "}
+          {dias[diaParaRemoverAerobico]?.nome}?
+        </Typography>
+      </DialogoConfirmacao>
 
       <Dialog
         open={avisoValidacaoAberto}
@@ -1342,12 +1256,8 @@ export default function PlanoDetalhe({ glassStyle }) {
         fullWidth
         aria-labelledby="validar-plano-titulo"
         aria-describedby="validar-plano-descricao"
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
       >
-        <DialogTitle
-          id="validar-plano-titulo"
-          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
-        >
+        <DialogTitle id="validar-plano-titulo">
           Validação necessária
         </DialogTitle>
         <DialogContent>
@@ -1355,7 +1265,7 @@ export default function PlanoDetalhe({ glassStyle }) {
             Você precisa validar esse plano antes de exportá-lo!
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+        <DialogActions>
           <Button
             color="inherit"
             onClick={() => setAvisoValidacaoAberto(false)}

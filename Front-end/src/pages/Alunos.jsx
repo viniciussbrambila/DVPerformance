@@ -34,6 +34,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import DesktopDatePicker from "../components/DesktopDatePicker";
 import DesktopDateRangePicker from "../components/DesktopDateRangePicker";
+import { DialogoConfirmacao } from "../components/DialogoConfirmacao";
 import {
   obterDataCadastro,
   formatarDataCadastro,
@@ -55,21 +56,16 @@ import {
   expirarCachePorPrefixo,
   removerCachePorPrefixo,
 } from "../utils/cacheSessao";
-import { fetchAutenticado } from "../services/api";
+import {
+  API_BASE_URL,
+  fetchAutenticado,
+  lerUsuarioSessao,
+} from "../services/api";
 
-const API_URL = "http://localhost:5011/alunos";
-
-const obterUsuarioLogado = () => {
-  try {
-    const salvo = localStorage.getItem("usuarioLogado");
-    return salvo ? JSON.parse(salvo) : null;
-  } catch {
-    return null;
-  }
-};
+const API_URL = `${API_BASE_URL}/alunos`;
 
 const obterChaveAlunos = () => {
-  const usuario = obterUsuarioLogado();
+  const usuario = lerUsuarioSessao();
   return usuario?.id ? `alunos:${usuario.id}` : null;
 };
 
@@ -91,7 +87,7 @@ const medidaValida = (campo, valor) => {
 const converterMedida = (valor) =>
   valor === "" ? null : Number(String(valor).replace(",", "."));
 
-export default function Alunos({ glassStyle }) {
+export default function Alunos() {
   const [alunos, setAlunos] = useState(() => {
     const chave = obterChaveAlunos();
     return chave ? lerCache(chave) || [] : [];
@@ -122,7 +118,7 @@ export default function Alunos({ glassStyle }) {
 
   // Carrega a lista de alunos do Back-end vinculados ao Personal logado ao abrir a página
   const carregarAlunos = async () => {
-    const usuarioLogado = obterUsuarioLogado();
+    const usuarioLogado = lerUsuarioSessao();
     if (!usuarioLogado?.id) {
       setAlunos([]);
       setCarregando(false);
@@ -201,7 +197,8 @@ export default function Alunos({ glassStyle }) {
         ? formatarDataNascimento(aluno.dataDeNascimento)
         : "",
       peso: aluno.peso == null ? "" : String(aluno.peso).replace(".", ","),
-      altura: aluno.altura == null ? "" : String(aluno.altura).replace(".", ","),
+      altura:
+        aluno.altura == null ? "" : String(aluno.altura).replace(".", ","),
       sexo: aluno.sexo,
       experiencia: aluno.experiencia,
       frequenciaSemanal: aluno.frequenciaSemanal,
@@ -231,7 +228,9 @@ export default function Alunos({ glassStyle }) {
       if (response.ok) {
         const chave = obterChaveAlunos();
         setAlunos((lista) => {
-          const novaLista = lista.filter((aluno) => aluno.id !== idParaExcluir);
+          const novaLista = lista.filter(
+            (aluno) => aluno.id !== idParaExcluir,
+          );
           if (chave) salvarCache(chave, novaLista);
           return novaLista;
         });
@@ -249,7 +248,9 @@ export default function Alunos({ glassStyle }) {
 
   // Valida os campos obrigatórios e os limites de peso e altura
   const limitesNascimento = limitesDataNascimento();
-  const nascimentoISO = converterDataNascimentoParaISO(formData.dataDeNascimento);
+  const nascimentoISO = converterDataNascimentoParaISO(
+    formData.dataDeNascimento,
+  );
   const formularioValido =
     formData.nome.trim() !== "" &&
     dataNascimentoValida(nascimentoISO) &&
@@ -269,7 +270,7 @@ export default function Alunos({ glassStyle }) {
 
     setErrosApi([]);
 
-    const usuarioLogado = obterUsuarioLogado();
+    const usuarioLogado = lerUsuarioSessao();
     if (!usuarioLogado?.id) {
       setErrosApi(["Usuário logado não identificado. Faça login novamente."]);
       return;
@@ -314,9 +315,7 @@ export default function Alunos({ glassStyle }) {
       const alunoSalvo = dadosResposta;
       setAlunos((lista) => {
         const novaLista = editingId
-          ? lista.map((aluno) =>
-              aluno.id === editingId ? alunoSalvo : aluno,
-            )
+          ? lista.map((aluno) => (aluno.id === editingId ? alunoSalvo : aluno))
           : [...lista, alunoSalvo];
         salvarCache(chave, novaLista);
         return novaLista;
@@ -333,14 +332,14 @@ export default function Alunos({ glassStyle }) {
       }
 
       handleFecharModal();
-    } catch (erro) {
+    } catch {
       setErrosApi([
-        "Não foi possível conectar ao servidor Back-end (verifique se a API está rodando na porta 5011).",
+        `Não foi possível conectar ao servidor Back-end (verifique se a API está rodando em ${API_BASE_URL}).`,
       ]);
     }
   };
 
-  const usuarioId = obterUsuarioLogado()?.id;
+  const usuarioId = lerUsuarioSessao()?.id;
   const alunosVisiveis = usuarioId
     ? prepararAlunosRelatorio(alunos, usuarioId)
     : [];
@@ -369,7 +368,10 @@ export default function Alunos({ glassStyle }) {
         <Typography variant="h4" color="text.primary">
           Gerir Alunos
         </Typography>
-        <Box className="no-print" sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <Box
+          className="no-print"
+          sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}
+        >
           <Button
             variant="contained"
             size="large"
@@ -444,26 +446,27 @@ export default function Alunos({ glassStyle }) {
       <TableContainer
         component={Paper}
         elevation={0}
-        sx={{ ...glassStyle, borderRadius: 4, p: 2 }}
+        sx={{ borderRadius: 4, p: 2 }}
       >
-        <Table size="small" sx={{ minWidth: 1000, "@media print": { minWidth: 0 } }}>
+        <Table
+          size="small"
+          sx={{ minWidth: 1000, "@media print": { minWidth: 0 } }}
+        >
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
                 Data de cadastro
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
-                Nome do aluno
-              </TableCell>
-              <TableCell className="no-print" sx={{ fontWeight: "bold" }}>Objetivo</TableCell>
-              <TableCell className="no-print" sx={{ fontWeight: "bold" }}>Experiência</TableCell>
-              <TableCell className="no-print" sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>Nome do aluno</TableCell>
+              <TableCell className="no-print">Objetivo</TableCell>
+              <TableCell className="no-print">Experiência</TableCell>
+              <TableCell className="no-print" sx={{ whiteSpace: "nowrap" }}>
                 Frequência
               </TableCell>
               <TableCell
                 className="no-print"
                 align="center"
-                sx={{ fontWeight: "bold", width: "1%", whiteSpace: "nowrap" }}
+                sx={{ width: "1%", whiteSpace: "nowrap" }}
               >
                 Ações
               </TableCell>
@@ -509,7 +512,9 @@ export default function Alunos({ glassStyle }) {
                 </TableCell>
                 <TableCell className="no-print">{aluno.objetivo}</TableCell>
                 <TableCell className="no-print">{aluno.experiencia}</TableCell>
-                <TableCell className="no-print">{aluno.frequenciaSemanal} dias/semana</TableCell>
+                <TableCell className="no-print">
+                  {aluno.frequenciaSemanal} dias/semana
+                </TableCell>
                 <TableCell
                   className="no-print"
                   align="center"
@@ -562,15 +567,8 @@ export default function Alunos({ glassStyle }) {
       </TableContainer>
 
       {/* Modal também com efeito de Vidro Fumado e cantos arredondados padrão */}
-      <Dialog
-        open={open}
-        onClose={handleFecharModal}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>
+      <Dialog open={open} onClose={handleFecharModal} maxWidth="sm" fullWidth>
+        <DialogTitle>
           {editingId ? "Editar Aluno" : "Registar Novo Aluno"}
         </DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
@@ -752,7 +750,7 @@ export default function Alunos({ glassStyle }) {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+        <DialogActions>
           <Button
             onClick={handleFecharModal}
             color="inherit"
@@ -772,35 +770,18 @@ export default function Alunos({ glassStyle }) {
       </Dialog>
 
       {/* Modal de confirmação de exclusão */}
-      <Dialog
+      <DialogoConfirmacao
         open={Boolean(idParaExcluir)}
         onClose={handleCancelarExclusao}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+        titulo="Confirmar exclusão"
+        confirmarTexto="Excluir cadastro"
+        onConfirmar={confirmarExclusao}
       >
-        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.35rem" }}>
-          Confirmar exclusão
-        </DialogTitle>
-        <DialogContent>
-          <Typography color="text.secondary">
-            Tem certeza de que deseja excluir este cadastro? Esta ação é permanente e não poderá ser desfeita.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-          <Button onClick={handleCancelarExclusao} color="inherit">
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={confirmarExclusao}
-          >
-            Excluir cadastro
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Typography color="text.secondary">
+          Tem certeza de que deseja excluir este cadastro? Esta ação é
+          permanente e não poderá ser desfeita.
+        </Typography>
+      </DialogoConfirmacao>
     </Box>
   );
 }

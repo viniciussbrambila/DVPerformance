@@ -23,23 +23,18 @@ import {
   expirarCachePorPrefixo,
   removerCachePorPrefixo,
 } from "../utils/cacheSessao";
-import { fetchAutenticado } from "../services/api";
+import {
+  API_BASE_URL,
+  fetchAutenticado,
+  lerUsuarioSessao,
+} from "../services/api";
 
-const ALUNOS_API_URL = "http://localhost:5011/alunos";
-const TREINOS_API_URL = "http://localhost:5011/treinos";
+const ALUNOS_API_URL = `${API_BASE_URL}/alunos`;
+const TREINOS_API_URL = `${API_BASE_URL}/treinos`;
 
-const obterUsuarioLogado = () => {
-  try {
-    const salvo = localStorage.getItem("usuarioLogado");
-    return salvo ? JSON.parse(salvo) : null;
-  } catch {
-    return null;
-  }
-};
-
-export default function Treinos({ glassStyle }) {
+export default function Treinos() {
   const navigate = useNavigate();
-  const usuarioInicial = obterUsuarioLogado();
+  const usuarioInicial = lerUsuarioSessao();
   const [alunoId, setAlunoId] = useState("");
   const [gerando, setGerando] = useState(false);
   const [alunos, setAlunos] = useState(
@@ -48,17 +43,21 @@ export default function Treinos({ glassStyle }) {
         lerCache(`alunosSemTreino:${usuarioInicial.id}`)) ||
       [],
   );
-  const [carregando, setCarregando] = useState(() => Boolean(usuarioInicial?.id));
+  const [carregando, setCarregando] = useState(() =>
+    Boolean(usuarioInicial?.id),
+  );
   const [erros, setErros] = useState([]);
   const [escolhendoDivisao, setEscolhendoDivisao] = useState(false);
   const geracaoEmAndamento = useRef(false);
-  const alunoSelecionado = alunos.find((aluno) => String(aluno.id) === String(alunoId));
+  const alunoSelecionado = alunos.find(
+    (aluno) => String(aluno.id) === String(alunoId),
+  );
 
   useEffect(() => {
     let ativo = true;
 
     const carregarAlunos = async () => {
-      const usuarioLogado = obterUsuarioLogado();
+      const usuarioLogado = lerUsuarioSessao();
       if (!usuarioLogado?.id) {
         if (ativo) {
           setCarregando(false);
@@ -91,15 +90,18 @@ export default function Treinos({ glassStyle }) {
         const lista = Array.isArray(dados) ? dados : [];
         setAlunos(lista);
         setAlunoId((atual) =>
-          atual && !lista.some((a) => String(a.id) === String(atual)) ? "" : atual,
+          atual && !lista.some((a) => String(a.id) === String(atual))
+            ? ""
+            : atual,
         );
       } catch (erro) {
         console.error("Erro ao conectar com a API:", erro);
         if (ativo && !lerCache(chave)) {
           setErros([
             erro instanceof TypeError
-              ? "Não foi possível conectar ao servidor. Verifique se a API está rodando em http://localhost:5011."
-              : erro.message || "Não foi possível carregar os alunos sem treino.",
+              ? `Não foi possível conectar ao servidor. Verifique se a API está rodando em ${API_BASE_URL}.`
+              : erro.message ||
+                "Não foi possível carregar os alunos sem treino.",
           ]);
         }
       } finally {
@@ -134,7 +136,7 @@ export default function Treinos({ glassStyle }) {
 
   const handleGerar = async (divisaoId) => {
     if (!alunoSelecionado || !divisaoId || geracaoEmAndamento.current) return;
-    const usuarioLogado = obterUsuarioLogado();
+    const usuarioLogado = lerUsuarioSessao();
     if (!usuarioLogado?.id) {
       setErros(["Usuário logado não identificado. Faça login novamente."]);
       return;
@@ -194,7 +196,6 @@ export default function Treinos({ glassStyle }) {
       <Paper
         elevation={0}
         sx={{
-          ...glassStyle,
           p: 4,
           borderRadius: 4,
           textAlign: "center",
@@ -246,11 +247,16 @@ export default function Treinos({ glassStyle }) {
 
           {!carregando && alunos.length === 0 && (
             <Alert severity="info" sx={{ textAlign: "left" }}>
-              Todos os alunos ativos já possuem treino gerado. Para criar um novo treino para um aluno, exclua o plano atual dele em <b>Planos de Treino</b>.
+              Todos os alunos ativos já possuem treino gerado. Para criar um
+              novo treino para um aluno, exclua o plano atual dele em{" "}
+              <b>Planos de Treino</b>.
             </Alert>
           )}
 
-          <FormControl fullWidth disabled={gerando || carregando || alunos.length === 0}>
+          <FormControl
+            fullWidth
+            disabled={gerando || carregando || alunos.length === 0}
+          >
             <InputLabel id="aluno-label">
               {carregando
                 ? "Carregando alunos..."

@@ -13,10 +13,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -27,6 +23,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import DesktopDateRangePicker from "../components/DesktopDateRangePicker";
+import { DialogoConfirmacao } from "../components/DialogoConfirmacao";
 import {
   exportarPdfRelatorio,
   filtrarPlanosTreino,
@@ -44,18 +41,13 @@ import {
   expirarCachePorPrefixo,
   removerCachePorPrefixo,
 } from "../utils/cacheSessao";
-import { fetchAutenticado } from "../services/api";
+import {
+  API_BASE_URL,
+  fetchAutenticado,
+  lerUsuarioSessao,
+} from "../services/api";
 
-const API_URL = "http://localhost:5011/treinos";
-
-const obterUsuarioLogado = () => {
-  try {
-    const salvo = localStorage.getItem("usuarioLogado");
-    return salvo ? JSON.parse(salvo) : null;
-  } catch {
-    return null;
-  }
-};
+const API_URL = `${API_BASE_URL}/treinos`;
 
 const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
@@ -101,11 +93,11 @@ function montarTexto(plano) {
 }
 
 const obterChavePlanos = () => {
-  const usuarioLogado = obterUsuarioLogado();
+  const usuarioLogado = lerUsuarioSessao();
   return `planos:${usuarioLogado?.id || "geral"}`;
 };
 
-export default function PlanosExportados({ glassStyle }) {
+export default function PlanosExportados() {
   const navigate = useNavigate();
   const [planos, setPlanos] = useState(
     () => lerCache(obterChavePlanos()) || [],
@@ -127,7 +119,7 @@ export default function PlanosExportados({ glassStyle }) {
 
     const carregar = async () => {
       setErro("");
-      const usuarioLogado = obterUsuarioLogado();
+      const usuarioLogado = lerUsuarioSessao();
       const chave = `planos:${usuarioLogado?.id || "geral"}`;
       const query = usuarioLogado?.id ? `?usuarioId=${usuarioLogado.id}` : "";
 
@@ -259,8 +251,6 @@ export default function PlanosExportados({ glassStyle }) {
     }
   };
 
-  const cabecalhoSx = { fontWeight: 600, color: "text.primary" };
-
   return (
     <Box className="relatorio-impressao">
       <ImpressaoRelatorio />
@@ -277,7 +267,10 @@ export default function PlanosExportados({ glassStyle }) {
         <Typography variant="h4" sx={{ fontWeight: "bold" }}>
           Planos de Treino
         </Typography>
-        <Box className="no-print" sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <Box
+          className="no-print"
+          sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}
+        >
           <Button
             variant="contained"
             size="large"
@@ -359,18 +352,15 @@ export default function PlanosExportados({ glassStyle }) {
         />
       </Box>
 
-      <Paper
-        elevation={0}
-        sx={{ ...glassStyle, borderRadius: 4, overflow: "hidden" }}
-      >
+      <Paper elevation={0} sx={{ borderRadius: 4, overflow: "hidden" }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={cabecalhoSx}>Data</TableCell>
-                <TableCell sx={cabecalhoSx}>Aluno</TableCell>
-                <TableCell sx={cabecalhoSx}>Status</TableCell>
-                <TableCell className="no-print" align="center" sx={cabecalhoSx}>
+                <TableCell>Data</TableCell>
+                <TableCell>Aluno</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell className="no-print" align="center">
                   Ações
                 </TableCell>
               </TableRow>
@@ -466,86 +456,40 @@ export default function PlanosExportados({ glassStyle }) {
         </TableContainer>
       </Paper>
 
-      <Dialog
+      <DialogoConfirmacao
         open={Boolean(planoParaValidar)}
         onClose={() => setPlanoParaValidar(null)}
-        maxWidth="xs"
-        fullWidth
-        aria-labelledby="validar-plano-titulo"
-        aria-describedby="validar-plano-descricao"
-        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+        titulo="Validação necessária"
+        idTitulo="validar-plano-titulo"
+        idDescricao="validar-plano-descricao"
+        cancelarTexto="Voltar"
+        confirmarTexto="Visualizar plano"
+        confirmarCor="primary"
+        justificativaAcoes="space-between"
+        onConfirmar={() => {
+          navigate(`/planos/${planoParaValidar.id}`);
+          setPlanoParaValidar(null);
+        }}
       >
-        <DialogTitle
-          id="validar-plano-titulo"
-          sx={{ fontWeight: "bold", fontSize: "1.35rem" }}
-        >
-          Validação necessária
-        </DialogTitle>
+        <Typography id="validar-plano-descricao" color="text.secondary">
+          Para baixar o plano de treino em TXT você precisa visualizá-lo e
+          validá-lo antes.
+        </Typography>
+      </DialogoConfirmacao>
 
-        <DialogContent>
-          <Typography id="validar-plano-descricao" color="text.secondary">
-            Para baixar o plano de treino em TXT você precisa visualizá-lo e
-            validá-lo antes.
-          </Typography>
-        </DialogContent>
-
-        <DialogActions
-          sx={{ px: 3, pb: 2, pt: 1, gap: 1, justifyContent: "space-between" }}
-        >
-          <Button color="inherit" onClick={() => setPlanoParaValidar(null)}>
-            Voltar
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              navigate(`/planos/${planoParaValidar.id}`);
-              setPlanoParaValidar(null);
-            }}
-          >
-            Visualizar plano
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
+      <DialogoConfirmacao
         open={Boolean(planoParaExcluir)}
         onClose={() => !excluindo && setPlanoParaExcluir(null)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 4, p: 1 } }}
-        slotProps={{ paper: { sx: { borderRadius: 4, p: 1 } } }}
+        titulo="Confirmar exclusão"
+        confirmarTexto="Excluir plano"
+        desabilitado={excluindo}
+        onConfirmar={confirmarExclusao}
       >
-        <DialogTitle sx={{ fontWeight: "bold", fontSize: "1.35rem" }}>
-          Confirmar exclusão
-        </DialogTitle>
-
-        <DialogContent>
-          <Typography color="text.secondary">
-            Tem certeza de que deseja excluir este plano de treino? Esta ação é
-            permanente e não poderá ser desfeita.
-          </Typography>
-        </DialogContent>
-
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-          <Button
-            color="inherit"
-            disabled={excluindo}
-            onClick={() => setPlanoParaExcluir(null)}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={excluindo}
-            onClick={confirmarExclusao}
-          >
-            Excluir plano
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Typography color="text.secondary">
+          Tem certeza de que deseja excluir este plano de treino? Esta ação é
+          permanente e não poderá ser desfeita.
+        </Typography>
+      </DialogoConfirmacao>
     </Box>
   );
 }

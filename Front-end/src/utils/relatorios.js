@@ -1,13 +1,5 @@
 import { normalizarTextoBusca } from "./busca.js";
 
-export function obterUsuarioRelatorio() {
-  try {
-    return JSON.parse(localStorage.getItem("usuarioLogado") || "null");
-  } catch {
-    return null;
-  }
-}
-
 export function prepararAlunosRelatorio(lista, usuarioId) {
   return lista.filter(
     (aluno) =>
@@ -63,7 +55,7 @@ function normalizarDataFiltro(valor, fimDoDia = false) {
 
 export function filtrarAlunosCadastrados(
   alunos,
-  { busca = "", dia, mes, ano, dataInicio, dataFim, ordem = "recentes" },
+  { busca = "", dataInicio, dataFim, ordem = "recentes" },
 ) {
   const inicio = normalizarDataFiltro(dataInicio, false);
   const fim = normalizarDataFiltro(dataFim, true);
@@ -77,10 +69,7 @@ export function filtrarAlunosCadastrados(
 
       return (
         aluno.nome.toLowerCase().includes(busca.trim().toLowerCase()) &&
-        dentroDoIntervalo &&
-        (!dia || data?.getDate() === Number(dia)) &&
-        (!mes || (data && data.getMonth() + 1 === Number(mes))) &&
-        (!ano || data?.getFullYear() === Number(ano))
+        dentroDoIntervalo
       );
     })
     .sort((a, b) => {
@@ -96,7 +85,7 @@ export function filtrarAlunosCadastrados(
     });
 }
 
-export function obterDataPlano(plano) {
+function obterDataPlano(plano) {
   const valor = plano?.data || plano?.dataCriacao;
   if (!valor) return null;
   const data = /^\d{4}-\d{2}-\d{2}$/.test(valor)
