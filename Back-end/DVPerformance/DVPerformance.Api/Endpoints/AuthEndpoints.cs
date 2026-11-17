@@ -1,15 +1,21 @@
+using System.Security.Cryptography;
+using System.Text;
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using DVPerformance.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
 
 public static class AuthEndpoints
 {
+    public const string CodigoRecuperacaoAcademicoPadrao = "DVP-2026";
+
     public static void MapAuthEndpoints(this WebApplication app)
     {
-        // Cria um grupo de rotas com o prefixo "/auth"
-        var grupo = app.MapGroup("/auth");
+        // Cria um grupo de rotas com o prefixo "/auth" e limita tentativas para mitigar força bruta
+        var grupo = app.MapGroup("/auth")
+            .RequireRateLimiting("AuthRateLimit");
 
         // POST /auth/cadastro -> Cria uma nova conta de Personal no banco PostgreSQL já com todos os exercícios e máquinas pré-cadastrados
         grupo.MapPost("/cadastro", async (AuthRequest? dados, AppDbContext db) =>
@@ -42,7 +48,7 @@ public static class AuthEndpoints
             var novoUsuario = new Usuario
             {
                 NomeUsuario = nomeLimpo,
-                Senha = dados.Senha,
+                Senha = SegurancaService.GerarHashSenha(dados.Senha),
                 Perfil = "admin",
                 CatalogoInicializado = false,
                 Ativo = true
@@ -54,6 +60,8 @@ public static class AuthEndpoints
             // Provisiona automaticamente o catálogo completo de exercícios e máquinas na nova conta do Personal
             await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, novoUsuario);
 
+            var token = SegurancaService.GerarTokenSessao(novoUsuario);
+
             // Retorna os dados da conta criada sem expor a senha
             return Results.Created($"/auth/usuarios/{novoUsuario.Id}", new
             {
@@ -62,6 +70,7 @@ public static class AuthEndpoints
                 nome = novoUsuario.NomeUsuario,
                 perfil = novoUsuario.Perfil,
                 ativo = novoUsuario.Ativo,
+                token,
                 mensagem = "Conta criada com sucesso com exercícios e máquinas pré-cadastrados."
             });
         });
@@ -82,10 +91,9 @@ public static class AuthEndpoints
             var nomeLimpo = dados!.Usuario.Trim();
 
             var conta = await db.Usuarios.FirstOrDefaultAsync(u =>
-                u.NomeUsuario == nomeLimpo &&
-                u.Senha == dados.Senha);
+                u.NomeUsuario == nomeLimpo);
 
-            if (conta is null)
+            if (conta is null || !SegurancaService.VerificarSenha(dados.Senha, conta.Senha, out var precisaAtualizarHash))
             {
                 return Results.Json(new
                 {
@@ -103,11 +111,20 @@ public static class AuthEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
+            // Migra automaticamente a senha legada em texto plano para PBKDF2-SHA256 no primeiro login válido
+            if (precisaAtualizarHash)
+            {
+                conta.Senha = SegurancaService.GerarHashSenha(dados.Senha);
+                await db.SaveChangesAsync();
+            }
+
             // Garante que contas antigas recebam os pré-cadastros ao entrar (respeitando personalizações posteriores)
             if (!conta.CatalogoInicializado)
             {
                 await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, conta);
             }
+
+            var token = SegurancaService.GerarTokenSessao(conta);
 
             return Results.Ok(new
             {
@@ -116,12 +133,13 @@ public static class AuthEndpoints
                 nome = conta.NomeUsuario,
                 perfil = conta.Perfil,
                 ativo = conta.Ativo,
+                token,
                 mensagem = "Login realizado com sucesso."
             });
         });
 
-        // PUT /auth/recuperar-senha -> Altera a senha de um usuário ativo existente no banco
-        grupo.MapPut("/recuperar-senha", async (RecuperarSenhaRequest? dados, AppDbContext db) =>
+        // PUT /auth/recuperar-senha -> Altera a senha de um usuário ativo mediante comprovação (senhaAtual ou codigoRecuperacao)
+        grupo.MapPut("/recuperar-senha", async (RecuperarSenhaRequest? dados, AppDbContext db, IConfiguration config) =>
         {
             var erros = ValidarRecuperacaoSenha(dados);
             if (erros.Count > 0)
@@ -140,14 +158,37 @@ public static class AuthEndpoints
 
             if (conta is null)
             {
-                return Results.NotFound(new
+                return Results.Json(new
                 {
-                    mensagem = "Usuário não encontrado ou desativado.",
-                    erros = new[] { "Não foi encontrada nenhuma conta ativa com o usuário informado." }
-                });
+                    mensagem = "Não foi possível redefinir a senha.",
+                    erros = new[] { "Usuário não encontrado ou credenciais de verificação inválidas." }
+                }, statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            conta.Senha = dados.NovaSenha;
+            var codigoEsperado = config["Security:RecoveryCode"];
+            if (string.IsNullOrWhiteSpace(codigoEsperado))
+            {
+                codigoEsperado = CodigoRecuperacaoAcademicoPadrao;
+            }
+
+            var autorizadoPorSenhaAtual = !string.IsNullOrWhiteSpace(dados.SenhaAtual) &&
+                SegurancaService.VerificarSenha(dados.SenhaAtual, conta.Senha, out _);
+
+            var autorizadoPorCodigo = !string.IsNullOrWhiteSpace(dados.CodigoRecuperacao) &&
+                CryptographicOperations.FixedTimeEquals(
+                    Encoding.UTF8.GetBytes(dados.CodigoRecuperacao.Trim()),
+                    Encoding.UTF8.GetBytes(codigoEsperado.Trim()));
+
+            if (!autorizadoPorSenhaAtual && !autorizadoPorCodigo)
+            {
+                return Results.Json(new
+                {
+                    mensagem = "Código de recuperação ou senha atual inválidos.",
+                    erros = new[] { "Informe a senha atual correta ou o código de recuperação válido da academia." }
+                }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            conta.Senha = SegurancaService.GerarHashSenha(dados.NovaSenha);
             await db.SaveChangesAsync();
 
             return Results.Ok(new
@@ -157,7 +198,7 @@ public static class AuthEndpoints
         });
     }
 
-    private static List<string> ValidarCadastro(AuthRequest? dados)
+    public static List<string> ValidarCadastro(AuthRequest? dados)
     {
         var erros = new List<string>();
 
@@ -189,7 +230,7 @@ public static class AuthEndpoints
         return erros;
     }
 
-    private static List<string> ValidarLogin(AuthRequest? dados)
+    public static List<string> ValidarLogin(AuthRequest? dados)
     {
         var erros = new List<string>();
 
@@ -212,7 +253,7 @@ public static class AuthEndpoints
         return erros;
     }
 
-    private static List<string> ValidarRecuperacaoSenha(RecuperarSenhaRequest? dados)
+    public static List<string> ValidarRecuperacaoSenha(RecuperarSenhaRequest? dados)
     {
         var erros = new List<string>();
 
@@ -225,6 +266,11 @@ public static class AuthEndpoints
         if (string.IsNullOrWhiteSpace(dados.Usuario))
         {
             erros.Add("Informe o seu usuário.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dados.SenhaAtual) && string.IsNullOrWhiteSpace(dados.CodigoRecuperacao))
+        {
+            erros.Add("Informe a senha atual ou o código de recuperação da conta.");
         }
 
         if (string.IsNullOrWhiteSpace(dados.NovaSenha))

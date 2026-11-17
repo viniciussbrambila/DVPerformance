@@ -57,6 +57,7 @@ import {
   temCache,
   expirarCachePorPrefixo,
 } from "../utils/cacheSessao";
+import { fetchAutenticado } from "../services/api";
 
 const API_URL = "http://localhost:5011/exercicios";
 
@@ -126,7 +127,7 @@ export default function Exercicios({
     setErroCarregamento("");
     try {
       const dados = await buscarComCache(chave, async () => {
-        const response = await fetch(url);
+        const response = await fetchAutenticado(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       });
@@ -275,7 +276,7 @@ export default function Exercicios({
       const url = editandoId ? `${API_URL}/${editandoId}` : API_URL;
       const metodo = editandoId ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      const response = await fetchAutenticado(url, {
         method: metodo,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -327,7 +328,7 @@ export default function Exercicios({
     if (!idParaExcluir) return;
 
     try {
-      const response = await fetch(`${API_URL}/${idParaExcluir}`, {
+      const response = await fetchAutenticado(`${API_URL}/${idParaExcluir}`, {
         method: "DELETE",
       });
 

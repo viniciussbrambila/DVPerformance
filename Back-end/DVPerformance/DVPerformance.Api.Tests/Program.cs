@@ -255,5 +255,6 @@ DVPerformance.Api.Tests.FocosMuscularesTests.Executar(Testar, Exigir);
 DVPerformance.Api.Tests.AdutoresAbdutoresTests.Executar(Testar, Exigir);
 
 DVPerformance.Api.Tests.DivisoesTreinoTests.Executar(Testar, Exigir);
+DVPerformance.Api.Tests.SegurancaTests.Executar(Testar, Exigir);
 
 Console.WriteLine($"{quantidade} testes concluídos sem acessar o banco de dados.");

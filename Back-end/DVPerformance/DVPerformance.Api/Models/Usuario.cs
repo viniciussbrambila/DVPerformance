@@ -8,6 +8,7 @@ public class Usuario
 
     public string NomeUsuario { get; set; } = string.Empty;
 
+    [JsonIgnore]
     public string Senha { get; set; } = string.Empty;
 
     // Por padrão, todo Personal cadastrado tem perfil e permissões de Admin
@@ -29,10 +30,14 @@ public class AuthRequest
     public string Senha { get; set; } = string.Empty;
 }
 
-// Dados enviados pelo Front-end na tela de Esqueci Minha Senha
+// Dados enviados pelo Front-end na tela de Esqueci Minha Senha / Alterar Senha
 public class RecuperarSenhaRequest
 {
     public string Usuario { get; set; } = string.Empty;
+
+    public string? SenhaAtual { get; set; }
+
+    public string? CodigoRecuperacao { get; set; }
 
     public string NovaSenha { get; set; } = string.Empty;
 }

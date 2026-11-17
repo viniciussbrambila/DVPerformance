@@ -1,5 +1,6 @@
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using DVPerformance.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
@@ -12,11 +13,18 @@ public static class MaquinaEndpoints
         var grupo = app.MapGroup("/maquinas");
 
         // GET /maquinas?usuarioId=1 -> Lista as máquinas ativas da conta do Personal (pré-cadastradas + personalizadas)
-        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
+        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, HttpContext httpContext, AppDbContext db) =>
         {
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
             {
-                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, usuarioId.Value);
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
+            if (idResolvido.HasValue && idResolvido.Value > 0)
+            {
+                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, idResolvido.Value);
             }
 
             var query = db.Maquinas
@@ -29,10 +37,10 @@ public static class MaquinaEndpoints
                 query = query.Where(m => m.Ativo);
             }
 
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (idResolvido.HasValue && idResolvido.Value > 0)
             {
                 // RF03: Retorna exclusivamente as máquinas da conta deste Personal
-                query = query.Where(m => m.UsuarioId == usuarioId.Value);
+                query = query.Where(m => m.UsuarioId == idResolvido.Value);
 
                 var maquinasPersonal = await query
                     .OrderBy(m => m.GrupoMuscular!.Regiao)
@@ -62,7 +70,7 @@ public static class MaquinaEndpoints
         });
 
         // GET /maquinas/{id} -> Busca uma máquina ativa específica pelo Id no banco
-        grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapGet("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -79,15 +87,22 @@ public static class MaquinaEndpoints
                 return Results.NotFound(new { mensagem = "Máquina não encontrada ou desativada." });
             }
 
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, maquina.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
             return Results.Ok(maquina);
         });
 
         // POST /maquinas -> Cadastra uma nova máquina na conta do Personal vinculada a grupos_musculares (RF03 / RN18)
-        grupo.MapPost("/", async (int? usuarioId, Maquina? novaMaquina, AppDbContext db) =>
+        grupo.MapPost("/", async (int? usuarioId, Maquina? novaMaquina, HttpContext httpContext, AppDbContext db) =>
         {
-            if (novaMaquina is not null && (!novaMaquina.UsuarioId.HasValue || novaMaquina.UsuarioId.Value <= 0) && usuarioId.HasValue && usuarioId.Value > 0)
+            var idAutenticado = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
+            if (novaMaquina is not null && (!novaMaquina.UsuarioId.HasValue || novaMaquina.UsuarioId.Value <= 0) && idAutenticado.HasValue && idAutenticado.Value > 0)
             {
-                novaMaquina.UsuarioId = usuarioId.Value;
+                novaMaquina.UsuarioId = idAutenticado.Value;
             }
 
             var (erros, grupoMuscular) = await ValidarMaquinaAsync(novaMaquina, db, exigirUsuarioId: true);
@@ -104,27 +119,18 @@ public static class MaquinaEndpoints
             var descricaoLimpa = novaMaquina.Descricao?.Trim() ?? string.Empty;
             var donoId = novaMaquina.UsuarioId!.Value;
 
-            var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == donoId && u.Ativo);
-            if (usuario is null)
-            {
-                return Results.BadRequest(new
-                {
-                    mensagem = "O usuário informado não foi encontrado.",
-                    erros = new[] { "A conta informada (usuarioId) não existe ou está desativada no banco de dados." }
-                });
-            }
-
             // RN18: A atualização e manutenção do catálogo de máquinas deve ser restrita ao Administrador
-            if (!string.Equals(usuario.Perfil, "admin", StringComparison.OrdinalIgnoreCase))
+            var (usuario, erroPermissao) = await AutorizacaoEndpoints.ExigirAdministradorAtivoAsync(
+                db,
+                httpContext,
+                donoId,
+                "RN18: Apenas usuários com perfil de Administrador podem cadastrar ou manter máquinas no catálogo.");
+            if (erroPermissao is not null)
             {
-                return Results.Json(new
-                {
-                    mensagem = "Acesso negado.",
-                    erros = new[] { "RN18: Apenas usuários com perfil de Administrador podem cadastrar ou manter máquinas no catálogo." }
-                }, statusCode: StatusCodes.Status403Forbidden);
+                return erroPermissao;
             }
 
-            await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, usuario);
+            await CatalogoPadraoService.GarantirCatalogoDoPersonalAsync(db, usuario!);
 
             var mesmoNomeExistente = await db.Maquinas
                 .Include(m => m.GrupoMuscular)
@@ -170,14 +176,20 @@ public static class MaquinaEndpoints
         });
 
         // POST /maquinas/restaurar-padrao?usuarioId=1 -> Restaura as máquinas pré-cadastradas que o Personal tenha removido, mantendo as criadas por ele
-        grupo.MapPost("/restaurar-padrao", async (int usuarioId, AppDbContext db) =>
+        grupo.MapPost("/restaurar-padrao", async (int? usuarioId, HttpContext httpContext, AppDbContext db) =>
         {
-            if (usuarioId <= 0)
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId) ?? usuarioId;
+            if (idResolvido is not > 0)
             {
                 return Results.BadRequest(new { mensagem = "Informe um usuarioId válido para restaurar as máquinas padrão." });
             }
 
-            var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Ativo);
+            var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == idResolvido.Value && u.Ativo);
             if (usuario is null)
             {
                 return Results.NotFound(new { mensagem = "Conta de Personal não encontrada ou desativada." });
@@ -192,11 +204,11 @@ public static class MaquinaEndpoints
                 }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarMaquinasPadraoAsync(db, usuarioId);
+            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarMaquinasPadraoAsync(db, idResolvido.Value);
 
             return Results.Ok(new
             {
-                usuarioId,
+                usuarioId = idResolvido.Value,
                 inseridos,
                 reativados,
                 totalPadrao = CatalogoPadraoService.MaquinasPadrao.Count,
@@ -205,7 +217,7 @@ public static class MaquinaEndpoints
         });
 
         // PUT /maquinas/{id} -> Atualiza uma máquina ativa existente na conta do Personal (RF03 / RN18)
-        grupo.MapPut("/{id:int}", async (int id, Maquina? dadosAtualizados, AppDbContext db) =>
+        grupo.MapPut("/{id:int}", async (int id, Maquina? dadosAtualizados, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -221,6 +233,16 @@ public static class MaquinaEndpoints
                 return Results.NotFound(new { mensagem = "Máquina não encontrada ou desativada." });
             }
 
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, maquinaExistente.UsuarioId) is IResult erroPropriedadeExistente)
+            {
+                return erroPropriedadeExistente;
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, dadosAtualizados?.UsuarioId) is IResult erroPropriedadeNovo)
+            {
+                return erroPropriedadeNovo;
+            }
+
             var (erros, grupoMuscular) = await ValidarMaquinaAsync(dadosAtualizados, db, exigirUsuarioId: false);
             if (erros.Count > 0)
             {
@@ -231,39 +253,30 @@ public static class MaquinaEndpoints
                 });
             }
 
-            var donoVerificarId = (dadosAtualizados!.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
-                ? dadosAtualizados.UsuarioId.Value
-                : maquinaExistente.UsuarioId;
+            var donoVerificarId = maquinaExistente.UsuarioId
+                ?? ((dadosAtualizados!.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+                    ? dadosAtualizados.UsuarioId.Value
+                    : AutorizacaoEndpoints.ResolverUsuarioId(httpContext, null));
 
             if (donoVerificarId.HasValue && donoVerificarId.Value > 0)
             {
-                var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == donoVerificarId.Value && u.Ativo);
-                if (usuario is null)
+                var (_, erroPermissao) = await AutorizacaoEndpoints.ExigirAdministradorAtivoAsync(
+                    db,
+                    httpContext,
+                    donoVerificarId.Value,
+                    "RN18: Apenas usuários com perfil de Administrador podem alterar máquinas do catálogo.");
+                if (erroPermissao is not null)
                 {
-                    return Results.BadRequest(new
-                    {
-                        mensagem = "O usuário informado não foi encontrado.",
-                        erros = new[] { "A conta informada (usuarioId) não existe ou está desativada no banco de dados." }
-                    });
+                    return erroPermissao;
                 }
 
-                // RN18: Restrito ao Administrador
-                if (!string.Equals(usuario.Perfil, "admin", StringComparison.OrdinalIgnoreCase))
+                if (!maquinaExistente.UsuarioId.HasValue)
                 {
-                    return Results.Json(new
-                    {
-                        mensagem = "Acesso negado.",
-                        erros = new[] { "RN18: Apenas usuários com perfil de Administrador podem alterar máquinas do catálogo." }
-                    }, statusCode: StatusCodes.Status403Forbidden);
-                }
-
-                if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
-                {
-                    maquinaExistente.UsuarioId = dadosAtualizados.UsuarioId;
+                    maquinaExistente.UsuarioId = donoVerificarId.Value;
                 }
             }
 
-            maquinaExistente.Nome = dadosAtualizados.Nome.Trim();
+            maquinaExistente.Nome = dadosAtualizados!.Nome.Trim();
             maquinaExistente.GrupoMuscularId = grupoMuscular!.Id;
             maquinaExistente.GrupoMuscular = grupoMuscular;
             maquinaExistente.FocoMuscular = dadosAtualizados.FocoMuscular;
@@ -275,8 +288,8 @@ public static class MaquinaEndpoints
             return Results.Ok(maquinaExistente);
         });
 
-        // DELETE /maquinas/{id} -> Remove a máquina da conta do Personal (Soft Delete - preserva integridade de planos vigentes conforme RN17)
-        grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
+        // DELETE /maquinas/{id} -> Remove a máquina da conta do Personal (Soft Delete - preserva integridade de planos vigentes conforme RN17 e valida RN18)
+        grupo.MapDelete("/{id:int}", async (int id, int? usuarioId, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -287,6 +300,25 @@ public static class MaquinaEndpoints
             if (maquina is null)
             {
                 return Results.NotFound(new { mensagem = "Máquina não encontrada ou já desativada." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, maquina.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var donoVerificarId = maquina.UsuarioId ?? AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+            if (donoVerificarId.HasValue && donoVerificarId.Value > 0)
+            {
+                var (_, erroPermissao) = await AutorizacaoEndpoints.ExigirAdministradorAtivoAsync(
+                    db,
+                    httpContext,
+                    donoVerificarId.Value,
+                    "RN18: Apenas usuários com perfil de Administrador podem remover máquinas do catálogo.");
+                if (erroPermissao is not null)
+                {
+                    return erroPermissao;
+                }
             }
 
             maquina.Ativo = false;

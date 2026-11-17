@@ -23,6 +23,7 @@ import {
   expirarCachePorPrefixo,
   removerCachePorPrefixo,
 } from "../utils/cacheSessao";
+import { fetchAutenticado } from "../services/api";
 
 const ALUNOS_API_URL = "http://localhost:5011/alunos";
 const TREINOS_API_URL = "http://localhost:5011/treinos";
@@ -73,7 +74,7 @@ export default function Treinos({ glassStyle }) {
         const dados = await buscarComCache(
           chave,
           async () => {
-            const response = await fetch(
+            const response = await fetchAutenticado(
               `${ALUNOS_API_URL}/sem-treino?usuarioId=${usuarioLogado.id}`,
               { cache: "no-store" },
             );
@@ -148,7 +149,7 @@ export default function Treinos({ glassStyle }) {
     });
 
     try {
-      const response = await fetch(
+      const response = await fetchAutenticado(
         TREINOS_API_URL + "/gerar/" + alunoSelecionado.id + "?" + query,
         { method: "POST" },
       );

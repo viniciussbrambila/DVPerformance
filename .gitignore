@@ -34,3 +34,8 @@ artifacts/
 # Configurações locais e segredos de desenvolvimento
 **/appsettings.Development.json
 **/appsettings.Local.json
+
+# Pastas de IA e assistentes
+.agents/
+skills/
+skills-lock.json

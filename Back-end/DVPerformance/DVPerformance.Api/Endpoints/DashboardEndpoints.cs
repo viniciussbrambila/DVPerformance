@@ -1,4 +1,5 @@
 using DVPerformance.Api.Data;
+using DVPerformance.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
@@ -10,13 +11,20 @@ public static class DashboardEndpoints
         var grupo = app.MapGroup("/dashboard");
 
         // GET /dashboard/resumo?usuarioId=1 -> Retorna as contagens do painel em uma única consulta leve no PostgreSQL
-        grupo.MapGet("/resumo", async (int? usuarioId, AppDbContext db) =>
+        grupo.MapGet("/resumo", async (int? usuarioId, HttpContext httpContext, AppDbContext db) =>
         {
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
+            if (idResolvido.HasValue && idResolvido.Value > 0)
             {
                 var resumo = await db.Usuarios
                     .AsNoTracking()
-                    .Where(u => u.Id == usuarioId.Value)
+                    .Where(u => u.Id == idResolvido.Value)
                     .Select(u => new
                     {
                         totalAlunos = db.Alunos.Count(a => a.Ativo && a.UsuarioId == u.Id),

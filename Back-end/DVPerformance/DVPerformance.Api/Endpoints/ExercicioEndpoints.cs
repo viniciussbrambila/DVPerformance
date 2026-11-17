@@ -1,5 +1,6 @@
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using DVPerformance.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
@@ -39,11 +40,18 @@ public static class ExercicioEndpoints
         var grupo = app.MapGroup("/exercicios");
 
         // GET /exercicios?usuarioId=1 -> Lista os exercícios ativos da conta do Personal (pré-cadastrados + personalizados)
-        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
+        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, HttpContext httpContext, AppDbContext db) =>
         {
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
             {
-                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, usuarioId.Value);
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
+            if (idResolvido.HasValue && idResolvido.Value > 0)
+            {
+                await CatalogoPadraoService.GarantirCatalogoPorUsuarioIdAsync(db, idResolvido.Value);
             }
 
             var query = db.Exercicios
@@ -56,10 +64,10 @@ public static class ExercicioEndpoints
                 query = query.Where(e => e.Ativo);
             }
 
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (idResolvido.HasValue && idResolvido.Value > 0)
             {
                 // Retorna exclusivamente os exercícios da conta deste Personal
-                query = query.Where(e => e.UsuarioId == usuarioId.Value);
+                query = query.Where(e => e.UsuarioId == idResolvido.Value);
 
                 var exerciciosPersonal = await query
                     .OrderBy(e => e.GrupoMuscular!.Regiao)
@@ -89,7 +97,7 @@ public static class ExercicioEndpoints
         });
 
         // GET /exercicios/{id} -> Busca um exercício ativo específico pelo Id no banco
-        grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapGet("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -106,15 +114,27 @@ public static class ExercicioEndpoints
                 return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
             }
 
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, exercicio.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
             return Results.Ok(exercicio);
         });
 
         // POST /exercicios -> Cadastra um novo exercício personalizado na conta do Personal
-        grupo.MapPost("/", async (int? usuarioId, Exercicio? novoExercicio, AppDbContext db) =>
+        grupo.MapPost("/", async (int? usuarioId, Exercicio? novoExercicio, HttpContext httpContext, AppDbContext db) =>
         {
-            if (novoExercicio is not null && (!novoExercicio.UsuarioId.HasValue || novoExercicio.UsuarioId.Value <= 0) && usuarioId.HasValue && usuarioId.Value > 0)
+            var idAutenticado = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
+            if (novoExercicio is not null && (!novoExercicio.UsuarioId.HasValue || novoExercicio.UsuarioId.Value <= 0) && idAutenticado.HasValue && idAutenticado.Value > 0)
             {
-                novoExercicio.UsuarioId = usuarioId.Value;
+                novoExercicio.UsuarioId = idAutenticado.Value;
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, novoExercicio?.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             var (erros, grupoMuscular) = await ValidarExercicioAsync(novoExercicio, db, exigirUsuarioId: true);
@@ -187,24 +207,30 @@ public static class ExercicioEndpoints
         });
 
         // POST /exercicios/restaurar-padrao?usuarioId=1 -> Restaura os exercícios pré-cadastrados que o Personal tenha removido, mantendo os criados por ele
-        grupo.MapPost("/restaurar-padrao", async (int usuarioId, AppDbContext db) =>
+        grupo.MapPost("/restaurar-padrao", async (int? usuarioId, HttpContext httpContext, AppDbContext db) =>
         {
-            if (usuarioId <= 0)
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId) ?? usuarioId;
+            if (idResolvido is not > 0)
             {
                 return Results.BadRequest(new { mensagem = "Informe um usuarioId válido para restaurar os exercícios padrão." });
             }
 
-            var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == usuarioId && u.Ativo);
+            var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == idResolvido.Value && u.Ativo);
             if (!personalExiste)
             {
                 return Results.NotFound(new { mensagem = "Conta de Personal não encontrada ou desativada." });
             }
 
-            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarExerciciosPadraoAsync(db, usuarioId);
+            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarExerciciosPadraoAsync(db, idResolvido.Value);
 
             return Results.Ok(new
             {
-                usuarioId,
+                usuarioId = idResolvido.Value,
                 inseridos,
                 reativados,
                 totalPadrao = CatalogoPadraoService.ExerciciosPadrao.Count,
@@ -213,7 +239,7 @@ public static class ExercicioEndpoints
         });
 
         // PUT /exercicios/{id} -> Atualiza um exercício ativo existente na conta do Personal
-        grupo.MapPut("/{id:int}", async (int id, Exercicio? dadosAtualizados, AppDbContext db) =>
+        grupo.MapPut("/{id:int}", async (int id, Exercicio? dadosAtualizados, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -227,6 +253,16 @@ public static class ExercicioEndpoints
             if (exercicioExistente is null)
             {
                 return Results.NotFound(new { mensagem = "Exercício não encontrado ou desativado." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, exercicioExistente.UsuarioId) is IResult erroPropriedadeExistente)
+            {
+                return erroPropriedadeExistente;
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, dadosAtualizados?.UsuarioId) is IResult erroPropriedadeNovo)
+            {
+                return erroPropriedadeNovo;
             }
 
             var (erros, grupoMuscular) = await ValidarExercicioAsync(dadosAtualizados, db, exigirUsuarioId: false);
@@ -246,7 +282,7 @@ public static class ExercicioEndpoints
             exercicioExistente.NivelMinimo = dadosAtualizados.NivelMinimo;
             exercicioExistente.Descricao = dadosAtualizados.Descricao?.Trim() ?? string.Empty;
 
-            if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+            if (!exercicioExistente.UsuarioId.HasValue && dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
             {
                 exercicioExistente.UsuarioId = dadosAtualizados.UsuarioId;
             }
@@ -257,7 +293,7 @@ public static class ExercicioEndpoints
         });
 
         // DELETE /exercicios/{id} -> Remove o exercício da conta do Personal (Soft Delete, preservando fichas antigas)
-        grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapDelete("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -268,6 +304,11 @@ public static class ExercicioEndpoints
             if (exercicio is null)
             {
                 return Results.NotFound(new { mensagem = "Exercício não encontrado ou já desativado." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, exercicio.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             exercicio.Ativo = false;

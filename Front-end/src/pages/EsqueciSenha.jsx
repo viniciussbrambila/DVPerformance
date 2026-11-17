@@ -18,6 +18,7 @@ const API_RECUPERAR_SENHA_URL = "http://localhost:5011/auth/recuperar-senha";
 
 export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
   const [usuario, setUsuario] = useState("");
+  const [codigoRecuperacao, setCodigoRecuperacao] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [showNova, setShowNova] = useState(false);
@@ -36,7 +37,12 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
     setTentouEnviar(true);
     setErroApi("");
 
-    if (!usuario.trim() || senhaCurta || senhasDiferentes) {
+    if (
+      !usuario.trim() ||
+      !codigoRecuperacao.trim() ||
+      senhaCurta ||
+      senhasDiferentes
+    ) {
       return;
     }
 
@@ -47,6 +53,7 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           usuario: usuario.trim(),
+          codigoRecuperacao: codigoRecuperacao.trim(),
           novaSenha,
         }),
       });
@@ -55,7 +62,7 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
 
       if (!response.ok) {
         setErroApi(
-          data?.erros?.[0] || data?.mensagem || "Usuário não encontrado.",
+          data?.erros?.[0] || data?.mensagem || "Não foi possível redefinir a senha.",
         );
         return;
       }
@@ -119,7 +126,7 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
           color="text.secondary"
           sx={{ mb: 3, textAlign: "center" }}
         >
-          Informe seu usuário e crie uma nova senha!
+          Informe seu usuário, o código de segurança da academia e crie uma nova senha!
         </Typography>
 
         <Box
@@ -153,6 +160,21 @@ export default function EsqueciSenha({ glassStyle, onVoltarLogin }) {
               tentouEnviar && !usuario.trim()
                 ? "Informe o seu usuário"
                 : ""
+            }
+            disabled={enviado}
+          />
+
+          <TextField
+            label="Código de recuperação"
+            placeholder="Ex.: DVP-2026"
+            value={codigoRecuperacao}
+            onChange={(e) => setCodigoRecuperacao(e.target.value)}
+            slotProps={{ htmlInput: { autoCapitalize: "characters", autoCorrect: "off", spellCheck: false } }}
+            error={tentouEnviar && !codigoRecuperacao.trim()}
+            helperText={
+              tentouEnviar && !codigoRecuperacao.trim()
+                ? "Informe o código de recuperação (padrão acadêmico: DVP-2026)"
+                : "Código de validação da academia (padrão: DVP-2026)"
             }
             disabled={enviado}
           />

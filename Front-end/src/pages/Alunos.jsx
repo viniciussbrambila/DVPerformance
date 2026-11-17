@@ -55,6 +55,7 @@ import {
   expirarCachePorPrefixo,
   removerCachePorPrefixo,
 } from "../utils/cacheSessao";
+import { fetchAutenticado } from "../services/api";
 
 const API_URL = "http://localhost:5011/alunos";
 
@@ -133,7 +134,7 @@ export default function Alunos({ glassStyle }) {
 
     try {
       const dados = await buscarComCache(chave, async () => {
-        const response = await fetch(
+        const response = await fetchAutenticado(
           `${API_URL}?usuarioId=${usuarioLogado.id}`,
           { cache: "no-store" },
         );
@@ -223,7 +224,7 @@ export default function Alunos({ glassStyle }) {
     if (!idParaExcluir) return;
 
     try {
-      const response = await fetch(`${API_URL}/${idParaExcluir}`, {
+      const response = await fetchAutenticado(`${API_URL}/${idParaExcluir}`, {
         method: "DELETE",
       });
 
@@ -290,7 +291,7 @@ export default function Alunos({ glassStyle }) {
       const url = editingId ? `${API_URL}/${editingId}` : API_URL;
       const metodo = editingId ? "PUT" : "POST";
 
-      const response = await fetch(url, {
+      const response = await fetchAutenticado(url, {
         method: metodo,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

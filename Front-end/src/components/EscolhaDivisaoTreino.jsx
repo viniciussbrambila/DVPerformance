@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import { fetchAutenticado } from "../services/api";
 
 const API_URL = "http://localhost:5011/treinos/divisoes";
 
@@ -57,7 +58,7 @@ export default function EscolhaDivisaoTreino({
         if (experiencia) {
           params.set("experiencia", experiencia);
         }
-        const resposta = await fetch(`${API_URL}?${params.toString()}`, {
+        const resposta = await fetchAutenticado(`${API_URL}?${params.toString()}`, {
           signal: controller.signal,
         });
         const dados = await resposta.json().catch(() => null);

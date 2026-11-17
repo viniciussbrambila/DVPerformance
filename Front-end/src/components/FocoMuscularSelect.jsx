@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, MenuItem, TextField, Typography } from "@mui/material";
 import { buscarComCache, lerCache, temCache } from "../utils/cacheSessao";
 import { normalizarTextoBusca } from "../utils/busca";
+import { fetchAutenticado } from "../services/api";
 
 const CHAVE_CACHE = "focosMusculares";
 const API_URL = "http://localhost:5011/exercicios/focos-musculares";
@@ -226,7 +227,7 @@ export function useFocosMusculares() {
     buscarComCache(
       CHAVE_CACHE,
       async () => {
-        const resposta = await fetch(API_URL);
+        const resposta = await fetchAutenticado(API_URL);
         if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
         const dados = await resposta.json();
         if (

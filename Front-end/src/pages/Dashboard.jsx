@@ -7,6 +7,7 @@ import AddTaskIcon from "@mui/icons-material/AddTask";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import { buscarComCache, lerCache } from "../utils/cacheSessao";
+import { fetchAutenticado } from "../services/api";
 
 const DASHBOARD_RESUMO_URL = "http://localhost:5011/dashboard/resumo";
 
@@ -105,7 +106,7 @@ export default function Dashboard({ glassStyle }) {
 
       try {
         const resumo = await buscarComCache(chave, async () => {
-          const resp = await fetch(
+          const resp = await fetchAutenticado(
             `${DASHBOARD_RESUMO_URL}?usuarioId=${usuarioLogado.id}`,
           );
 

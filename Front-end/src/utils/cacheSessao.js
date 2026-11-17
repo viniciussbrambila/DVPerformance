@@ -1,6 +1,8 @@
 // Cache leve em memória de sessão para manter os dados já carregados da API
 // entre trocas de tela (padrão Stale-While-Revalidate, sem regras de negócio).
 
+import { fetchAutenticado } from "../services/api";
+
 const cache = new Map();
 const requisicoesEmAndamento = new Map();
 const versoesCache = new Map();
@@ -143,7 +145,7 @@ export function preCarregarSessao(usuarioId) {
   const base = "http://localhost:5011";
 
   const buscarJson = async (url) => {
-    const resp = await fetch(url, { cache: "no-store" });
+    const resp = await fetchAutenticado(url, { cache: "no-store" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
   };

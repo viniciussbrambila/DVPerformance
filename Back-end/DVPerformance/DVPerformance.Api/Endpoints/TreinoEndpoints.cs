@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using DVPerformance.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
@@ -48,8 +49,15 @@ public static class TreinoEndpoints
         });
 
         // GET /treinos?usuarioId=1 -> Lista todos os treinos ativos já enriquecidos com dados do aluno, dica sorteada, status e dias agrupados
-        grupo.MapGet("/", async (int? usuarioId, int? alunoId, bool? incluirInativos, AppDbContext db) =>
+        grupo.MapGet("/", async (int? usuarioId, int? alunoId, bool? incluirInativos, HttpContext httpContext, AppDbContext db) =>
         {
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
             var query = db.Treinos
                 .AsNoTracking()
                 .Include(t => t.Aluno)
@@ -68,9 +76,9 @@ public static class TreinoEndpoints
                 query = query.Where(t => t.Ativo && (t.Aluno == null || t.Aluno.Ativo));
             }
 
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (idResolvido.HasValue && idResolvido.Value > 0)
             {
-                query = query.Where(t => t.UsuarioId == usuarioId.Value);
+                query = query.Where(t => t.UsuarioId == idResolvido.Value);
             }
 
             if (alunoId.HasValue && alunoId.Value > 0)
@@ -86,7 +94,7 @@ public static class TreinoEndpoints
         });
 
         // GET /treinos/{id} -> Busca uma ficha de treino específica pelo ID com todos os itens, dica do objetivo e dias estruturados
-        grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapGet("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -111,15 +119,26 @@ public static class TreinoEndpoints
                 return Results.NotFound(new { mensagem = "Ficha de treino não encontrada." });
             }
 
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, treino.UsuarioId ?? treino.Aluno?.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
             return Results.Ok(FormatarPlanoResposta(treino));
         });
 
         // GET /treinos/aluno/{alunoId} -> Lista o histórico de fichas de treino de um aluno específico
-        grupo.MapGet("/aluno/{alunoId:int}", async (int alunoId, AppDbContext db) =>
+        grupo.MapGet("/aluno/{alunoId:int}", async (int alunoId, HttpContext httpContext, AppDbContext db) =>
         {
             if (alunoId <= 0)
             {
                 return Results.BadRequest(new { mensagem = "O ID do aluno deve ser um número inteiro positivo." });
+            }
+
+            var aluno = await db.Alunos.AsNoTracking().FirstOrDefaultAsync(a => a.Id == alunoId);
+            if (aluno is not null && AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, aluno.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             var treinos = await db.Treinos
@@ -141,17 +160,27 @@ public static class TreinoEndpoints
         });
 
         // POST /treinos/gerar/{alunoId} -> Motor Inteligente DV Performance: gera e salva a ficha (automática ou manual em branco)
-        grupo.MapPost("/gerar/{alunoId:int}", async (int alunoId, int? usuarioId, string? divisao, AppDbContext db) =>
+        grupo.MapPost("/gerar/{alunoId:int}", async (int alunoId, int? usuarioId, string? divisao, HttpContext httpContext, AppDbContext db) =>
         {
             if (alunoId <= 0)
             {
                 return Results.BadRequest(new { mensagem = "Informe um ID de aluno válido para gerar o treino." });
             }
 
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedadeParam)
+            {
+                return erroPropriedadeParam;
+            }
+
             var aluno = await db.Alunos.AsNoTracking().FirstOrDefaultAsync(a => a.Id == alunoId && a.Ativo);
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou inativo no sistema." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, aluno.UsuarioId) is IResult erroPropriedadeAluno)
+            {
+                return erroPropriedadeAluno;
             }
 
             var errosEtarios = AlunoEndpoints.ValidarDadosEtarios(aluno);
@@ -178,9 +207,10 @@ public static class TreinoEndpoints
                 }
             }
 
-            // Identifica o Personal dono da ficha (pelo query param ou pelo vínculo do próprio aluno)
-            var donoId = (usuarioId.HasValue && usuarioId.Value > 0)
-                ? usuarioId.Value
+            // Identifica o Personal dono da ficha (pelo usuário autenticado, query param ou vínculo do próprio aluno)
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+            var donoId = (idResolvido.HasValue && idResolvido.Value > 0)
+                ? idResolvido.Value
                 : aluno.UsuarioId;
 
             if (donoId.HasValue && donoId.Value > 0)
@@ -318,7 +348,7 @@ public static class TreinoEndpoints
         });
 
         // PATCH /treinos/{id}/status -> Atualiza o status do plano ("Rascunho", "Validado", "Exportado") no banco PostgreSQL
-        grupo.MapPatch("/{id:int}/status", async (int id, AtualizarStatusTreinoRequest? dados, AppDbContext db) =>
+        grupo.MapPatch("/{id:int}/status", async (int id, AtualizarStatusTreinoRequest? dados, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -335,12 +365,18 @@ public static class TreinoEndpoints
             }
 
             var treino = await db.Treinos
+                .Include(t => t.Aluno)
                 .Include(t => t.Itens)
                 .FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
 
             if (treino is null)
             {
                 return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou desativada." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, treino.UsuarioId ?? treino.Aluno?.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             if (novoStatus is "Validado" or "Exportado" && treino.Itens.Count == 0)
@@ -362,7 +398,7 @@ public static class TreinoEndpoints
         });
 
         // Salva a edição completa; os itens omitidos são removidos somente deste plano.
-        grupo.MapPut("/{id:int}/itens", async (int id, AtualizarItensTreinoRequest? dados, AppDbContext db) =>
+        grupo.MapPut("/{id:int}/itens", async (int id, AtualizarItensTreinoRequest? dados, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0 || dados?.Itens is not { Count: > 0 } entradas)
             {
@@ -385,6 +421,12 @@ public static class TreinoEndpoints
                 return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou desativada." });
             }
 
+            var donoId = treino.UsuarioId ?? treino.Aluno?.UsuarioId;
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, donoId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
             var originais = treino.Itens.ToDictionary(i => i.Id);
             if (entradas.Any(i => i is null || i.Id < 0 || (i.Id > 0 && !originais.ContainsKey(i.Id)))
                 || entradas.Where(i => i!.Id > 0).Select(i => i!.Id).Distinct().Count()
@@ -403,7 +445,6 @@ public static class TreinoEndpoints
                 .Where(e => idsExercicios.Contains(e.Id)).ToDictionaryAsync(e => e.Id);
             var maquinas = await db.Maquinas.Include(m => m.GrupoMuscular)
                 .Where(m => idsMaquinas.Contains(m.Id)).ToDictionaryAsync(m => m.Id);
-            var donoId = treino.UsuarioId ?? treino.Aluno?.UsuarioId;
             var ordensPorDia = new Dictionary<string, int>();
             var aerobicosPorDia = new Dictionary<string, int>();
             var itensPorDia = new HashSet<(string Divisao, int? ExercicioId, int? MaquinaId)>();
@@ -565,7 +606,7 @@ public static class TreinoEndpoints
         });
 
         // PUT /treinos/itens/{idItem} -> Permite ao Personal editar um item específico do treino gerado (séries, repetições, descanso, aeróbico ou trocar exercício/máquina)
-        grupo.MapPut("/itens/{idItem:int}", async (int idItem, ItemTreino dadosAtualizados, AppDbContext db) =>
+        grupo.MapPut("/itens/{idItem:int}", async (int idItem, ItemTreino dadosAtualizados, HttpContext httpContext, AppDbContext db) =>
         {
             if (idItem <= 0)
             {
@@ -576,6 +617,21 @@ public static class TreinoEndpoints
             if (item is null)
             {
                 return Results.NotFound(new { mensagem = "Item de treino não encontrado." });
+            }
+
+            var treinoDoItem = await db.Treinos
+                .Include(t => t.Aluno)
+                .FirstOrDefaultAsync(t => t.Id == item.TreinoId && t.Ativo);
+
+            if (treinoDoItem is null)
+            {
+                return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou desativada." });
+            }
+
+            var donoId = treinoDoItem.UsuarioId ?? treinoDoItem.Aluno?.UsuarioId;
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, donoId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             if (dadosAtualizados.Series < MinSeries || dadosAtualizados.Series > MaxSeries)
@@ -621,6 +677,42 @@ public static class TreinoEndpoints
                 {
                     mensagem = "Selecione apenas um exercício ou uma máquina para cada item do plano."
                 });
+            }
+
+            if (dadosAtualizados.ExercicioId.HasValue && dadosAtualizados.ExercicioId != item.ExercicioId)
+            {
+                var exercicio = await db.Exercicios.AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.Id == dadosAtualizados.ExercicioId.Value);
+                if (exercicio is null || !exercicio.Ativo || (donoId.HasValue && exercicio.UsuarioId != donoId))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Selecione um exercício ativo do catálogo da conta responsável pelo plano."
+                    });
+                }
+
+                if (ValidarNivelItemParaAluno(treinoDoItem.Aluno, exercicio.Nome, exercicio.NivelMinimo, "exercício") is string erroNivelExercicio)
+                {
+                    return Results.BadRequest(new { mensagem = erroNivelExercicio });
+                }
+            }
+
+            if (dadosAtualizados.MaquinaId.HasValue && dadosAtualizados.MaquinaId != item.MaquinaId)
+            {
+                var maquina = await db.Maquinas.AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.Id == dadosAtualizados.MaquinaId.Value);
+                if (maquina is null || !maquina.Ativo || (donoId.HasValue && maquina.UsuarioId != donoId))
+                {
+                    return Results.BadRequest(new
+                    {
+                        mensagem = "Selecione uma máquina ativa do catálogo da conta responsável pelo plano."
+                    });
+                }
+
+                if (ValidarNivelItemParaAluno(treinoDoItem.Aluno, maquina.Nome, maquina.NivelMinimo, "máquina") is string erroNivelMaquina)
+                {
+                    return Results.BadRequest(new { mensagem = erroNivelMaquina });
+                }
             }
 
             var divisao = string.IsNullOrWhiteSpace(dadosAtualizados.DivisaoTreino)
@@ -671,8 +763,7 @@ public static class TreinoEndpoints
             }
             if (alterouAerobico)
             {
-                var treino = await db.Treinos.FindAsync(item.TreinoId);
-                if (treino is not null) treino.Status = "Rascunho";
+                treinoDoItem.Status = "Rascunho";
             }
 
             await db.SaveChangesAsync();
@@ -688,17 +779,24 @@ public static class TreinoEndpoints
         });
 
         // DELETE /treinos/{id} -> Desativa uma ficha de treino (Soft Delete)
-        grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapDelete("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
                 return Results.BadRequest(new { mensagem = "O ID do treino deve ser um número inteiro positivo." });
             }
 
-            var treino = await db.Treinos.FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
+            var treino = await db.Treinos
+                .Include(t => t.Aluno)
+                .FirstOrDefaultAsync(t => t.Id == id && t.Ativo);
             if (treino is null)
             {
                 return Results.NotFound(new { mensagem = "Ficha de treino não encontrada ou já desativada." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, treino.UsuarioId ?? treino.Aluno?.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             treino.Ativo = false;

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using DVPerformance.Api.Data;
 using DVPerformance.Api.Models;
+using DVPerformance.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace DVPerformance.Api.Endpoints;
@@ -32,8 +33,14 @@ public static class AlunoEndpoints
         var grupo = app.MapGroup("/alunos");
 
         // GET /alunos?usuarioId=1 -> Lista os alunos ativos (ou todos se incluirInativos=true)
-        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, AppDbContext db) =>
+        grupo.MapGet("/", async (int? usuarioId, bool? incluirInativos, HttpContext httpContext, AppDbContext db) =>
         {
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
             var query = db.Alunos.AsNoTracking().AsQueryable();
 
             if (incluirInativos != true)
@@ -41,9 +48,9 @@ public static class AlunoEndpoints
                 query = query.Where(a => a.Ativo);
             }
 
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (idResolvido.HasValue && idResolvido.Value > 0)
             {
-                query = query.Where(a => a.UsuarioId == usuarioId.Value);
+                query = query.Where(a => a.UsuarioId == idResolvido.Value);
             }
 
             var alunos = await query.OrderBy(a => a.Id).ToListAsync();
@@ -51,15 +58,21 @@ public static class AlunoEndpoints
         });
 
         // GET /alunos/sem-treino?usuarioId=1 -> Lista alunos ativos sem plano ativo
-        grupo.MapGet("/sem-treino", async (int? usuarioId, AppDbContext db) =>
+        grupo.MapGet("/sem-treino", async (int? usuarioId, HttpContext httpContext, AppDbContext db) =>
         {
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
+            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
             var query = db.Alunos
                 .AsNoTracking()
                 .Where(a => a.Ativo && !db.Treinos.Any(t => t.AlunoId == a.Id && t.Ativo));
 
-            if (usuarioId.HasValue && usuarioId.Value > 0)
+            if (idResolvido.HasValue && idResolvido.Value > 0)
             {
-                query = query.Where(a => a.UsuarioId == usuarioId.Value);
+                query = query.Where(a => a.UsuarioId == idResolvido.Value);
             }
 
             var alunos = await query.OrderBy(a => a.Id).ToListAsync();
@@ -67,7 +80,7 @@ public static class AlunoEndpoints
         });
 
         // GET /alunos/{id} -> Busca um aluno ativo específico pelo Id no banco
-        grupo.MapGet("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapGet("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -80,15 +93,27 @@ public static class AlunoEndpoints
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou desativado." });
             }
 
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, aluno.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
+            }
+
             return Results.Ok(aluno);
         });
 
         // POST /alunos -> Cadastra um novo aluno no banco PostgreSQL vinculado ao Personal
-        grupo.MapPost("/", async (int? usuarioId, Aluno? novoAluno, AppDbContext db) =>
+        grupo.MapPost("/", async (int? usuarioId, Aluno? novoAluno, HttpContext httpContext, AppDbContext db) =>
         {
-            if (novoAluno is not null && (!novoAluno.UsuarioId.HasValue || novoAluno.UsuarioId.Value <= 0) && usuarioId.HasValue && usuarioId.Value > 0)
+            var idAutenticado = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId);
+
+            if (novoAluno is not null && (!novoAluno.UsuarioId.HasValue || novoAluno.UsuarioId.Value <= 0) && idAutenticado.HasValue && idAutenticado.Value > 0)
             {
-                novoAluno.UsuarioId = usuarioId.Value;
+                novoAluno.UsuarioId = idAutenticado.Value;
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, novoAluno?.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             var erros = ValidarAluno(novoAluno, exigirUsuarioId: true);
@@ -124,7 +149,7 @@ public static class AlunoEndpoints
         });
 
         // PUT /alunos/{id} -> Atualiza os dados de um aluno ativo existente no banco
-        grupo.MapPut("/{id:int}", async (int id, Aluno? dadosAtualizados, AppDbContext db) =>
+        grupo.MapPut("/{id:int}", async (int id, Aluno? dadosAtualizados, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -135,6 +160,16 @@ public static class AlunoEndpoints
             if (alunoExistente is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou desativado." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, alunoExistente.UsuarioId) is IResult erroPropriedadeExistente)
+            {
+                return erroPropriedadeExistente;
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, dadosAtualizados?.UsuarioId) is IResult erroPropriedadeNovo)
+            {
+                return erroPropriedadeNovo;
             }
 
             var erros = ValidarAluno(dadosAtualizados, exigirUsuarioId: false);
@@ -158,7 +193,7 @@ public static class AlunoEndpoints
             alunoExistente.Peso = dadosAtualizados.Peso;
             alunoExistente.Altura = dadosAtualizados.Altura;
 
-            if (dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
+            if (!alunoExistente.UsuarioId.HasValue && dadosAtualizados.UsuarioId.HasValue && dadosAtualizados.UsuarioId.Value > 0)
             {
                 alunoExistente.UsuarioId = dadosAtualizados.UsuarioId;
             }
@@ -201,7 +236,7 @@ public static class AlunoEndpoints
         });
 
         // DELETE /alunos/{id} -> Desativa o aluno (Soft Delete) mantendo o histórico no banco
-        grupo.MapDelete("/{id:int}", async (int id, AppDbContext db) =>
+        grupo.MapDelete("/{id:int}", async (int id, HttpContext httpContext, AppDbContext db) =>
         {
             if (id <= 0)
             {
@@ -212,6 +247,11 @@ public static class AlunoEndpoints
             if (aluno is null)
             {
                 return Results.NotFound(new { mensagem = "Aluno não encontrado ou já desativado." });
+            }
+
+            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, aluno.UsuarioId) is IResult erroPropriedade)
+            {
+                return erroPropriedade;
             }
 
             aluno.Ativo = false;

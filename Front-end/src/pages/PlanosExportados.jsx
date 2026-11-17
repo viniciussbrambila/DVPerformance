@@ -44,6 +44,7 @@ import {
   expirarCachePorPrefixo,
   removerCachePorPrefixo,
 } from "../utils/cacheSessao";
+import { fetchAutenticado } from "../services/api";
 
 const API_URL = "http://localhost:5011/treinos";
 
@@ -138,7 +139,7 @@ export default function PlanosExportados({ glassStyle }) {
         const dados = await buscarComCache(
           chave,
           async () => {
-            const response = await fetch(`${API_URL}${query}`, {
+            const response = await fetchAutenticado(`${API_URL}${query}`, {
               cache: "no-store",
             });
             if (!response.ok) {
@@ -199,7 +200,7 @@ export default function PlanosExportados({ glassStyle }) {
     URL.revokeObjectURL(url);
 
     try {
-      const response = await fetch(`${API_URL}/${plano.id}/status`, {
+      const response = await fetchAutenticado(`${API_URL}/${plano.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Exportado" }),
@@ -232,7 +233,7 @@ export default function PlanosExportados({ glassStyle }) {
     setErro("");
 
     try {
-      const response = await fetch(`${API_URL}/${planoId}`, {
+      const response = await fetchAutenticado(`${API_URL}/${planoId}`, {
         method: "DELETE",
       });
 

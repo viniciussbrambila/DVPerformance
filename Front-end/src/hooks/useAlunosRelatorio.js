@@ -4,6 +4,7 @@ import {
   obterUsuarioRelatorio,
   prepararAlunosRelatorio,
 } from "../utils/relatorios";
+import { fetchAutenticado } from "../services/api";
 
 export default function useAlunosRelatorio() {
   const usuario = obterUsuarioRelatorio();
@@ -28,7 +29,7 @@ export default function useAlunosRelatorio() {
       setCarregando(!temCache(chave));
       try {
         const dados = await buscarComCache(chave, async () => {
-          const resposta = await fetch(
+          const resposta = await fetchAutenticado(
             `http://localhost:5011/alunos?usuarioId=${usuarioId}`,
           );
           if (!resposta.ok)

@@ -59,6 +59,7 @@ import {
   removerCache,
   atualizarItemEmListasCache,
 } from "../utils/cacheSessao";
+import { fetchAutenticado } from "../services/api";
 
 const API_URL = "http://localhost:5011/treinos";
 
@@ -165,7 +166,7 @@ export default function PlanoDetalhe({ glassStyle }) {
 
       try {
         const dados = await buscarComCache(chave, async () => {
-          const response = await fetch(`${API_URL}/${id}`);
+          const response = await fetchAutenticado(`${API_URL}/${id}`);
           if (response.status === 404) {
             const erro404 = new Error("NAO_ENCONTRADO");
             erro404.status = 404;
@@ -359,7 +360,7 @@ export default function PlanoDetalhe({ glassStyle }) {
     setErroApi("");
 
     try {
-      const response = await fetch(API_URL + "/" + plano.id + "/itens", {
+      const response = await fetchAutenticado(API_URL + "/" + plano.id + "/itens", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itens: montarItensEdicao(diasEdicao) }),
@@ -388,7 +389,7 @@ export default function PlanoDetalhe({ glassStyle }) {
 
   const atualizarStatusNoBanco = async (novoStatus) => {
     try {
-      const response = await fetch(`${API_URL}/${plano.id}/status`, {
+      const response = await fetchAutenticado(`${API_URL}/${plano.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: novoStatus }),
