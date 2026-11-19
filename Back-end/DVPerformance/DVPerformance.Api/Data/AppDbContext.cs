@@ -52,6 +52,14 @@ public class AppDbContext : DbContext
                   .HasMaxLength(100)
                   .IsRequired();
 
+            entity.Property(u => u.ChaveRecuperacaoHash)
+                  .HasColumnName("chave_recuperacao_hash")
+                  .HasMaxLength(100);
+
+            entity.Property(u => u.ChaveRecuperacaoCifrada)
+                  .HasColumnName("chave_recuperacao_cifrada")
+                  .HasMaxLength(200);
+
             entity.Property(u => u.Perfil)
                   .HasColumnName("perfil")
                   .HasMaxLength(20)

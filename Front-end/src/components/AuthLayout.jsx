@@ -21,18 +21,20 @@ export function AuthCardLayout({
   return (
     <Box
       sx={{
-        minHeight: "80vh",
+        minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        px: 2,
+        py: 4,
       }}
     >
       <Paper
         elevation={0}
         sx={{
-          p: 4,
+          p: { xs: 3.5, sm: 5 },
           width: "100%",
-          maxWidth: 400,
+          maxWidth: 500,
           borderRadius: 4,
           display: "flex",
           flexDirection: "column",
@@ -42,10 +44,10 @@ export function AuthCardLayout({
         <Marca />
 
         <Typography
-          variant="body2"
+          variant="body1"
           color="text.secondary"
           sx={{
-            mb: 3,
+            mb: 3.5,
             ...(subtituloCentralizado ? { textAlign: "center" } : {}),
           }}
         >
@@ -60,7 +62,7 @@ export function AuthCardLayout({
             width: "100%",
             display: "flex",
             flexDirection: "column",
-            gap: 2,
+            gap: 2.5,
           }}
         >
           {children}
@@ -77,6 +79,9 @@ export function CampoSenha({
   error = false,
   helperText,
   disabled = false,
+  size = "medium",
+  fullWidth = false,
+  autoComplete,
 }) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
@@ -89,6 +94,9 @@ export function CampoSenha({
       error={error}
       helperText={helperText}
       disabled={disabled}
+      size={size}
+      fullWidth={fullWidth}
+      autoComplete={autoComplete}
       slotProps={{
         input: {
           endAdornment: (

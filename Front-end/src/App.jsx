@@ -26,7 +26,7 @@ import PlanosExportados from "./pages/PlanosExportados";
 import PlanoDetalhe from "./pages/PlanoDetalhe";
 import RelatorioAluno from "./pages/RelatorioAluno";
 
-const drawerWidth = 240;
+const drawerWidth = 288;
 
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
   width: 62,

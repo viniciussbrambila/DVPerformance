@@ -1,4 +1,15 @@
-import { Typography, TextField, Button, Link, Alert } from "@mui/material";
+import {
+  Typography,
+  TextField,
+  Button,
+  Link,
+  Alert,
+  Box,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
 import { useState } from "react";
 import { AuthCardLayout, CampoSenha } from "../components/AuthLayout";
 import { API_BASE_URL } from "../services/api";
@@ -7,12 +18,14 @@ const API_RECUPERAR_SENHA_URL = `${API_BASE_URL}/auth/recuperar-senha`;
 
 export default function EsqueciSenha({ onVoltarLogin }) {
   const [usuario, setUsuario] = useState("");
-  const [codigoRecuperacao, setCodigoRecuperacao] = useState("");
+  const [chaveRecuperacao, setChaveRecuperacao] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [tentouEnviar, setTentouEnviar] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
+  const [novaChaveGerada, setNovaChaveGerada] = useState("");
+  const [copiado, setCopiado] = useState(false);
   const [erroApi, setErroApi] = useState("");
   const [carregando, setCarregando] = useState(false);
 
@@ -26,7 +39,7 @@ export default function EsqueciSenha({ onVoltarLogin }) {
 
     if (
       !usuario.trim() ||
-      !codigoRecuperacao.trim() ||
+      !chaveRecuperacao.trim() ||
       senhaCurta ||
       senhasDiferentes
     ) {
@@ -40,7 +53,7 @@ export default function EsqueciSenha({ onVoltarLogin }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           usuario: usuario.trim(),
-          codigoRecuperacao: codigoRecuperacao.trim(),
+          chaveRecuperacao: chaveRecuperacao.trim(),
           novaSenha,
         }),
       });
@@ -60,6 +73,7 @@ export default function EsqueciSenha({ onVoltarLogin }) {
         data?.mensagem ||
           "Senha alterada com sucesso! Você já pode entrar com a nova senha.",
       );
+      setNovaChaveGerada(data?.chaveRecuperacao || "");
       setEnviado(true);
     } catch {
       setErroApi(
@@ -70,9 +84,19 @@ export default function EsqueciSenha({ onVoltarLogin }) {
     }
   };
 
+  const handleCopiarNovaChave = async () => {
+    if (!novaChaveGerada) return;
+    try {
+      await navigator.clipboard.writeText(novaChaveGerada);
+      setCopiado(true);
+    } catch {
+      setErroApi("Não foi possível copiar automaticamente. Copie a chave manualmente.");
+    }
+  };
+
   return (
     <AuthCardLayout
-      subtitulo="Informe seu usuário, o código de segurança da academia e crie uma nova senha!"
+      subtitulo="Informe seu usuário, sua chave pessoal de recuperação e crie uma nova senha!"
       subtituloCentralizado
       onSubmit={handleSubmit}
       noValidate
@@ -86,8 +110,59 @@ export default function EsqueciSenha({ onVoltarLogin }) {
         </Alert>
       )}
 
+      {enviado && novaChaveGerada && (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Sua nova chave de recuperação pessoal:
+          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
+              px: 2,
+              py: 1.5,
+              borderRadius: 2,
+              border: 1,
+              borderColor: "primary.main",
+              bgcolor: "action.hover",
+            }}
+          >
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontFamily: "monospace",
+                fontWeight: 700,
+                letterSpacing: 1,
+                wordBreak: "break-all",
+              }}
+            >
+              {novaChaveGerada}
+            </Typography>
+
+            <Tooltip title={copiado ? "Copiado!" : "Copiar chave"}>
+              <IconButton
+                onClick={handleCopiarNovaChave}
+                color={copiado ? "success" : "primary"}
+                aria-label="Copiar nova chave de recuperação"
+              >
+                {copiado ? <CheckIcon /> : <ContentCopyIcon />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+      )}
+
       <TextField
         label="Usuário"
+        size="medium"
         value={usuario}
         onChange={(e) => setUsuario(e.target.value)}
         autoComplete="username"
@@ -106,10 +181,11 @@ export default function EsqueciSenha({ onVoltarLogin }) {
       />
 
       <TextField
-        label="Código de recuperação"
-        placeholder="Ex.: DVP-2026"
-        value={codigoRecuperacao}
-        onChange={(e) => setCodigoRecuperacao(e.target.value)}
+        label="Chave de recuperação"
+        size="medium"
+        placeholder="Ex.: DVP-XXXX-XXXX-XXXX"
+        value={chaveRecuperacao}
+        onChange={(e) => setChaveRecuperacao(e.target.value)}
         slotProps={{
           htmlInput: {
             autoCapitalize: "characters",
@@ -117,11 +193,11 @@ export default function EsqueciSenha({ onVoltarLogin }) {
             spellCheck: false,
           },
         }}
-        error={tentouEnviar && !codigoRecuperacao.trim()}
+        error={tentouEnviar && !chaveRecuperacao.trim()}
         helperText={
-          tentouEnviar && !codigoRecuperacao.trim()
-            ? "Informe o código de recuperação (padrão acadêmico: DVP-2026)"
-            : "Código de validação da academia (padrão: DVP-2026)"
+          tentouEnviar && !chaveRecuperacao.trim()
+            ? "Informe a sua chave pessoal de recuperação"
+            : "Consulte sua chave em Sobre o usuário após fazer login"
         }
         disabled={enviado}
       />
@@ -156,6 +232,7 @@ export default function EsqueciSenha({ onVoltarLogin }) {
         fullWidth
         size="large"
         disabled={enviado || carregando}
+        sx={{ py: 1.4 }}
       >
         {carregando ? "Salvando..." : "Salvar"}
       </Button>

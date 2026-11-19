@@ -70,6 +70,7 @@ export default function Login({ onLogin, onIrCadastro, onIrEsqueciSenha }) {
       <TextField
         label="Usuário"
         type="text"
+        size="medium"
         value={usuario}
         onChange={(e) => setUsuario(e.target.value)}
         autoComplete="username"
@@ -110,6 +111,7 @@ export default function Login({ onLogin, onIrCadastro, onIrEsqueciSenha }) {
         fullWidth
         size="large"
         disabled={carregando}
+        sx={{ py: 1.4 }}
       >
         {carregando ? "Entrando..." : "Entrar"}
       </Button>

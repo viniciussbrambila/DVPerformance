@@ -34,6 +34,30 @@ public static class SegurancaTests
                 "Senha legada incorreta deve ser rejeitada.");
         });
 
+        testar("chave pessoal de recuperação é única, validada por hash e decifrada com integridade", () =>
+        {
+            var chave1 = SegurancaService.GerarChaveRecuperacao();
+            var chave2 = SegurancaService.GerarChaveRecuperacao();
+
+            exigir(chave1.StartsWith("DVP-", StringComparison.Ordinal) && chave1.Length == 18,
+                "A chave pessoal deve seguir o formato DVP-XXXX-XXXX-XXXX.");
+            exigir(chave1 != chave2, "Duas chaves geradas devem ser distintas.");
+
+            var hash = SegurancaService.GerarHashChaveRecuperacao(chave1);
+            exigir(hash.Length <= 100, "O hash da chave deve caber em varchar(100).");
+            exigir(SegurancaService.VerificarChaveRecuperacao(chave1.ToLowerInvariant(), hash),
+                "A verificação deve aceitar a chave com normalização de espaços/caixa.");
+            exigir(!SegurancaService.VerificarChaveRecuperacao(chave2, hash),
+                "Chave incorreta deve ser rejeitada.");
+
+            var cifrada = SegurancaService.CifrarChaveRecuperacao(chave1);
+            exigir(cifrada.Length <= 200, "A chave cifrada deve caber em varchar(200).");
+            exigir(SegurancaService.DecifrarChaveRecuperacao(cifrada) == chave1,
+                "A decifragem AES-GCM deve restaurar exatamente a chave original.");
+            exigir(SegurancaService.DecifrarChaveRecuperacao(cifrada + "adulterada") is null,
+                "Texto cifrado adulterado deve falhar na verificação de tag.");
+        });
+
         testar("token JWT HS256 autentica sessão legítima e rejeita adulteração ou expiração", () =>
         {
             var usuario = new Usuario
@@ -63,33 +87,40 @@ public static class SegurancaTests
                 "Token expirado deve ser rejeitado.");
         });
 
-        testar("recuperação de senha exige senha atual ou código de recuperação (DV-SEC-001)", () =>
+        testar("recuperação de senha exige chave pessoal e alteração de senha bloqueia senha repetida", () =>
         {
-            var errosSemComprovacao = AuthEndpoints.ValidarRecuperacaoSenha(new RecuperarSenhaRequest
+            var errosSemChave = AuthEndpoints.ValidarRecuperacaoSenha(new RecuperarSenhaRequest
             {
                 Usuario = "instrutor.teste",
                 NovaSenha = "NovaSenha123"
             });
-            exigir(errosSemComprovacao.Count == 1,
-                "Rejeitar redefinição de senha que informe apenas usuário e nova senha.");
+            exigir(errosSemChave.Count == 1,
+                "Rejeitar redefinição de senha sem a chave de recuperação pessoal.");
 
-            var errosComCodigo = AuthEndpoints.ValidarRecuperacaoSenha(new RecuperarSenhaRequest
+            var errosComChave = AuthEndpoints.ValidarRecuperacaoSenha(new RecuperarSenhaRequest
             {
                 Usuario = "instrutor.teste",
-                NovaSenha = "NovaSenha123",
-                CodigoRecuperacao = AuthEndpoints.CodigoRecuperacaoAcademicoPadrao
+                ChaveRecuperacao = "DVP-ABCD-EFGH-JKLM",
+                NovaSenha = "NovaSenha123"
             });
-            exigir(errosComCodigo.Count == 0,
-                "Aceitar payload com código de recuperação preenchido.");
+            exigir(errosComChave.Count == 0,
+                "Aceitar payload com usuário, chave pessoal e nova senha válidos.");
 
-            var errosComSenhaAtual = AuthEndpoints.ValidarRecuperacaoSenha(new RecuperarSenhaRequest
+            var errosSenhaIgual = AuthEndpoints.ValidarAlteracaoSenha(new AlterarSenhaRequest
             {
-                Usuario = "instrutor.teste",
-                NovaSenha = "NovaSenha123",
-                SenhaAtual = "SenhaAntiga123"
+                SenhaAtual = "MesmaSenha123",
+                NovaSenha = "MesmaSenha123"
             });
-            exigir(errosComSenhaAtual.Count == 0,
-                "Aceitar payload com confirmação da senha atual.");
+            exigir(errosSenhaIgual.Count == 1,
+                "Rejeitar alteração quando a nova senha é igual à senha atual.");
+
+            var errosAlteracaoValida = AuthEndpoints.ValidarAlteracaoSenha(new AlterarSenhaRequest
+            {
+                SenhaAtual = "SenhaAtual123",
+                NovaSenha = "NovaSenha123"
+            });
+            exigir(errosAlteracaoValida.Count == 0,
+                "Aceitar alteração quando a nova senha é válida e diferente da atual.");
         });
 
         testar("autorização multi-tenant bloqueia acesso cruzado entre personais (DV-SEC-002)", () =>
@@ -106,18 +137,22 @@ public static class SegurancaTests
             exigir(erroMesmoUsuario is null, "Deve permitir acesso ao próprio recurso do personal autenticado.");
         });
 
-        testar("entidade Usuario nunca expõe o campo Senha na serialização JSON (DV-SEC-008)", () =>
+        testar("entidade Usuario nunca expõe Senha nem hashes/cifra de recuperação na serialização JSON (DV-SEC-008)", () =>
         {
             var usuario = new Usuario
             {
                 Id = 1,
                 NomeUsuario = "personal.dv",
-                Senha = SegurancaService.GerarHashSenha("Segredo123")
+                Senha = SegurancaService.GerarHashSenha("Segredo123"),
+                ChaveRecuperacaoHash = SegurancaService.GerarHashChaveRecuperacao("DVP-ABCD-EFGH-JKLM"),
+                ChaveRecuperacaoCifrada = SegurancaService.CifrarChaveRecuperacao("DVP-ABCD-EFGH-JKLM")
             };
 
             var json = JsonSerializer.SerializeToElement(usuario, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             exigir(!json.TryGetProperty("senha", out _) && !json.TryGetProperty("Senha", out _),
                 "O campo Senha deve ser omitido por [JsonIgnore].");
+            exigir(!json.TryGetProperty("chaveRecuperacaoHash", out _) && !json.TryGetProperty("chaveRecuperacaoCifrada", out _),
+                "Os campos da chave de recuperação devem ser omitidos por [JsonIgnore].");
         });
     }
 }

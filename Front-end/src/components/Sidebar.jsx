@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Drawer,
   List,
@@ -7,10 +8,13 @@ import {
   ListItemText,
   Box,
   Typography,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { Link, useLocation } from "react-router-dom";
 import Marca from "./Marca";
+import DialogoSobreUsuario from "./DialogoSobreUsuario";
 import PeopleIcon from "@mui/icons-material/People";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
@@ -18,6 +22,7 @@ import AddTaskIcon from "@mui/icons-material/AddTask";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
+import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 
 const NavItemButton = styled(ListItemButton)(({ theme }) => ({
   minHeight: 48,
@@ -27,7 +32,7 @@ const NavItemButton = styled(ListItemButton)(({ theme }) => ({
   borderRadius: theme.spacing(2),
   "& .MuiListItemIcon-root": {
     minWidth: 0,
-    marginRight: theme.spacing(3),
+    marginRight: theme.spacing(2.5),
     justifyContent: "center",
   },
   "&.Mui-selected": {
@@ -53,77 +58,108 @@ const ITENS_NAVEGACAO = [
 
 export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
   const { pathname } = useLocation();
+  const [sobreUsuarioAberto, setSobreUsuarioAberto] = useState(false);
+
   const estaAtivo = (rota) =>
     pathname === rota || pathname.startsWith(`${rota}/`);
 
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        "& .MuiDrawer-paper": {
+    <>
+      <Drawer
+        variant="permanent"
+        sx={{
           width: drawerWidth,
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          whiteSpace: "nowrap",
-        },
-      }}
-    >
-      <Box sx={{ px: 2.5, py: 2.5 }}>
-        <Marca compacta />
-        <Typography
-          variant="h6"
-          sx={{
-            mt: 0.5,
-            fontSize: 14,
-            fontWeight: 500,
-            color: "text.secondary",
-          }}
-          noWrap
-        >
-          Sistema de Geração de Treino
-        </Typography>
-      </Box>
-
-      <Divider />
-
-      <List component="nav">
-        {ITENS_NAVEGACAO.map(({ rota, texto, Icone }) => (
-          <NavItemButton
-            key={rota}
-            component={Link}
-            to={rota}
-            selected={estaAtivo(rota)}
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            whiteSpace: "nowrap",
+          },
+        }}
+      >
+        <Box sx={{ px: 2.5, py: 2.5 }}>
+          <Marca compacta />
+          <Typography
+            variant="body2"
+            sx={{
+              mt: 0.75,
+              fontWeight: 500,
+              lineHeight: 1.4,
+              color: "text.secondary",
+              whiteSpace: "normal",
+            }}
           >
-            <ListItemIcon>
-              <Icone />
-            </ListItemIcon>
-            <ListItemText primary={texto} />
-          </NavItemButton>
-        ))}
-      </List>
-
-      <Box sx={{ mt: "auto" }}>
-        <Divider />
-
-        <Box sx={{ px: 2.5, py: 1.5 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: "bold" }} noWrap>
-            {usuarioLogado?.nome || usuarioLogado?.usuario}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {usuarioLogado?.perfil === "admin" ? "Admin" : "Personal"}
+            Sistema de Geração de Treino
           </Typography>
         </Box>
 
-        <NavItemButton onClick={onSair} sx={{ mb: 1, color: "error.main" }}>
-          <ListItemIcon sx={{ color: "inherit" }}>
-            <LogoutIcon />
-          </ListItemIcon>
-          <ListItemText primary="Sair" />
-        </NavItemButton>
-      </Box>
-    </Drawer>
+        <Divider />
+
+        <List component="nav">
+          {ITENS_NAVEGACAO.map(({ rota, texto, Icone }) => (
+            <NavItemButton
+              key={rota}
+              component={Link}
+              to={rota}
+              selected={estaAtivo(rota)}
+            >
+              <ListItemIcon>
+                <Icone />
+              </ListItemIcon>
+              <ListItemText primary={texto} />
+            </NavItemButton>
+          ))}
+        </List>
+
+        <Box sx={{ mt: "auto" }}>
+          <Divider />
+
+          <Box
+            sx={{
+              px: 2.5,
+              py: 1.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1,
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: "bold", minWidth: 0 }}
+              noWrap
+            >
+              {usuarioLogado?.nome || usuarioLogado?.usuario}
+            </Typography>
+
+            <Tooltip title="Sobre o usuário">
+              <IconButton
+                size="small"
+                color="primary"
+                aria-label="Sobre o usuário"
+                onClick={() => setSobreUsuarioAberto(true)}
+              >
+                <AccountCircleOutlinedIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          <NavItemButton onClick={onSair} sx={{ mb: 1, color: "error.main" }}>
+            <ListItemIcon sx={{ color: "inherit" }}>
+              <LogoutIcon />
+            </ListItemIcon>
+            <ListItemText primary="Sair" />
+          </NavItemButton>
+        </Box>
+      </Drawer>
+
+      <DialogoSobreUsuario
+        open={sobreUsuarioAberto}
+        onClose={() => setSobreUsuarioAberto(false)}
+        usuarioLogado={usuarioLogado}
+      />
+    </>
   );
 }

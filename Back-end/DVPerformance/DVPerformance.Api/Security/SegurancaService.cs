@@ -9,8 +9,9 @@ namespace DVPerformance.Api.Security;
 
 /// <summary>
 /// Serviço utilitário de criptografia e segurança da API DV Performance:
-/// 1) Hash de senhas com PBKDF2-HMAC-SHA256 + salt aleatório de 128 bits e comparação em tempo constante;
-/// 2) Emissão e validação de tokens de sessão assinados com HMAC-SHA256 (padrão JWT HS256).
+/// 1) Hash de senhas e chaves de recuperação com PBKDF2-HMAC-SHA256 + salt aleatório de 128 bits e comparação em tempo constante;
+/// 2) Cifragem autenticada AES-256-GCM para custódia da chave pessoal de recuperação (revelada somente mediante senha);
+/// 3) Emissão e validação de tokens de sessão assinados com HMAC-SHA256 (padrão JWT HS256).
 /// </summary>
 public static class SegurancaService
 {
@@ -18,6 +19,9 @@ public static class SegurancaService
     private const int IteracoesPadrao = 100_000;
     private const int TamanhoSaltBytes = 16;
     private const int TamanhoChaveBytes = 32;
+    private const int TamanhoNonceAesGcm = 12;
+    private const int TamanhoTagAesGcm = 16;
+    private const string AlfabetoChaveRecuperacao = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static readonly TimeSpan ValidadeTokenPadrao = TimeSpan.FromHours(12);
 
     // Chave de assinatura padrão de desenvolvimento acadêmico caso nenhuma variável de ambiente esteja definida.
@@ -116,6 +120,121 @@ public static class SegurancaService
 
         return iguais;
     }
+
+    /// <summary>
+    /// Gera uma chave de recuperação pessoal única no formato DVP-XXXX-XXXX-XXXX.
+    /// </summary>
+    public static string GerarChaveRecuperacao()
+    {
+        Span<char> bloco1 = stackalloc char[4];
+        Span<char> bloco2 = stackalloc char[4];
+        Span<char> bloco3 = stackalloc char[4];
+
+        PreencherBlocoAleatorio(bloco1);
+        PreencherBlocoAleatorio(bloco2);
+        PreencherBlocoAleatorio(bloco3);
+
+        return $"DVP-{new string(bloco1)}-{new string(bloco2)}-{new string(bloco3)}";
+    }
+
+    private static void PreencherBlocoAleatorio(Span<char> destino)
+    {
+        for (var i = 0; i < destino.Length; i++)
+        {
+            destino[i] = AlfabetoChaveRecuperacao[RandomNumberGenerator.GetInt32(AlfabetoChaveRecuperacao.Length)];
+        }
+    }
+
+    public static string NormalizarChaveRecuperacao(string? chave) =>
+        (chave ?? string.Empty).Trim().ToUpperInvariant();
+
+    public static string GerarHashChaveRecuperacao(string chave)
+    {
+        var normalizada = NormalizarChaveRecuperacao(chave);
+        if (string.IsNullOrEmpty(normalizada))
+        {
+            throw new ArgumentException("A chave de recuperação não pode ser vazia.", nameof(chave));
+        }
+
+        return GerarHashSenha(normalizada);
+    }
+
+    public static bool VerificarChaveRecuperacao(string? chaveInformada, string? hashArmazenado)
+    {
+        var normalizada = NormalizarChaveRecuperacao(chaveInformada);
+        if (string.IsNullOrEmpty(normalizada) || string.IsNullOrEmpty(hashArmazenado))
+        {
+            return false;
+        }
+
+        return VerificarSenha(normalizada, hashArmazenado, out _);
+    }
+
+    public static string CifrarChaveRecuperacao(string chave)
+    {
+        var normalizada = NormalizarChaveRecuperacao(chave);
+        if (string.IsNullOrEmpty(normalizada))
+        {
+            throw new ArgumentException("A chave de recuperação não pode ser vazia.", nameof(chave));
+        }
+
+        var chaveAes = DerivarChaveCifraRecuperacao();
+        var nonce = new byte[TamanhoNonceAesGcm];
+        RandomNumberGenerator.Fill(nonce);
+
+        var textoPlano = Encoding.UTF8.GetBytes(normalizada);
+        var textoCifrado = new byte[textoPlano.Length];
+        var tag = new byte[TamanhoTagAesGcm];
+
+        using var aes = new AesGcm(chaveAes, TamanhoTagAesGcm);
+        aes.Encrypt(nonce, textoPlano, textoCifrado, tag);
+
+        return $"{Convert.ToBase64String(nonce)}.{Convert.ToBase64String(textoCifrado)}.{Convert.ToBase64String(tag)}";
+    }
+
+    public static string? DecifrarChaveRecuperacao(string? valorCifrado)
+    {
+        if (string.IsNullOrWhiteSpace(valorCifrado))
+        {
+            return null;
+        }
+
+        var partes = valorCifrado.Split('.');
+        if (partes.Length != 3)
+        {
+            return null;
+        }
+
+        try
+        {
+            var nonce = Convert.FromBase64String(partes[0]);
+            var textoCifrado = Convert.FromBase64String(partes[1]);
+            var tag = Convert.FromBase64String(partes[2]);
+            if (nonce.Length != TamanhoNonceAesGcm || tag.Length != TamanhoTagAesGcm)
+            {
+                return null;
+            }
+
+            var chaveAes = DerivarChaveCifraRecuperacao();
+            var textoPlano = new byte[textoCifrado.Length];
+
+            using var aes = new AesGcm(chaveAes, TamanhoTagAesGcm);
+            aes.Decrypt(nonce, textoCifrado, tag, textoPlano);
+
+            return Encoding.UTF8.GetString(textoPlano);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
+    private static byte[] DerivarChaveCifraRecuperacao() =>
+        SHA256.HashData(Encoding.UTF8.GetBytes($"dvp-recovery-key-v1:{_segredoJwt}"));
 
     /// <summary>
     /// Emite um token compacto no padrão JWT (Header.Payload.Signature) assinado com HMAC-SHA256.

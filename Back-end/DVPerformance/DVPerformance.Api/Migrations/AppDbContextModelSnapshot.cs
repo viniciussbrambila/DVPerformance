@@ -825,6 +825,16 @@ namespace DVPerformance.Api.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("catalogo_inicializado");
 
+                    b.Property<string>("ChaveRecuperacaoCifrada")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("chave_recuperacao_cifrada");
+
+                    b.Property<string>("ChaveRecuperacaoHash")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("chave_recuperacao_hash");
+
                     b.Property<string>("NomeUsuario")
                         .IsRequired()
                         .HasMaxLength(50)

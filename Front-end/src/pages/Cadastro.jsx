@@ -1,4 +1,15 @@
-import { Typography, TextField, Button, Link, Alert } from "@mui/material";
+import {
+  Typography,
+  TextField,
+  Button,
+  Link,
+  Alert,
+  Box,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
 import { useState } from "react";
 import { AuthCardLayout, CampoSenha } from "../components/AuthLayout";
 import { API_BASE_URL } from "../services/api";
@@ -12,6 +23,8 @@ export default function Cadastro({ onCadastro, onVoltarLogin }) {
   const [tentouCadastrar, setTentouCadastrar] = useState(false);
   const [erroApi, setErroApi] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [chaveGerada, setChaveGerada] = useState("");
+  const [copiado, setCopiado] = useState(false);
 
   const usuarioTrim = usuario.trim();
   const usuarioInvalido = usuarioTrim.length < 3 || usuarioTrim.length > 50;
@@ -49,6 +62,11 @@ export default function Cadastro({ onCadastro, onVoltarLogin }) {
         return;
       }
 
+      if (data?.chaveRecuperacao) {
+        setChaveGerada(data.chaveRecuperacao);
+        return;
+      }
+
       onCadastro();
     } catch {
       setErroApi(
@@ -58,6 +76,88 @@ export default function Cadastro({ onCadastro, onVoltarLogin }) {
       setCarregando(false);
     }
   };
+
+  const handleCopiarChave = async () => {
+    if (!chaveGerada) return;
+    try {
+      await navigator.clipboard.writeText(chaveGerada);
+      setCopiado(true);
+    } catch {
+      setErroApi("Não foi possível copiar automaticamente. Copie a chave manualmente.");
+    }
+  };
+
+  if (chaveGerada) {
+    return (
+      <AuthCardLayout
+        subtitulo="Guarde sua chave pessoal de recuperação antes de continuar"
+        subtituloCentralizado
+        onSubmit={(e) => {
+          e.preventDefault();
+          onCadastro();
+        }}
+      >
+        <Alert severity="success">
+          Conta criada com sucesso! Use esta chave caso precise redefinir sua
+          senha no futuro.
+        </Alert>
+
+        {erroApi && <Alert severity="error">{erroApi}</Alert>}
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            px: 2,
+            py: 1.5,
+            borderRadius: 2,
+            border: 1,
+            borderColor: "primary.main",
+            bgcolor: "action.hover",
+          }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{
+              fontFamily: "monospace",
+              fontWeight: 700,
+              letterSpacing: 1,
+              wordBreak: "break-all",
+            }}
+          >
+            {chaveGerada}
+          </Typography>
+
+          <Tooltip title={copiado ? "Copiado!" : "Copiar chave"}>
+            <IconButton
+              onClick={handleCopiarChave}
+              color={copiado ? "success" : "primary"}
+              aria-label="Copiar chave de recuperação"
+            >
+              {copiado ? <CheckIcon /> : <ContentCopyIcon />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+          Você também pode consultar ou gerar uma nova chave depois clicando no
+          ícone de usuário no menu lateral.
+        </Typography>
+
+        <Button
+          type="submit"
+          variant="contained"
+          fullWidth
+          size="large"
+          sx={{ py: 1.4 }}
+        >
+          Ir para o login
+        </Button>
+      </AuthCardLayout>
+    );
+  }
 
   return (
     <AuthCardLayout
@@ -69,6 +169,7 @@ export default function Cadastro({ onCadastro, onVoltarLogin }) {
 
       <TextField
         label="Nome de usuário"
+        size="medium"
         value={usuario}
         onChange={(e) => setUsuario(e.target.value)}
         autoComplete="username"
@@ -117,6 +218,7 @@ export default function Cadastro({ onCadastro, onVoltarLogin }) {
         fullWidth
         size="large"
         disabled={carregando}
+        sx={{ py: 1.4 }}
       >
         {carregando ? "Cadastrando..." : "Cadastrar"}
       </Button>
