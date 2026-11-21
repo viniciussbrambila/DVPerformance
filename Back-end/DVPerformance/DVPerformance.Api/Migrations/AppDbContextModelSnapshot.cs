@@ -128,289 +128,289 @@ namespace DVPerformance.Api.Migrations
                         {
                             Id = 1,
                             Objetivo = "Hipertrofia",
-                            Texto = "Priorize a execução controlada na fase excêntrica (descida do peso) em cada repetição, mantendo a tensão mecânica constante no músculo-alvo para maximizar o estímulo de hipertrofia."
+                            Texto = "Segure a descida do peso com controle em cada repetição. Não deixe o peso despencar: controlar a volta força o músculo a trabalhar o dobro e gera muito mais resultado."
                         },
                         new
                         {
                             Id = 2,
                             Objetivo = "Hipertrofia",
-                            Texto = "Busque a progressão gradual de carga ou de repetições semana após semana, sempre preservando a amplitude completa do movimento antes de aumentar o peso."
+                            Texto = "Tente aumentar um pouco o peso ou fazer 1 ou 2 repetições a mais com o passar das semanas, mas só suba a carga quando conseguir fazer o movimento completo e bem feito."
                         },
                         new
                         {
                             Id = 3,
                             Objetivo = "Hipertrofia",
-                            Texto = "Respeite os intervalos de descanso prescritos entre as séries para recuperar sua capacidade de contração e manter um alto volume de carga útil durante toda a sessão."
+                            Texto = "Respeite o tempo de descanso marcado na ficha. Descansar o tempo certo recupera sua energia para você conseguir pegar firme na próxima série."
                         },
                         new
                         {
                             Id = 4,
                             Objetivo = "Hipertrofia",
-                            Texto = "O crescimento muscular acontece durante a recuperação: priorize de 7 a 9 horas de sono reparador por noite para otimizar a síntese proteica e a regeneração das fibras."
+                            Texto = "O músculo cresce quando você descansa, não durante o treino. Procure dormir de 7 a 9 horas por noite para seu corpo se recuperar e construir massa muscular."
                         },
                         new
                         {
                             Id = 5,
                             Objetivo = "Hipertrofia",
-                            Texto = "Mantenha uma ingestão adequada de proteínas fracionada ao longo do dia e hidratação constante para fornecer os nutrientes necessários à construção de massa magra."
+                            Texto = "Inclua boas fontes de proteína nas suas refeições ao longo do dia e beba bastante água: é disso que seu corpo precisa para construir músculos."
                         },
                         new
                         {
                             Id = 6,
                             Objetivo = "Hipertrofia",
-                            Texto = "Leve as séries de trabalho próximas à falha concêntrica com segurança técnica, evitando compensações posturais ou impulsos que roubem o esforço do músculo principal."
+                            Texto = "Treine até sentir que o músculo realmente cansou nas últimas repetições, mas sem roubar no movimento ou dar impulsos com o corpo para levantar o peso."
                         },
                         new
                         {
                             Id = 7,
                             Objetivo = "Hipertrofia",
-                            Texto = "Concentre-se na conexão mente-músculo durante cada série, sentindo o alongamento completo e o pico de contração antes de iniciar a próxima repetição."
+                            Texto = "Foque no músculo que está treinando em vez de apenas mover o peso no automático. Sinta ele alongar e contrair bem a cada repetição."
                         },
                         new
                         {
                             Id = 8,
                             Objetivo = "Hipertrofia",
-                            Texto = "Realize o cardio pós-treino na intensidade moderada indicada na ficha para melhorar a sensibilidade à insulina e o condicionamento sem comprometer a recuperação muscular."
+                            Texto = "Faça o cardio depois da musculação no ritmo moderado indicado na ficha. Isso melhora seu fôlego e ajuda o corpo a absorver melhor os nutrientes sem atrapalhar o ganho de massa."
                         },
                         new
                         {
                             Id = 9,
                             Objetivo = "Hipertrofia",
-                            Texto = "Não pule as séries iniciais de aquecimento articular e específico: elas preparam tendões e sistema nervoso para suportar cargas mais produtivas nas séries principais."
+                            Texto = "Nunca pule o aquecimento antes de pegar pesado. Fazer 1 ou 2 séries leves prepara suas articulações, evita lesões e melhora sua força no treino."
                         },
                         new
                         {
                             Id = 10,
                             Objetivo = "Hipertrofia",
-                            Texto = "A constância semanal supera treinos isolados extremos: cumprir todas as sessões planejadas garante a frequência ideal de estímulo para cada grupamento muscular."
+                            Texto = "Mais vale treinar bem toda semana do que fazer um treino exagerado e faltar nos outros dias. A regularidade é o que traz resultados visíveis."
                         },
                         new
                         {
                             Id = 11,
                             Objetivo = "Hipertrofia",
-                            Texto = "Anote as cargas utilizadas nos exercícios base do seu protocolo para acompanhar sua evolução real e identificar o momento exato de progredir nos treinos seguintes."
+                            Texto = "Anote os pesos que você usa nos exercícios principais. Assim você acompanha sua evolução de verdade e sabe exatamente quando está na hora de aumentar a carga."
                         },
                         new
                         {
                             Id = 12,
                             Objetivo = "Hipertrofia",
-                            Texto = "Evite treinar o mesmo grupo muscular em dias consecutivos fora da divisão prescrita, garantindo a supercompensação necessária para o ganho sólido de volume muscular."
+                            Texto = "Não treine o mesmo músculo em dias seguidos. Siga a divisão da sua ficha para dar o descanso necessário para o músculo crescer mais forte."
                         },
                         new
                         {
                             Id = 13,
                             Objetivo = "Emagrecimento",
-                            Texto = "Mantenha os intervalos de descanso curtos e rigorosos conforme prescrito na ficha para sustentar a frequência cardíaca elevada e ampliar o gasto calórico da sessão."
+                            Texto = "Fique de olho no relógio e respeite os descansos curtos da ficha. Isso mantém seus batimentos acelerados e faz você gastar muito mais calorias no treino."
                         },
                         new
                         {
                             Id = 14,
                             Objetivo = "Emagrecimento",
-                            Texto = "A musculação é essencial no emagrecimento: preservar e estimular sua massa magra mantém o metabolismo basal ativo e evita a flacidez durante a redução de gordura."
+                            Texto = "Musculação também emagrece! Manter e ganhar músculos deixa seu metabolismo mais acelerado até em repouso e ajuda a evitar a flacidez enquanto você perde peso."
                         },
                         new
                         {
                             Id = 15,
                             Objetivo = "Emagrecimento",
-                            Texto = "Combine o treino de força com o cardio pós-treino indicado no protocolo para potencializar a oxidação de gorduras aproveitando a depleção prévia de glicogênio."
+                            Texto = "Fazer o cardio logo após a musculação turbina a queima de gordura, já que seu corpo já gastou a energia rápida durante os exercícios com peso."
                         },
                         new
                         {
                             Id = 16,
                             Objetivo = "Emagrecimento",
-                            Texto = "Aumente seu nível de movimento fora da academia: caminhar mais no dia a dia, usar escadas e evitar longos períodos sentado acelera significativamente o gasto energético semanal."
+                            Texto = "Mexa-se mais fora da academia: troque o elevador pela escada, caminhe sempre que puder e evite ficar sentado por horas. Esses pequenos hábitos fazem muita diferença na balança."
                         },
                         new
                         {
                             Id = 17,
                             Objetivo = "Emagrecimento",
-                            Texto = "Mantenha excelente hidratação antes, durante e após o treino; o consumo adequado de água otimiza o metabolismo energético, o desempenho físico e o controle da saciedade."
+                            Texto = "Beba bastante água ao longo do dia e durante o treino. Além de melhorar sua disposição, a água ajuda o metabolismo a funcionar bem e controla a sensação de fome."
                         },
                         new
                         {
                             Id = 18,
                             Objetivo = "Emagrecimento",
-                            Texto = "Não reduza drasticamente as cargas por estar em foco de perda de gordura: manter treinos intensos sinaliza ao organismo que a musculatura deve ser preservada."
+                            Texto = "Não pegue leve demais nos pesos só porque quer emagrecer. Treinar com intensidade mostra ao seu corpo que ele precisa queimar gordura, e não os seus músculos."
                         },
                         new
                         {
                             Id = 19,
                             Objetivo = "Emagrecimento",
-                            Texto = "Alinhe a regularidade dos treinos a uma alimentação equilibrada em déficit calórico sustentável, priorizando alimentos naturais, fibras e bom aporte de proteínas."
+                            Texto = "O treino anda junto com a alimentação: prefira comidas naturais, frutas, verduras e boas proteínas no dia a dia, sem precisar passar fome com dietas radicais."
                         },
                         new
                         {
                             Id = 20,
                             Objetivo = "Emagrecimento",
-                            Texto = "Cuide da qualidade do sono diariamente: noites mal dormidas desregulam hormônios ligados à fome e ao estresse, dificultando a queima de gordura e a disposição para treinar."
+                            Texto = "Dormir bem ajuda a emagrecer: noites mal dormidas aumentam o estresse e a vontade de comer doces e besteiras no dia seguinte, além de tirarem sua energia para treinar."
                         },
                         new
                         {
                             Id = 21,
                             Objetivo = "Emagrecimento",
-                            Texto = "Evite compensar o gasto do treino com excessos alimentares: a consistência diária entre exercício e nutrição é o que constrói resultados duradouros na composição corporal."
+                            Texto = "Cuidado para não exagerar na comida achando que 'já queimou tudo na academia'. É o equilíbrio diário entre treino e alimentação que transforma seu corpo."
                         },
                         new
                         {
                             Id = 22,
                             Objetivo = "Emagrecimento",
-                            Texto = "Acompanhe sua evolução por medidas corporais, roupas e desempenho nos treinos, pois a balança isoladamente não diferencia perda de gordura de ganho de massa muscular."
+                            Texto = "Não se prenda só ao número da balança! Observe como suas roupas estão vestindo, suas medidas e sua disposição, pois você pode estar trocando gordura por músculo."
                         },
                         new
                         {
                             Id = 23,
                             Objetivo = "Emagrecimento",
-                            Texto = "Execute os exercícios multiarticulares com empenho e boa amplitude, pois movimentos que recrutam grandes grupos musculares demandam muito mais energia do organismo."
+                            Texto = "Capriche nos exercícios que trabalham vários músculos ao mesmo tempo (como agachamento, leg press e puxadas). Eles exigem mais do corpo e queimam muito mais calorias."
                         },
                         new
                         {
                             Id = 24,
                             Objetivo = "Emagrecimento",
-                            Texto = "Mesmo nos dias de menor disposição, cumpra a sessão planejada: manter o hábito ativo é mais eficiente para o emagrecimento do que buscar perfeição apenas em alguns dias."
+                            Texto = "Nos dias de preguiça, vá treinar mesmo assim, nem que seja em um ritmo mais leve. Manter o hábito ativo vale muito mais do que esperar pelo dia perfeito."
                         },
                         new
                         {
                             Id = 25,
                             Objetivo = "Força",
-                            Texto = "Respeite integralmente os tempos mais longos de descanso entre as séries: eles são indispensáveis para restaurar os estoques de ATP-CP e o sistema nervoso central."
+                            Texto = "No treino de força, o descanso maior entre as séries é obrigatório. Espere o tempo completo marcado na ficha para recuperar totalmente a energia antes de levantar pesado de novo."
                         },
                         new
                         {
                             Id = 26,
                             Objetivo = "Força",
-                            Texto = "Ative firmemente o core e controle a respiração (estabilização intra-abdominal) antes de cada repetição pesada para proteger a coluna e transferir mais força ao movimento."
+                            Texto = "Trave bem o abdômen e respire fundo antes de iniciar cada repetição pesada. Um tronco firme protege sua coluna e ajuda você a empurrar ou puxar mais peso com segurança."
                         },
                         new
                         {
                             Id = 27,
                             Objetivo = "Força",
-                            Texto = "Realize séries progressivas de aquecimento específico no primeiro exercício do dia antes de entrar na carga máxima de trabalho, preparando articulações e recrutamento neural."
+                            Texto = "Antes de colocar sua carga máxima no primeiro exercício, faça algumas séries de aquecimento aumentando o peso aos poucos. Isso prepara seu corpo e suas articulações para o esforço."
                         },
                         new
                         {
                             Id = 28,
                             Objetivo = "Força",
-                            Texto = "Imprima intenção de velocidade na fase concêntrica (subida da carga) mantendo controle total na descida, maximizando o recrutamento das fibras musculares de maior potência."
+                            Texto = "Desça o peso com total controle e faça força para subir com firmeza e explosão. Essa intenção de velocidade ativa mais fibras musculares e aumenta sua força."
                         },
                         new
                         {
                             Id = 29,
                             Objetivo = "Força",
-                            Texto = "No treino de força, a qualidade técnica vem sempre antes do ego: interrompa a série caso perceba perda do alinhamento articular ou compensações perigosas na postura."
+                            Texto = "Técnica sempre vem antes do peso: se perceber que a postura entortou ou que você está forçando a coluna para subir a carga, pare a série e ajuste o peso."
                         },
                         new
                         {
                             Id = 30,
                             Objetivo = "Força",
-                            Texto = "Garanta pés bem plantados no solo, escápulas estabilizadas e pegada firme na barra ou equipamento antes de iniciar cada repetição para evitar dissipação de força."
+                            Texto = "Antes de começar o movimento, firme bem os pés no chão, encaixe os ombros e segure a barra com firmeza. Uma base estável evita desperdício de energia."
                         },
                         new
                         {
                             Id = 31,
                             Objetivo = "Força",
-                            Texto = "Pequenos incrementos de carga ao longo das semanas geram grandes ganhos de força a médio prazo sem sobrecarregar tendões, ligamentos e articulações."
+                            Texto = "Não tenha pressa de dobrar os pesos. Aumentar de 1 kg em 1 kg ou 2 kg em 2 kg toda semana gera um ganho enorme de força sem machucar suas articulações."
                         },
                         new
                         {
                             Id = 32,
                             Objetivo = "Força",
-                            Texto = "Priorize os exercícios multiarticulares livres ou guiados do início da ficha enquanto o sistema nervoso está descansado, pois são eles que constroem sua base de força."
+                            Texto = "Dê o seu máximo nos primeiros exercícios da ficha (como supino, agachamento e remadas), pois você ainda está descansado e são eles que constroem sua base de força."
                         },
                         new
                         {
                             Id = 33,
                             Objetivo = "Força",
-                            Texto = "Mantenha o cardio leve conforme prescrito na ficha apenas como suporte cardiovascular e aquecimento, preservando suas reservas energéticas para as séries pesadas."
+                            Texto = "Mantenha o cardio em ritmo leve, apenas como indicado na ficha. O objetivo aqui é cuidar do coração sem gastar a energia que você precisa para levantar cargas altas."
                         },
                         new
                         {
                             Id = 34,
                             Objetivo = "Força",
-                            Texto = "Cuide da mobilidade de tornozelos, quadris e ombros regularmente: articulações móveis e estáveis permitem alavancas mecânicas muito mais seguras e eficientes sob carga."
+                            Texto = "Faça exercícios de mobilidade para ombros, quadris e tornozelos. Articulações soltas e flexíveis permitem movimentos mais profundos, seguros e com muito mais força."
                         },
                         new
                         {
                             Id = 35,
                             Objetivo = "Força",
-                            Texto = "Valorize os dias de descanso da sua divisão semanal, pois adaptações neurais e estruturais de força exigem recuperação completa entre sessões intensas."
+                            Texto = "Respeite os dias de descanso da semana. Levantar cargas altas exige muito do corpo, e é no repouso que você realmente fica mais forte para o próximo treino."
                         },
                         new
                         {
                             Id = 36,
                             Objetivo = "Força",
-                            Texto = "Mantenha um bom aporte energético e hidratação adequada antes de treinar; estoques plenos de glicogênio muscular são fundamentais para sustentar cargas elevadas."
+                            Texto = "Não vá treinar força em jejum ou desidratado. Alimente-se bem e beba água antes do treino para ter energia suficiente na hora de encarar os pesos maiores."
                         },
                         new
                         {
                             Id = 37,
                             Objetivo = "Resistência",
-                            Texto = "Mantenha um ritmo cadenciado e respiração fluida do início ao fim de cada série longa, evitando prender o ar para retardar a instalação precoce da fadiga periférica."
+                            Texto = "Mantenha um ritmo constante e respire sem prender o ar durante as séries longas. Segurar a respiração faz você cansar muito mais rápido."
                         },
                         new
                         {
                             Id = 38,
                             Objetivo = "Resistência",
-                            Texto = "Controle a escolha da carga para completar toda a faixa de repetições altas prescrita mantendo a postura impecável até a última repetição da série."
+                            Texto = "Escolha um peso que permita completar todas as repetições altas da ficha mantendo a postura correta do começo ao fim, sem precisar parar no meio da série."
                         },
                         new
                         {
                             Id = 39,
                             Objetivo = "Resistência",
-                            Texto = "Respeite os intervalos reduzidos de descanso entre as séries para estimular a capilarização muscular, a eficiência mitocondrial e a tolerância à acidose metabólica."
+                            Texto = "Respeite os intervalos curtos de descanso entre as séries. É exatamente treinar com o músculo ainda um pouco cansado que aumenta sua resistência física."
                         },
                         new
                         {
                             Id = 40,
                             Objetivo = "Resistência",
-                            Texto = "Capriche na hidratação ao longo do dia e durante a sessão: a perda hídrica reduz rapidamente o rendimento em treinos de resistência muscular e aeróbica."
+                            Texto = "Beba água antes, durante e depois do treino. Em treinos longos e com muitas repetições, a falta de água derruba seu fôlego e sua energia rapidamente."
                         },
                         new
                         {
                             Id = 41,
                             Objetivo = "Resistência",
-                            Texto = "Execute o cardio contínuo pós-treino na zona aeróbica orientada para fortalecer o sistema cardiorrespiratório e acelerar a remoção de metabólitos entre os esforços."
+                            Texto = "Faça o cardio contínuo após o treino no ritmo indicado na ficha. Ele fortalece seu coração, aumenta o fôlego e ajuda seu corpo a se recuperar mais rápido do cansaço."
                         },
                         new
                         {
                             Id = 42,
                             Objetivo = "Resistência",
-                            Texto = "Não encurte a amplitude das repetições quando a queimação muscular surgir: manter o movimento completo sob fadiga controlada é o que desenvolve resistência real."
+                            Texto = "Quando o músculo começar a queimar nas repetições finais, não encurte o movimento. Manter a amplitude completa mesmo cansado é o que desenvolve resistência de verdade."
                         },
                         new
                         {
                             Id = 43,
                             Objetivo = "Resistência",
-                            Texto = "Garanta uma ingestão equilibrada de carboidratos de qualidade na rotina alimentar para manter os estoques de energia necessários às sessões de maior volume de repetições."
+                            Texto = "Inclua carboidratos saudáveis na sua alimentação (como arroz, aveia, frutas e raízes). Eles são o combustível principal para aguentar treinos longos sem perder o ritmo."
                         },
                         new
                         {
                             Id = 44,
                             Objetivo = "Resistência",
-                            Texto = "Mantenha ombros, pescoço e musculaturas acessórias livres de tensão desnecessária durante o exercício para economizar energia e focar o esforço nos músculos-alvo."
+                            Texto = "Relaxe o pescoço e não tensione os ombros à toa durante os exercícios. Evitar tensão desnecessária economiza energia para você ir mais longe na série."
                         },
                         new
                         {
                             Id = 45,
                             Objetivo = "Resistência",
-                            Texto = "A evolução na resistência aparece quando o mesmo esforço passa a parecer mais leve e sua recuperação entre as séries se torna cada vez mais rápida."
+                            Texto = "Você sabe que está evoluindo quando o mesmo treino começa a parecer mais fácil e sua respiração volta ao normal cada vez mais rápido entre uma série e outra."
                         },
                         new
                         {
                             Id = 46,
                             Objetivo = "Resistência",
-                            Texto = "Alongamentos leves e exercícios de mobilidade após a sessão ajudam a aliviar a rigidez muscular e preservar a fluidez articular ao longo da semana de treinos."
+                            Texto = "Tire 5 minutinhos para fazer alongamentos leves ao final do treino. Isso alivia a rigidez muscular e deixa seu corpo mais solto para as próximas sessões da semana."
                         },
                         new
                         {
                             Id = 47,
                             Objetivo = "Resistência",
-                            Texto = "Mantenha regularidade absoluta na frequência semanal: adaptações aeróbicas e de resistência muscular respondem de forma excelente à continuidade dos estímulos."
+                            Texto = "A regularidade é o segredo do fôlego: quanto mais constante você for na semana, mais rápido seu corpo se adapta e demora mais para cansar."
                         },
                         new
                         {
                             Id = 48,
                             Objetivo = "Resistência",
-                            Texto = "Preste atenção redobrada à estabilidade do core no final das séries longas, garantindo que a fadiga não comprometa o alinhamento da coluna lombar."
+                            Texto = "Nas últimas repetições, quando o cansaço bater, redobre a atenção na postura e mantenha o abdômen firme para não sobrecarregar a lombar."
                         });
                 });
 
