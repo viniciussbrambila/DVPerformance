@@ -189,7 +189,7 @@ export default function Treinos() {
 
   return (
     <Box sx={{ maxWidth: 672, mx: "auto" }}>
-      <Typography variant="h4" sx={{ fontWeight: "bold", mb: 3 }}>
+      <Typography variant="h4" sx={{ mb: 3 }}>
         Gerar Plano de Treino
       </Typography>
 

@@ -1,15 +1,5 @@
-import { useState } from "react";
-import {
-  Button,
-  Checkbox,
-  Chip,
-  Divider,
-  ListItemText,
-  Menu,
-  MenuItem,
-} from "@mui/material";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import MenuFiltro, { ChipFiltro } from "./MenuFiltro";
+import { Checkbox, Divider, ListItemText, MenuItem } from "@mui/material";
 import { normalizarTextoBusca } from "../utils/busca";
 
 export const CATEGORIAS_GRUPOS = [
@@ -89,9 +79,6 @@ export default function FiltroGrupoMuscular({
   gruposSelecionados,
   onChange,
 }) {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const aberto = Boolean(anchorEl);
-
   const todosSelecionados =
     gruposSelecionados.length === TODOS_GRUPOS_MUSCULARES.length;
   const algunsSelecionados =
@@ -128,119 +115,88 @@ export default function FiltroGrupoMuscular({
   };
 
   return (
-    <>
-      <Button
-        variant="outlined"
-        color={filtroAtivo ? "primary" : "inherit"}
-        startIcon={<FilterListIcon />}
-        endIcon={<KeyboardArrowDownIcon />}
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        aria-haspopup="menu"
-        aria-expanded={aberto ? "true" : undefined}
-        aria-label="Filtrar por região ou grupo muscular"
-        sx={{
-          minHeight: 40,
-          px: 2,
-          borderColor: filtroAtivo ? "primary.main" : "divider",
-          fontWeight: 500,
-          whiteSpace: "nowrap",
-        }}
-      >
-        {obterTextoBotao(gruposSelecionados)}
-      </Button>
+    <MenuFiltro
+      ativo={filtroAtivo}
+      texto={obterTextoBotao(gruposSelecionados)}
+      ariaLabel="Filtrar por região ou grupo muscular"
+      minWidth={320}
+      maxHeight={440}
+    >
+      <MenuItem onClick={alternarTodos} sx={{ py: 0.75 }}>
+        <Checkbox
+          checked={todosSelecionados}
+          indeterminate={algunsSelecionados}
+          size="small"
+          sx={{ mr: 1, p: 0.5 }}
+        />
+        <ListItemText
+          primary="Todos os grupos musculares"
+          slotProps={{
+            primary: { fontWeight: 600, fontSize: "0.9rem" },
+          }}
+        />
+        <ChipFiltro
+          label={`${gruposSelecionados.length}/${TODOS_GRUPOS_MUSCULARES.length}`}
+        />
+      </MenuItem>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={aberto}
-        onClose={() => setAnchorEl(null)}
-        slotProps={{
-          paper: {
-            sx: { minWidth: 320, maxHeight: 440, borderRadius: 2, mt: 0.5 },
-          },
-        }}
-      >
-        <MenuItem onClick={alternarTodos} sx={{ py: 0.75 }}>
-          <Checkbox
-            checked={todosSelecionados}
-            indeterminate={algunsSelecionados}
-            size="small"
-            sx={{ mr: 1, p: 0.5 }}
-          />
-          <ListItemText
-            primary="Todos os grupos musculares"
-            slotProps={{
-              primary: { fontWeight: 600, fontSize: "0.9rem" },
-            }}
-          />
-          <Chip
-            label={`${gruposSelecionados.length}/${TODOS_GRUPOS_MUSCULARES.length}`}
-            size="small"
-            variant="outlined"
-            sx={{ ml: 1.5, height: 20, fontSize: "0.7rem", fontWeight: 600 }}
-          />
-        </MenuItem>
+      <Divider sx={{ my: 0.5 }} />
 
-        <Divider sx={{ my: 0.5 }} />
+      {CATEGORIAS_GRUPOS.flatMap((categoria) => {
+        const selecionadosRegiao = categoria.grupos.filter((grupo) =>
+          gruposSelecionados.includes(grupo),
+        ).length;
+        const todosDaRegiao = selecionadosRegiao === categoria.grupos.length;
+        const algunsDaRegiao = selecionadosRegiao > 0 && !todosDaRegiao;
 
-        {CATEGORIAS_GRUPOS.flatMap((categoria) => {
-          const selecionadosRegiao = categoria.grupos.filter((grupo) =>
-            gruposSelecionados.includes(grupo),
-          ).length;
-          const todosDaRegiao = selecionadosRegiao === categoria.grupos.length;
-          const algunsDaRegiao = selecionadosRegiao > 0 && !todosDaRegiao;
-
-          return [
+        return [
+          <MenuItem
+            key={`regiao-${categoria.regiao}`}
+            onClick={() => alternarRegiao(categoria)}
+            sx={{ py: 0.75 }}
+          >
+            <Checkbox
+              checked={todosDaRegiao}
+              indeterminate={algunsDaRegiao}
+              size="small"
+              sx={{ mr: 1, p: 0.5 }}
+            />
+            <ListItemText
+              primary={categoria.regiao}
+              slotProps={{
+                primary: {
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  color: "primary.main",
+                },
+              }}
+            />
+            <ChipFiltro
+              label={`${selecionadosRegiao}/${categoria.grupos.length}`}
+              color={todosDaRegiao ? "primary" : "default"}
+            />
+          </MenuItem>,
+          ...categoria.grupos.map((grupo) => (
             <MenuItem
-              key={`regiao-${categoria.regiao}`}
-              onClick={() => alternarRegiao(categoria)}
-              sx={{ py: 0.75 }}
+              key={grupo}
+              onClick={() => alternarGrupo(grupo)}
+              sx={{ py: 0.5, pl: 4 }}
             >
               <Checkbox
-                checked={todosDaRegiao}
-                indeterminate={algunsDaRegiao}
+                checked={gruposSelecionados.includes(grupo)}
                 size="small"
                 sx={{ mr: 1, p: 0.5 }}
               />
               <ListItemText
-                primary={categoria.regiao}
+                primary={grupo}
                 slotProps={{
-                  primary: {
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    color: "primary.main",
-                  },
+                  primary: { fontWeight: 500, fontSize: "0.9rem" },
                 }}
               />
-              <Chip
-                label={`${selecionadosRegiao}/${categoria.grupos.length}`}
-                size="small"
-                color={todosDaRegiao ? "primary" : "default"}
-                variant="outlined"
-                sx={{ ml: 1.5, height: 20, fontSize: "0.7rem", fontWeight: 600 }}
-              />
-            </MenuItem>,
-            ...categoria.grupos.map((grupo) => (
-              <MenuItem
-                key={grupo}
-                onClick={() => alternarGrupo(grupo)}
-                sx={{ py: 0.5, pl: 4 }}
-              >
-                <Checkbox
-                  checked={gruposSelecionados.includes(grupo)}
-                  size="small"
-                  sx={{ mr: 1, p: 0.5 }}
-                />
-                <ListItemText
-                  primary={grupo}
-                  slotProps={{
-                    primary: { fontWeight: 500, fontSize: "0.9rem" },
-                  }}
-                />
-              </MenuItem>
-            )),
-          ];
-        })}
-      </Menu>
-    </>
+            </MenuItem>
+          )),
+        ];
+      })}
+    </MenuFiltro>
   );
 }

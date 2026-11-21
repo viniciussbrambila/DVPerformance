@@ -264,7 +264,7 @@ export default function PlanosExportados() {
           mb: 3,
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography variant="h4">
           Planos de Treino
         </Typography>
         <Box

@@ -1,14 +1,5 @@
-import { useState } from "react";
-import {
-  Button,
-  Checkbox,
-  Chip,
-  ListItemText,
-  Menu,
-  MenuItem,
-} from "@mui/material";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import MenuFiltro, { ChipFiltro } from "./MenuFiltro";
+import { Checkbox, ListItemText, MenuItem } from "@mui/material";
 import {
   OPCOES_NIVEL_MINIMO,
   nivelPermitidoParaAluno,
@@ -20,8 +11,6 @@ export default function FiltroNivelExercicio({
   onChange,
   experienciaAluno = null,
 }) {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const aberto = Boolean(anchorEl);
   const nivelAluno = normalizarNivelExperiencia(experienciaAluno);
 
   const alternarNivel = (nivel) => {
@@ -49,76 +38,44 @@ export default function FiltroNivelExercicio({
     ).length;
 
   return (
-    <>
-      <Button
-        variant="outlined"
-        color={filtroAtivo ? "primary" : "inherit"}
-        startIcon={<FilterListIcon />}
-        endIcon={<KeyboardArrowDownIcon />}
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        aria-haspopup="menu"
-        aria-expanded={aberto ? "true" : undefined}
-        aria-label="Filtrar por nível do exercício"
-        sx={{
-          minHeight: 40,
-          px: 2,
-          borderColor: filtroAtivo ? "primary.main" : "divider",
-          fontWeight: 500,
-          whiteSpace: "nowrap",
-        }}
-      >
-        {textoBotao}
-      </Button>
+    <MenuFiltro
+      ativo={filtroAtivo}
+      texto={textoBotao}
+      ariaLabel="Filtrar por nível do exercício"
+      minWidth={280}
+    >
+      {OPCOES_NIVEL_MINIMO.map((opcao) => {
+        const permitido = nivelPermitidoParaAluno(opcao.valor, nivelAluno);
+        const marcado =
+          permitido && niveisSelecionados.includes(opcao.valor);
 
-      <Menu
-        anchorEl={anchorEl}
-        open={aberto}
-        onClose={() => setAnchorEl(null)}
-        slotProps={{
-          paper: {
-            sx: { minWidth: 280, borderRadius: 2, mt: 0.5 },
-          },
-        }}
-      >
-        {OPCOES_NIVEL_MINIMO.map((opcao) => {
-          const permitido = nivelPermitidoParaAluno(opcao.valor, nivelAluno);
-          const marcado =
-            permitido && niveisSelecionados.includes(opcao.valor);
-
-          return (
-            <MenuItem
-              key={opcao.valor}
+        return (
+          <MenuItem
+            key={opcao.valor}
+            disabled={!permitido}
+            onClick={() => alternarNivel(opcao.valor)}
+            sx={{ py: 0.75 }}
+          >
+            <Checkbox
+              checked={marcado}
               disabled={!permitido}
-              onClick={() => alternarNivel(opcao.valor)}
-              sx={{ py: 0.75 }}
-            >
-              <Checkbox
-                checked={marcado}
-                disabled={!permitido}
-                size="small"
-                sx={{ mr: 1, p: 0.5 }}
-              />
-              <ListItemText
-                primary={opcao.valor}
-                secondary={
-                  !permitido ? `Bloqueado (aluno ${nivelAluno})` : undefined
-                }
-                slotProps={{
-                  primary: { fontWeight: 500, fontSize: "0.95rem" },
-                  secondary: { fontSize: "0.75rem" },
-                }}
-              />
-              <Chip
-                label={opcao.valor}
-                size="small"
-                color={opcao.cor}
-                variant="outlined"
-                sx={{ ml: 1.5, height: 20, fontSize: "0.7rem", fontWeight: 600 }}
-              />
-            </MenuItem>
-          );
-        })}
-      </Menu>
-    </>
+              size="small"
+              sx={{ mr: 1, p: 0.5 }}
+            />
+            <ListItemText
+              primary={opcao.valor}
+              secondary={
+                !permitido ? `Bloqueado (aluno ${nivelAluno})` : undefined
+              }
+              slotProps={{
+                primary: { fontWeight: 500, fontSize: "0.95rem" },
+                secondary: { fontSize: "0.75rem" },
+              }}
+            />
+            <ChipFiltro label={opcao.valor} color={opcao.cor} />
+          </MenuItem>
+        );
+      })}
+    </MenuFiltro>
   );
 }

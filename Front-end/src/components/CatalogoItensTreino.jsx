@@ -386,7 +386,7 @@ export default function CatalogoItensTreino({
           mb: 3,
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography variant="h4">
           {config.tituloPagina}
         </Typography>
 

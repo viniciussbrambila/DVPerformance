@@ -1,26 +1,8 @@
-import { useState } from "react";
-import Button from "@mui/material/Button";
+import MenuFiltro, { ChipFiltro } from "./MenuFiltro";
 import Checkbox from "@mui/material/Checkbox";
-import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 import ListItemText from "@mui/material/ListItemText";
-import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import { styled } from "@mui/material/styles";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-
-const BotaoFiltro = styled(Button, {
-  shouldForwardProp: (prop) => prop !== "filtroAtivo",
-})(({ theme, filtroAtivo }) => ({
-  minHeight: 40,
-  paddingInline: theme.spacing(2),
-  borderColor: filtroAtivo
-    ? theme.palette.primary.main
-    : theme.palette.divider,
-  fontWeight: 500,
-  whiteSpace: "nowrap",
-}));
 
 function obterTextoBotao({
   titulo,
@@ -60,9 +42,6 @@ export default function FiltroMultiSelecao({
   ariaLabel,
   minWidthMenu = 260,
 }) {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const aberto = Boolean(anchorEl);
-
   const todosValores = opcoes.map((opcao) => opcao.valor);
   const todosSelecionados = selecionados.length === opcoes.length;
   const algunsSelecionados = selecionados.length > 0 && !todosSelecionados;
@@ -92,97 +71,62 @@ export default function FiltroMultiSelecao({
   });
 
   return (
-    <>
-      <BotaoFiltro
-        variant="outlined"
-        color={filtroAtivo ? "primary" : "inherit"}
-        filtroAtivo={filtroAtivo}
-        startIcon={<FilterListIcon />}
-        endIcon={<KeyboardArrowDownIcon />}
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        aria-haspopup="menu"
-        aria-expanded={aberto ? "true" : undefined}
-        aria-label={ariaLabel || `Filtrar por ${titulo.toLowerCase()}`}
-      >
-        {textoBotao}
-      </BotaoFiltro>
+    <MenuFiltro
+      ativo={filtroAtivo}
+      texto={textoBotao}
+      ariaLabel={ariaLabel || `Filtrar por ${titulo.toLowerCase()}`}
+      minWidth={minWidthMenu}
+      maxHeight={400}
+    >
+      <MenuItem onClick={alternarTodos} sx={{ py: 0.75 }}>
+        <Checkbox
+          checked={todosSelecionados}
+          indeterminate={algunsSelecionados}
+          size="small"
+          sx={{ mr: 1, p: 0.5 }}
+        />
+        <ListItemText
+          primary={rotuloTodos}
+          slotProps={{
+            primary: { fontWeight: 600, fontSize: "0.9rem" },
+          }}
+        />
+        <ChipFiltro
+          label={`${selecionados.length}/${opcoes.length}`}
+          color={todosSelecionados ? "primary" : "default"}
+        />
+      </MenuItem>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={aberto}
-        onClose={() => setAnchorEl(null)}
-        slotProps={{
-          paper: {
-            sx: {
-              minWidth: minWidthMenu,
-              maxHeight: 400,
-              borderRadius: 2,
-              mt: 0.5,
-            },
-          },
-        }}
-      >
-        <MenuItem onClick={alternarTodos} sx={{ py: 0.75 }}>
-          <Checkbox
-            checked={todosSelecionados}
-            indeterminate={algunsSelecionados}
-            size="small"
-            sx={{ mr: 1, p: 0.5 }}
-          />
-          <ListItemText
-            primary={rotuloTodos}
-            slotProps={{
-              primary: { fontWeight: 600, fontSize: "0.9rem" },
-            }}
-          />
-          <Chip
-            label={`${selecionados.length}/${opcoes.length}`}
-            size="small"
-            color={todosSelecionados ? "primary" : "default"}
-            variant="outlined"
-            sx={{ ml: 1.5, height: 20, fontSize: "0.7rem", fontWeight: 600 }}
-          />
-        </MenuItem>
+      <Divider sx={{ my: 0.5 }} />
 
-        <Divider sx={{ my: 0.5 }} />
-
-        {opcoes.map((opcao) => {
-          const marcado = selecionados.includes(opcao.valor);
-          return (
-            <MenuItem
-              key={opcao.valor}
-              onClick={() => alternarOpcao(opcao.valor)}
-              sx={{ py: 0.6 }}
-            >
-              <Checkbox
-                checked={marcado}
-                size="small"
-                sx={{ mr: 1, p: 0.5 }}
+      {opcoes.map((opcao) => {
+        const marcado = selecionados.includes(opcao.valor);
+        return (
+          <MenuItem
+            key={opcao.valor}
+            onClick={() => alternarOpcao(opcao.valor)}
+            sx={{ py: 0.6 }}
+          >
+            <Checkbox
+              checked={marcado}
+              size="small"
+              sx={{ mr: 1, p: 0.5 }}
+            />
+            <ListItemText
+              primary={opcao.rotulo}
+              slotProps={{
+                primary: { fontWeight: 500, fontSize: "0.9rem" },
+              }}
+            />
+            {opcao.corChip && (
+              <ChipFiltro
+                label={opcao.rotulo}
+                color={opcao.corChip}
               />
-              <ListItemText
-                primary={opcao.rotulo}
-                slotProps={{
-                  primary: { fontWeight: 500, fontSize: "0.9rem" },
-                }}
-              />
-              {opcao.corChip && (
-                <Chip
-                  label={opcao.rotulo}
-                  size="small"
-                  color={opcao.corChip}
-                  variant="outlined"
-                  sx={{
-                    ml: 1.5,
-                    height: 20,
-                    fontSize: "0.7rem",
-                    fontWeight: 600,
-                  }}
-                />
-              )}
-            </MenuItem>
-          );
-        })}
-      </Menu>
-    </>
+            )}
+          </MenuItem>
+        );
+      })}
+    </MenuFiltro>
   );
 }

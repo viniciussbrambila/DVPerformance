@@ -205,11 +205,7 @@ export default function EscolhaDivisaoTreino({
                       sx={{ fontSize: 32, color: "primary.main" }}
                     />
                   )}
-                  <Typography
-                    component="span"
-                    variant="h6"
-                    sx={{ fontWeight: 700 }}
-                  >
+                  <Typography component="span" variant="h6">
                     {divisao.nome}
                   </Typography>
                   {divisao.nivelMinimo && (

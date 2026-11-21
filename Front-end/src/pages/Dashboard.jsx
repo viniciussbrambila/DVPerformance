@@ -42,7 +42,7 @@ function CardContagem({ icone, titulo, valor }) {
         <Typography variant="body2" color="text.secondary">
           {titulo}
         </Typography>
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography variant="h4">
           {valor}
         </Typography>
       </Box>
@@ -119,7 +119,7 @@ export default function Dashboard() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ fontWeight: "bold", mb: 3 }}>
+      <Typography variant="h4" sx={{ mb: 3 }}>
         Dashboard
       </Typography>
 

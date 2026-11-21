@@ -582,7 +582,7 @@ export default function Alunos() {
                   "&:last-child td, &:last-child th": { border: 0 },
                 }}
               >
-                <TableCell sx={{ whiteSpace: "nowrap" }}>
+                <TableCell>
                   {formatarDataCadastro(aluno)}
                 </TableCell>
                 <TableCell component="th" scope="row" sx={{ fontWeight: 600 }}>
@@ -596,7 +596,6 @@ export default function Alunos() {
                 <TableCell
                   className="no-print"
                   align="center"
-                  sx={{ whiteSpace: "nowrap" }}
                 >
                   <Box
                     sx={{

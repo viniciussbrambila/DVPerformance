@@ -215,7 +215,7 @@ export default function PlanoDetalhe() {
             {erroApi}
           </Alert>
         )}
-        <Typography variant="h5" sx={{ fontWeight: "bold", mb: 2 }}>
+        <Typography variant="h5" sx={{ mb: 2 }}>
           Plano não encontrado
         </Typography>
         <Button
@@ -475,7 +475,7 @@ export default function PlanoDetalhe() {
             Planos
           </Button>
 
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+          <Typography variant="h4">
             Plano de Treino
           </Typography>
         </Box>
@@ -770,7 +770,6 @@ export default function PlanoDetalhe() {
                           >
                             {editando ? (
                               <TextField
-                                size="small"
                                 type={
                                   campo === "repeticoes" ? "text" : "number"
                                 }
@@ -1002,7 +1001,7 @@ export default function PlanoDetalhe() {
         {dicas.length > 0 && (
           <Box sx={{ mt: 4, breakInside: "avoid" }}>
             <Divider sx={{ mb: 3 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
               Dicas para {plano.objetivo}
             </Typography>
             {dicas.map((dica, indice) => (
@@ -1063,7 +1062,7 @@ export default function PlanoDetalhe() {
                 }}
               >
                 <Icone sx={{ fontSize: 32, color: "primary.main" }} />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                <Typography variant="h6">
                   {titulo}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">

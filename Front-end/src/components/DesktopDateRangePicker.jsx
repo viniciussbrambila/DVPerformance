@@ -14,6 +14,7 @@ import DateRangeOutlinedIcon from "@mui/icons-material/DateRangeOutlined";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
 import CalendarioMes, {
+  PROPS_POPOVER_CALENDARIO,
   MESES_CURTOS,
   aplicarMascaraDataBR,
   formatarDataBR,
@@ -350,20 +351,7 @@ export default function DesktopDateRangePicker({
         open={aberto}
         anchorEl={anchorEl}
         onClose={handleFechar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        slotProps={{
-          paper: {
-            elevation: 8,
-            sx: {
-              mt: 1,
-              p: 2,
-              borderRadius: 3,
-              overflow: "hidden",
-              maxWidth: "calc(100vw - 24px)",
-            },
-          },
-        }}
+        {...PROPS_POPOVER_CALENDARIO}
       >
         <Box
           sx={{
@@ -379,7 +367,6 @@ export default function DesktopDateRangePicker({
             placeholder="DD/MM/AAAA ou MM/AAAA"
             value={textoInicio}
             onChange={handleChangeTextoInicio}
-            size="small"
             fullWidth
             slotProps={{ inputLabel: { shrink: true } }}
           />
@@ -396,7 +383,6 @@ export default function DesktopDateRangePicker({
             placeholder="DD/MM/AAAA ou MM/AAAA"
             value={textoFim}
             onChange={handleChangeTextoFim}
-            size="small"
             fullWidth
             slotProps={{ inputLabel: { shrink: true } }}
           />
@@ -454,7 +440,7 @@ export default function DesktopDateRangePicker({
           />
         </Box>
 
-        <Divider sx={{ mt: 1.5, mb: 1.5 }} />
+        <Divider sx={{ my: 1.5 }} />
 
         <Box
           sx={{

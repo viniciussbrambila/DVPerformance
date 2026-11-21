@@ -12,6 +12,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import DateRangeOutlinedIcon from "@mui/icons-material/DateRangeOutlined";
 import CalendarioMes, {
+  PROPS_POPOVER_CALENDARIO,
   ajustarMesParaAno,
   aplicarMascaraDataBR,
   diaForaDosLimites,
@@ -197,20 +198,7 @@ export default function DesktopDatePicker({
         open={aberto}
         anchorEl={anchorEl}
         onClose={handleFechar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        slotProps={{
-          paper: {
-            elevation: 8,
-            sx: {
-              mt: 1,
-              p: 2,
-              borderRadius: 3,
-              overflow: "hidden",
-              maxWidth: "calc(100vw - 24px)",
-            },
-          },
-        }}
+        {...PROPS_POPOVER_CALENDARIO}
       >
         <CalendarioMes
           ano={mesVisivel.ano}
@@ -226,7 +214,7 @@ export default function DesktopDatePicker({
           alturaListaAnos={140}
         />
 
-        <Divider sx={{ mt: 1.5, mb: 1.5 }} />
+        <Divider sx={{ my: 1.5 }} />
 
         <Box
           sx={{

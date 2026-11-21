@@ -5,6 +5,23 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
+export const PROPS_POPOVER_CALENDARIO = {
+  anchorOrigin: { vertical: "bottom", horizontal: "left" },
+  transformOrigin: { vertical: "top", horizontal: "left" },
+  slotProps: {
+    paper: {
+      elevation: 8,
+      sx: {
+        mt: 1,
+        p: 2,
+        borderRadius: 3,
+        overflow: "hidden",
+        maxWidth: "calc(100vw - 24px)",
+      },
+    },
+  },
+};
+
 const MESES = [
   "Janeiro",
   "Fevereiro",

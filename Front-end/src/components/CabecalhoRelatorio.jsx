@@ -31,7 +31,7 @@ export default function CabecalhoRelatorio({
         >
           Voltar
         </Button>
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography variant="h4">
           {titulo}
         </Typography>
       </Box>

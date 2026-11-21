@@ -385,7 +385,4 @@ public static class SegurancaService
         [property: JsonPropertyName("exp")] long Exp);
 }
 
-public sealed record UsuarioAutenticado(int Id, string NomeUsuario, string Perfil)
-{
-    public bool EhAdmin => string.Equals(Perfil, "admin", StringComparison.OrdinalIgnoreCase);
-}
+public sealed record UsuarioAutenticado(int Id, string NomeUsuario, string Perfil);
