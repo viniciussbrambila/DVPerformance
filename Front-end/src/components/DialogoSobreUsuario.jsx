@@ -148,7 +148,9 @@ export default function DialogoSobreUsuario({ open, onClose, usuarioLogado }) {
       await navigator.clipboard.writeText(chaveRecuperacao);
       setCopiado(true);
     } catch {
-      setErroChave("Não foi possível copiar automaticamente. Copie o código manualmente.");
+      setErroChave(
+        "Não foi possível copiar automaticamente. Copie o código manualmente.",
+      );
     }
   };
 
@@ -272,14 +274,17 @@ export default function DialogoSobreUsuario({ open, onClose, usuarioLogado }) {
               <Box
                 component="form"
                 onSubmit={handleRevelarChave}
+                autoComplete="off"
                 noValidate
                 sx={{ display: "flex", flexDirection: "column", gap: 2 }}
               >
                 <CampoSenha
                   label="Senha de cadastro"
+                  name="verificacao-chave-recuperacao"
                   size="small"
                   fullWidth
-                  autoComplete="current-password"
+                  bloquearAutofill
+                  autoComplete="one-time-code"
                   value={senhaConfirmacao}
                   onChange={(e) => setSenhaConfirmacao(e.target.value)}
                   error={tentouRevelar && !senhaConfirmacao.trim()}
@@ -359,6 +364,7 @@ export default function DialogoSobreUsuario({ open, onClose, usuarioLogado }) {
           <Box
             component="form"
             onSubmit={handleAlterarSenha}
+            autoComplete="off"
             noValidate
             sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
@@ -367,9 +373,11 @@ export default function DialogoSobreUsuario({ open, onClose, usuarioLogado }) {
 
             <CampoSenha
               label="Senha atual"
+              name="verificacao-senha-atual"
               size="small"
               fullWidth
-              autoComplete="current-password"
+              bloquearAutofill
+              autoComplete="one-time-code"
               value={senhaAtual}
               onChange={(e) => setSenhaAtual(e.target.value)}
               error={tentouAlterar && !senhaAtual.trim()}
@@ -383,8 +391,10 @@ export default function DialogoSobreUsuario({ open, onClose, usuarioLogado }) {
 
             <CampoSenha
               label="Nova senha"
+              name="definir-nova-senha"
               size="small"
               fullWidth
+              bloquearAutofill
               autoComplete="new-password"
               value={novaSenha}
               onChange={(e) => setNovaSenha(e.target.value)}
@@ -401,8 +411,10 @@ export default function DialogoSobreUsuario({ open, onClose, usuarioLogado }) {
 
             <CampoSenha
               label="Confirmar nova senha"
+              name="confirmar-nova-senha"
               size="small"
               fullWidth
+              bloquearAutofill
               autoComplete="new-password"
               value={confirmarNovaSenha}
               onChange={(e) => setConfirmarNovaSenha(e.target.value)}

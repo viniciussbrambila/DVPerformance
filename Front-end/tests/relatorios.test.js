@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { filtrarPlanosTreino } from "../src/utils/relatorios.js";
+import {
+  filtrarAlunosCadastrados,
+  filtrarPlanosTreino,
+} from "../src/utils/relatorios.js";
 
 const planosExemplo = [
   {
@@ -26,6 +29,41 @@ const planosExemplo = [
     aluno: "Ágatha Souza",
     status: "Validado",
     data: "2026-11-15T18:00:00",
+  },
+];
+
+const alunosExemplo = [
+  {
+    id: 1,
+    nome: "Lucas Pereira",
+    objetivo: "Hipertrofia",
+    experiencia: "Iniciante",
+    frequenciaSemanal: 3,
+    dataCadastro: "2026-11-01",
+  },
+  {
+    id: 2,
+    nome: "Mariana Alves",
+    objetivo: "Emagrecimento",
+    experiencia: "Intermediário",
+    frequenciaSemanal: 5,
+    dataCadastro: "2026-11-05",
+  },
+  {
+    id: 3,
+    nome: "Rafael Gomes",
+    objetivo: "Força",
+    experiencia: "Avançado",
+    frequenciaSemanal: 4,
+    dataCadastro: "2026-11-10",
+  },
+  {
+    id: 4,
+    nome: "Érica Lima",
+    objetivo: "Resistência",
+    experiencia: "Intermediário",
+    frequenciaSemanal: 3,
+    dataCadastro: "2026-11-12",
   },
 ];
 
@@ -69,5 +107,50 @@ test("filtra planos por intervalo de datas, status e nome sem exigir acentos", (
   assert.deepEqual(
     porBuscaEStatus.map((p) => p.id),
     [4],
+  );
+});
+
+test("filtra alunos por objetivo, experiência e frequência combinados", () => {
+  const porObjetivo = filtrarAlunosCadastrados(alunosExemplo, {
+    objetivos: ["Hipertrofia", "Força"],
+  });
+  assert.deepEqual(
+    porObjetivo.map((a) => a.id),
+    [3, 1],
+  );
+
+  const porExperienciaEFrequencia = filtrarAlunosCadastrados(alunosExemplo, {
+    experiencias: ["Intermediário"],
+    frequencias: [3, 5],
+  });
+  assert.deepEqual(
+    porExperienciaEFrequencia.map((a) => a.id),
+    [4, 2],
+  );
+
+  const combinado = filtrarAlunosCadastrados(alunosExemplo, {
+    busca: "erica",
+    objetivos: ["Resistência"],
+    experiencias: ["Intermediário"],
+    frequencias: [3],
+  });
+  assert.deepEqual(
+    combinado.map((a) => a.id),
+    [4],
+  );
+});
+
+test("retorna lista vazia quando algum filtro multi-seleção está vazio", () => {
+  assert.deepEqual(
+    filtrarAlunosCadastrados(alunosExemplo, { objetivos: [] }),
+    [],
+  );
+  assert.deepEqual(
+    filtrarAlunosCadastrados(alunosExemplo, { experiencias: [] }),
+    [],
+  );
+  assert.deepEqual(
+    filtrarAlunosCadastrados(alunosExemplo, { frequencias: [] }),
+    [],
   );
 });

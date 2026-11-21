@@ -53,10 +53,35 @@ function normalizarDataFiltro(valor, fimDoDia = false) {
   );
 }
 
+function correspondeFiltroTexto(valorItem, valoresSelecionados) {
+  if (!Array.isArray(valoresSelecionados)) return true;
+  if (valoresSelecionados.length === 0) return false;
+  const itemNormalizado = normalizarTextoBusca(valorItem).trim();
+  return valoresSelecionados.some(
+    (valor) => normalizarTextoBusca(valor).trim() === itemNormalizado,
+  );
+}
+
+function correspondeFiltroNumerico(valorItem, valoresSelecionados) {
+  if (!Array.isArray(valoresSelecionados)) return true;
+  if (valoresSelecionados.length === 0) return false;
+  const numeroItem = Number(valorItem);
+  return valoresSelecionados.some((valor) => Number(valor) === numeroItem);
+}
+
 export function filtrarAlunosCadastrados(
   alunos,
-  { busca = "", dataInicio, dataFim, ordem = "recentes" },
+  {
+    busca = "",
+    dataInicio,
+    dataFim,
+    ordem = "recentes",
+    objetivos = null,
+    experiencias = null,
+    frequencias = null,
+  } = {},
 ) {
+  const termo = normalizarTextoBusca(busca).trim();
   const inicio = normalizarDataFiltro(dataInicio, false);
   const fim = normalizarDataFiltro(dataFim, true);
 
@@ -67,9 +92,24 @@ export function filtrarAlunosCadastrados(
         (!inicio || (data && data.getTime() >= inicio.getTime())) &&
         (!fim || (data && data.getTime() <= fim.getTime()));
 
+      const bateNome =
+        !termo || normalizarTextoBusca(aluno.nome).includes(termo);
+      const bateObjetivo = correspondeFiltroTexto(aluno.objetivo, objetivos);
+      const bateExperiencia = correspondeFiltroTexto(
+        aluno.experiencia,
+        experiencias,
+      );
+      const bateFrequencia = correspondeFiltroNumerico(
+        aluno.frequenciaSemanal,
+        frequencias,
+      );
+
       return (
-        aluno.nome.toLowerCase().includes(busca.trim().toLowerCase()) &&
-        dentroDoIntervalo
+        bateNome &&
+        dentroDoIntervalo &&
+        bateObjetivo &&
+        bateExperiencia &&
+        bateFrequencia
       );
     })
     .sort((a, b) => {

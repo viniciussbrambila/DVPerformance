@@ -15,6 +15,7 @@ import { styled } from "@mui/material/styles";
 import { Link, useLocation } from "react-router-dom";
 import Marca from "./Marca";
 import DialogoSobreUsuario from "./DialogoSobreUsuario";
+import { DialogoConfirmacao } from "./DialogoConfirmacao";
 import PeopleIcon from "@mui/icons-material/People";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
@@ -59,9 +60,15 @@ const ITENS_NAVEGACAO = [
 export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
   const { pathname } = useLocation();
   const [sobreUsuarioAberto, setSobreUsuarioAberto] = useState(false);
+  const [confirmarSaidaAberto, setConfirmarSaidaAberto] = useState(false);
 
   const estaAtivo = (rota) =>
     pathname === rota || pathname.startsWith(`${rota}/`);
+
+  const handleConfirmarSaida = () => {
+    setConfirmarSaidaAberto(false);
+    onSair();
+  };
 
   return (
     <>
@@ -146,7 +153,10 @@ export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
             </Tooltip>
           </Box>
 
-          <NavItemButton onClick={onSair} sx={{ mb: 1, color: "error.main" }}>
+          <NavItemButton
+            onClick={() => setConfirmarSaidaAberto(true)}
+            sx={{ mb: 1, color: "error.main" }}
+          >
             <ListItemIcon sx={{ color: "inherit" }}>
               <LogoutIcon />
             </ListItemIcon>
@@ -160,6 +170,24 @@ export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
         onClose={() => setSobreUsuarioAberto(false)}
         usuarioLogado={usuarioLogado}
       />
+
+      <DialogoConfirmacao
+        open={confirmarSaidaAberto}
+        onClose={() => setConfirmarSaidaAberto(false)}
+        titulo="Confirmar saída"
+        idTitulo="titulo-confirmar-saida"
+        idDescricao="descricao-confirmar-saida"
+        confirmarTexto="Sair"
+        cancelarTexto="Cancelar"
+        confirmarCor="error"
+        confirmarIcone={<LogoutIcon />}
+        onConfirmar={handleConfirmarSaida}
+      >
+        <Typography id="descricao-confirmar-saida" color="text.secondary">
+          Tem certeza de que deseja sair da sua conta? Será necessário fazer
+          login novamente para acessar o sistema.
+        </Typography>
+      </DialogoConfirmacao>
     </>
   );
 }

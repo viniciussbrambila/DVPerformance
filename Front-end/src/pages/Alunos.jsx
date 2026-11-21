@@ -34,6 +34,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ImpressaoRelatorio from "../components/ImpressaoRelatorio";
 import DesktopDatePicker from "../components/DesktopDatePicker";
 import DesktopDateRangePicker from "../components/DesktopDateRangePicker";
+import FiltroMultiSelecao from "../components/FiltroMultiSelecao";
 import { DialogoConfirmacao } from "../components/DialogoConfirmacao";
 import {
   obterDataCadastro,
@@ -63,6 +64,29 @@ import {
 } from "../services/api";
 
 const API_URL = `${API_BASE_URL}/alunos`;
+
+const OPCOES_OBJETIVO = [
+  { valor: "Hipertrofia", rotulo: "Hipertrofia" },
+  { valor: "Emagrecimento", rotulo: "Emagrecimento" },
+  { valor: "Força", rotulo: "Força" },
+  { valor: "Resistência", rotulo: "Resistência" },
+];
+
+const OPCOES_EXPERIENCIA = [
+  { valor: "Iniciante", rotulo: "Iniciante", corChip: "success" },
+  { valor: "Intermediário", rotulo: "Intermediário", corChip: "warning" },
+  { valor: "Avançado", rotulo: "Avançado", corChip: "error" },
+];
+
+const OPCOES_FREQUENCIA = [2, 3, 4, 5, 6].map((dias) => ({
+  valor: dias,
+  rotulo: `${dias} dias/semana`,
+  rotuloCurto: `${dias} dias`,
+}));
+
+const TODOS_OBJETIVOS = OPCOES_OBJETIVO.map((opcao) => opcao.valor);
+const TODAS_EXPERIENCIAS = OPCOES_EXPERIENCIA.map((opcao) => opcao.valor);
+const TODAS_FREQUENCIAS = OPCOES_FREQUENCIA.map((opcao) => opcao.valor);
 
 const obterChaveAlunos = () => {
   const usuario = lerUsuarioSessao();
@@ -97,6 +121,10 @@ export default function Alunos() {
     return Boolean(chave && !temCache(chave));
   });
   const [busca, setBusca] = useState("");
+  const [objetivosFiltro, setObjetivosFiltro] = useState(TODOS_OBJETIVOS);
+  const [experienciasFiltro, setExperienciasFiltro] =
+    useState(TODAS_EXPERIENCIAS);
+  const [frequenciasFiltro, setFrequenciasFiltro] = useState(TODAS_FREQUENCIAS);
   const [intervaloData, setIntervaloData] = useState([null, null]);
   const [ordem, setOrdem] = useState("recentes");
   const [erro, setErro] = useState("");
@@ -349,8 +377,21 @@ export default function Alunos() {
     dataInicio,
     dataFim,
     ordem,
+    objetivos: objetivosFiltro,
+    experiencias: experienciasFiltro,
+    frequencias: frequenciasFiltro,
   });
   const semData = alunosVisiveis.some((aluno) => !obterDataCadastro(aluno));
+  const mensagemListaVazia =
+    alunosVisiveis.length === 0
+      ? "Nenhum aluno cadastrado."
+      : objetivosFiltro.length === 0
+        ? "Selecione pelo menos um objetivo no filtro para exibir os alunos."
+        : experienciasFiltro.length === 0
+          ? "Selecione pelo menos uma experiência no filtro para exibir os alunos."
+          : frequenciasFiltro.length === 0
+            ? "Selecione pelo menos uma frequência no filtro para exibir os alunos."
+            : "Nenhum aluno encontrado para os filtros selecionados.";
 
   return (
     <Box className="relatorio-impressao">
@@ -395,7 +436,13 @@ export default function Alunos() {
 
       <Box
         className="no-print"
-        sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 3 }}
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 2,
+          mb: 3,
+        }}
       >
         <TextField
           placeholder="Pesquisar por nome do aluno"
@@ -412,6 +459,39 @@ export default function Alunos() {
               ),
             },
           }}
+        />
+        <FiltroMultiSelecao
+          titulo="Objetivo"
+          rotuloTodos="Todos os objetivos"
+          textoTodos="Todos"
+          textoNenhum="Nenhum"
+          textoSelecionadosPlural="selecionados"
+          ariaLabel="Filtrar alunos por objetivo"
+          opcoes={OPCOES_OBJETIVO}
+          selecionados={objetivosFiltro}
+          onChange={setObjetivosFiltro}
+        />
+        <FiltroMultiSelecao
+          titulo="Experiência"
+          rotuloTodos="Todas as experiências"
+          textoTodos="Todas"
+          textoNenhum="Nenhuma"
+          textoSelecionadosPlural="selecionadas"
+          ariaLabel="Filtrar alunos por experiência"
+          opcoes={OPCOES_EXPERIENCIA}
+          selecionados={experienciasFiltro}
+          onChange={setExperienciasFiltro}
+        />
+        <FiltroMultiSelecao
+          titulo="Frequência"
+          rotuloTodos="Todas as frequências"
+          textoTodos="Todas"
+          textoNenhum="Nenhuma"
+          textoSelecionadosPlural="selecionadas"
+          ariaLabel="Filtrar alunos por frequência semanal"
+          opcoes={OPCOES_FREQUENCIA}
+          selecionados={frequenciasFiltro}
+          onChange={setFrequenciasFiltro}
         />
         <TextField
           select
@@ -488,9 +568,7 @@ export default function Alunos() {
                   align="center"
                   sx={{ py: 4, color: "text.secondary" }}
                 >
-                  {alunosVisiveis.length === 0
-                    ? "Nenhum aluno cadastrado."
-                    : "Nenhum aluno encontrado para os filtros selecionados."}
+                  {mensagemListaVazia}
                 </TableCell>
               </TableRow>
             )}
@@ -684,9 +762,11 @@ export default function Alunos() {
                     : ""
                 }
               >
-                <MenuItem value="Iniciante">Iniciante</MenuItem>
-                <MenuItem value="Intermediário">Intermediário</MenuItem>
-                <MenuItem value="Avançado">Avançado</MenuItem>
+                {OPCOES_EXPERIENCIA.map((opcao) => (
+                  <MenuItem key={opcao.valor} value={opcao.valor}>
+                    {opcao.rotulo}
+                  </MenuItem>
+                ))}
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -704,9 +784,9 @@ export default function Alunos() {
                     : ""
                 }
               >
-                {[2, 3, 4, 5, 6].map((num) => (
-                  <MenuItem key={num} value={num}>
-                    {num} dias
+                {OPCOES_FREQUENCIA.map((opcao) => (
+                  <MenuItem key={opcao.valor} value={opcao.valor}>
+                    {opcao.rotuloCurto}
                   </MenuItem>
                 ))}
               </TextField>
@@ -726,10 +806,11 @@ export default function Alunos() {
                     : ""
                 }
               >
-                <MenuItem value="Hipertrofia">Hipertrofia</MenuItem>
-                <MenuItem value="Emagrecimento">Emagrecimento</MenuItem>
-                <MenuItem value="Força">Força</MenuItem>
-                <MenuItem value="Resistência">Resistência</MenuItem>
+                {OPCOES_OBJETIVO.map((opcao) => (
+                  <MenuItem key={opcao.valor} value={opcao.valor}>
+                    {opcao.rotulo}
+                  </MenuItem>
+                ))}
               </TextField>
               <Box
                 sx={{

@@ -46,10 +46,10 @@ export function AuthCardLayout({
         <Typography
           variant="body1"
           color="text.secondary"
-          sx={{
-            mb: 3.5,
-            ...(subtituloCentralizado ? { textAlign: "center" } : {}),
-          }}
+          sx={[
+            { mb: 3.5 },
+            subtituloCentralizado && { textAlign: "center" },
+          ]}
         >
           {subtitulo}
         </Typography>
@@ -74,6 +74,7 @@ export function AuthCardLayout({
 
 export function CampoSenha({
   label,
+  name,
   value,
   onChange,
   error = false,
@@ -82,12 +83,22 @@ export function CampoSenha({
   size = "medium",
   fullWidth = false,
   autoComplete,
+  bloquearAutofill = false,
 }) {
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [prontoParaDigitar, setProntoParaDigitar] = useState(!bloquearAutofill);
+
+  const handleDesbloquear = (e) => {
+    if (bloquearAutofill && !prontoParaDigitar) {
+      e.currentTarget.readOnly = false;
+      setProntoParaDigitar(true);
+    }
+  };
 
   return (
     <TextField
       label={label}
+      name={name}
       type={mostrarSenha ? "text" : "password"}
       value={value}
       onChange={onChange}
@@ -96,8 +107,23 @@ export function CampoSenha({
       disabled={disabled}
       size={size}
       fullWidth={fullWidth}
-      autoComplete={autoComplete}
+      autoComplete={
+        bloquearAutofill ? autoComplete || "one-time-code" : autoComplete
+      }
       slotProps={{
+        htmlInput: bloquearAutofill
+          ? {
+              readOnly: !prontoParaDigitar,
+              onFocus: handleDesbloquear,
+              onMouseDown: handleDesbloquear,
+              autoCapitalize: "none",
+              autoCorrect: "off",
+              spellCheck: false,
+              "data-lpignore": "true",
+              "data-1p-ignore": "true",
+              "data-bwignore": "true",
+            }
+          : undefined,
         input: {
           endAdornment: (
             <InputAdornment position="end">
