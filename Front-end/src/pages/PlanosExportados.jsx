@@ -28,9 +28,7 @@ import {
   exportarPdfRelatorio,
   filtrarPlanosTreino,
 } from "../utils/relatorios";
-import { formatarTempoAerobico } from "../utils/edicaoTreino";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import {
   buscarComCache,
@@ -53,45 +51,6 @@ const formatarData = (iso) => new Date(iso).toLocaleDateString("pt-BR");
 
 const corChip = { Validado: "success", Rascunho: "warning", Exportado: "info" };
 
-function montarTexto(plano) {
-  const linhas = [
-    "DV Performance - Plano de Treino",
-    plano.nomePlano ? `Protocolo: ${plano.nomePlano}` : null,
-    `Aluno: ${plano.aluno}`,
-    `Objetivo: ${plano.objetivo}`,
-    `Frequência: ${plano.frequencia}x/semana`,
-    plano.divisao ? `Divisão: ${plano.divisao}` : null,
-    `Data: ${formatarData(plano.data)}`,
-    "",
-  ].filter((l) => l !== null);
-
-  (plano.dias || []).forEach((dia) => {
-    linhas.push(dia.nome);
-    (dia.exercicios || []).forEach((ex) => {
-      const rotuloGrupo = ex.grupo ? ` [${ex.grupo}]` : "";
-      linhas.push(
-        `  - ${ex.nome}${rotuloGrupo}: ${ex.series}x${ex.repeticoes} (descanso ${ex.descanso})`,
-      );
-    });
-    if (dia.tempoAerobico) {
-      linhas.push(`  * ${formatarTempoAerobico(dia.tempoAerobico)}`);
-    }
-    linhas.push("");
-  });
-
-  const dicas = Array.isArray(plano.dicas)
-    ? plano.dicas.slice(0, 2)
-    : plano.dica
-      ? [plano.dica]
-      : [];
-  if (dicas.length > 0) {
-    linhas.push(`Dicas para ${plano.objetivo}`);
-    dicas.forEach((dica, indice) => linhas.push(`${indice + 1}. ${dica}`));
-  }
-
-  return linhas.join("\n");
-}
-
 const obterChavePlanos = () => {
   const usuarioLogado = lerUsuarioSessao();
   return `planos:${usuarioLogado?.id || "geral"}`;
@@ -111,7 +70,6 @@ export default function PlanosExportados() {
   const [intervaloData, setIntervaloData] = useState([null, null]);
   const [ordem, setOrdem] = useState("recentes");
   const [planoParaExcluir, setPlanoParaExcluir] = useState(null);
-  const [planoParaValidar, setPlanoParaValidar] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
@@ -174,49 +132,6 @@ export default function PlanosExportados() {
     dataFim,
     ordem,
   });
-
-  const baixarTxt = async (plano) => {
-    if (plano.status !== "Validado" && plano.status !== "Exportado") {
-      setPlanoParaValidar(plano);
-      return;
-    }
-
-    const blob = new Blob([montarTexto(plano)], {
-      type: "text/plain;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `plano-${plano.aluno.toLowerCase().replace(/\s+/g, "-")}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    try {
-      const response = await fetchAutenticado(`${API_URL}/${plano.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Exportado" }),
-      });
-
-      if (response.ok) {
-        const chave = obterChavePlanos();
-        const novaLista = planos.map((p) =>
-          p.id === plano.id ? { ...p, status: "Exportado" } : p,
-        );
-        setPlanos(novaLista);
-        salvarCache(chave, novaLista);
-        const detalheAtual = lerCache(`planoDetalhe:${plano.id}`);
-        if (detalheAtual) {
-          salvarCache(`planoDetalhe:${plano.id}`, {
-            ...detalheAtual,
-            status: "Exportado",
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Erro ao atualizar status do plano:", err);
-    }
-  };
 
   const confirmarExclusao = async () => {
     if (!planoParaExcluir) return;
@@ -430,17 +345,6 @@ export default function PlanosExportados() {
                         <Button
                           size="small"
                           color="inherit"
-                          startIcon={
-                            <FileDownloadOutlinedIcon fontSize="small" />
-                          }
-                          onClick={() => baixarTxt(p)}
-                          sx={{ bgcolor: "action.hover" }}
-                        >
-                          Baixar .txt
-                        </Button>
-                        <Button
-                          size="small"
-                          color="inherit"
                           startIcon={<DeleteOutlinedIcon fontSize="small" />}
                           onClick={() => setPlanoParaExcluir(p)}
                           sx={{ bgcolor: "action.hover" }}
@@ -455,27 +359,6 @@ export default function PlanosExportados() {
           </Table>
         </TableContainer>
       </Paper>
-
-      <DialogoConfirmacao
-        open={Boolean(planoParaValidar)}
-        onClose={() => setPlanoParaValidar(null)}
-        titulo="Validação necessária"
-        idTitulo="validar-plano-titulo"
-        idDescricao="validar-plano-descricao"
-        cancelarTexto="Voltar"
-        confirmarTexto="Visualizar plano"
-        confirmarCor="primary"
-        justificativaAcoes="space-between"
-        onConfirmar={() => {
-          navigate(`/planos/${planoParaValidar.id}`);
-          setPlanoParaValidar(null);
-        }}
-      >
-        <Typography id="validar-plano-descricao" color="text.secondary">
-          Para baixar o plano de treino em TXT você precisa visualizá-lo e
-          validá-lo antes.
-        </Typography>
-      </DialogoConfirmacao>
 
       <DialogoConfirmacao
         open={Boolean(planoParaExcluir)}
