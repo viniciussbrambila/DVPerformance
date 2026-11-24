@@ -395,7 +395,7 @@ export default function Alunos() {
 
   return (
     <Box className="relatorio-impressao">
-      <ImpressaoRelatorio />
+      <ImpressaoRelatorio mostrarEmissao />
       <Box
         sx={{
           display: "flex",

@@ -189,6 +189,17 @@ export function filtrarPlanosTreino(
     });
 }
 
+export function formatarDataHoraEmissao(data = new Date()) {
+  const referencia = data instanceof Date ? data : new Date(data);
+  if (Number.isNaN(referencia.getTime())) return "";
+  const dataFormatada = referencia.toLocaleDateString("pt-BR");
+  const horaFormatada = referencia.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${dataFormatada} às ${horaFormatada}`;
+}
+
 export function exportarPdfRelatorio(titulo) {
   const tituloAnterior = document.title;
   try {

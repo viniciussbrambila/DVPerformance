@@ -42,7 +42,7 @@ export default function RelatorioAluno() {
     : [];
   return (
     <Box className="relatorio-impressao">
-      <ImpressaoRelatorio />
+      <ImpressaoRelatorio mostrarEmissao />
       <CabecalhoRelatorio
         titulo="Características do Aluno"
         voltar="/alunos"

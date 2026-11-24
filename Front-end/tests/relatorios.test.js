@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   filtrarAlunosCadastrados,
   filtrarPlanosTreino,
+  formatarDataHoraEmissao,
 } from "../src/utils/relatorios.js";
 
 const planosExemplo = [
@@ -153,4 +154,9 @@ test("retorna lista vazia quando algum filtro multi-seleção está vazio", () =
     filtrarAlunosCadastrados(alunosExemplo, { frequencias: [] }),
     [],
   );
+});
+
+test("formata data/hora de emissão do relatório", () => {
+  const emissao = formatarDataHoraEmissao(new Date(2026, 10, 24, 19, 45));
+  assert.equal(emissao, "24/11/2026 às 19:45");
 });

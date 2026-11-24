@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { GlobalStyles } from "@mui/material";
+import { formatarDataHoraEmissao } from "../utils/relatorios";
 
 const ESTILOS_BASE_IMPRESSAO = {
   "@page": {
@@ -81,10 +83,46 @@ const ESTILOS_BASE_IMPRESSAO = {
   },
 };
 
-export default function ImpressaoRelatorio({ margemSuperior = "15mm" }) {
+export default function ImpressaoRelatorio({
+  margemSuperior = "15mm",
+  mostrarEmissao = false,
+}) {
+  const [dataEmissao, setDataEmissao] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!mostrarEmissao) return;
+
+    const atualizarEmissao = () => {
+      flushSync(() => {
+        setDataEmissao(new Date());
+      });
+    };
+
+    window.addEventListener("beforeprint", atualizarEmissao);
+    return () => window.removeEventListener("beforeprint", atualizarEmissao);
+  }, [mostrarEmissao]);
+
   const estilos = useMemo(
     () => ({
       ...ESTILOS_BASE_IMPRESSAO,
+      "@page": {
+        ...ESTILOS_BASE_IMPRESSAO["@page"],
+        ...(mostrarEmissao
+          ? {
+              "@bottom-left": {
+                content: JSON.stringify(
+                  `Emitido em: ${formatarDataHoraEmissao(dataEmissao)}`,
+                ),
+                fontFamily: "Arial, sans-serif",
+                fontSize: "10pt",
+                fontWeight: 400,
+                color: "#000",
+                textAlign: "left",
+                verticalAlign: "middle",
+              },
+            }
+          : {}),
+      },
       "@media print": {
         ...ESTILOS_BASE_IMPRESSAO["@media print"],
         ".relatorio-impressao, .plano-impressao": {
@@ -95,7 +133,7 @@ export default function ImpressaoRelatorio({ margemSuperior = "15mm" }) {
         },
       },
     }),
-    [margemSuperior],
+    [margemSuperior, mostrarEmissao, dataEmissao],
   );
 
   return <GlobalStyles styles={estilos} />;
