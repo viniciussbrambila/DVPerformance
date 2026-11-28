@@ -4,7 +4,6 @@ import {
   Typography,
   Button,
   ButtonBase,
-  ButtonGroup,
   IconButton,
   Tooltip,
   Divider,
@@ -821,10 +820,29 @@ export default function PlanoDetalhe() {
                               gap: 1,
                               justifyContent: "center",
                               alignItems: "center",
-                              flexWrap: "wrap",
+                              flexWrap: "nowrap",
+                              width: "max-content",
+                              mx: "auto",
+                              "& .MuiButton-root": {
+                                height: 32,
+                                flexShrink: 0,
+                                whiteSpace: "nowrap",
+                              },
+                              "& .MuiIconButton-root": {
+                                width: 32,
+                                height: 32,
+                              },
                             }}
                           >
-                            <ButtonGroup size="small" variant="text">
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                flexShrink: 0,
+                                "& > span": { display: "inline-flex" },
+                              }}
+                            >
                               <Tooltip title="Mover para cima">
                                 <span>
                                   <IconButton
@@ -874,7 +892,7 @@ export default function PlanoDetalhe() {
                                   </IconButton>
                                 </span>
                               </Tooltip>
-                            </ButtonGroup>
+                            </Box>
                             <Button
                               size="small"
                               color="inherit"

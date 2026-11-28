@@ -5,7 +5,7 @@ import { API_BASE_URL } from "../services/api";
 
 const API_LOGIN_URL = `${API_BASE_URL}/auth/login`;
 
-export default function Login({ onLogin, onIrCadastro, onIrEsqueciSenha }) {
+export default function Login({ onLogin, onIrCadastro }) {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [tentouEntrar, setTentouEntrar] = useState(false);
@@ -94,16 +94,6 @@ export default function Login({ onLogin, onIrCadastro, onIrEsqueciSenha }) {
         error={tentouEntrar && !senha.trim()}
         helperText={tentouEntrar && !senha.trim() ? "Informe a sua senha" : ""}
       />
-
-      <Link
-        component="button"
-        type="button"
-        underline="hover"
-        onClick={onIrEsqueciSenha}
-        sx={{ alignSelf: "flex-end", fontSize: 14 }}
-      >
-        Esqueci minha senha
-      </Link>
 
       <Button
         type="submit"

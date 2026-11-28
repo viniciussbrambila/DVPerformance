@@ -85,13 +85,11 @@ public class Program
 
         var app = builder.Build();
 
-        // Aplica as Migrations automaticamente ao iniciar a API, provisiona o catálogo pré-cadastrado
-        // e migra senhas legadas em texto plano para hash PBKDF2-SHA256
+        // Aplica as Migrations automaticamente ao iniciar a API e provisiona o catálogo pré-cadastrado
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.Database.MigrateAsync();
-            await MigrarSenhasEmTextoPlanoAsync(db);
             await CatalogoPadraoService.InicializarContasPendentesAsync(db);
             await CatalogoPadraoService.ClassificarFocosPendentesAsync(db);
         }
@@ -165,24 +163,4 @@ public class Program
         await app.RunAsync();
     }
 
-    private static async Task MigrarSenhasEmTextoPlanoAsync(AppDbContext db)
-    {
-        var usuarios = await db.Usuarios.ToListAsync();
-        var alterou = false;
-
-        foreach (var usuario in usuarios)
-        {
-            if (!string.IsNullOrWhiteSpace(usuario.Senha) &&
-                !SegurancaService.SenhaEstaHasheada(usuario.Senha))
-            {
-                usuario.Senha = SegurancaService.GerarHashSenha(usuario.Senha);
-                alterou = true;
-            }
-        }
-
-        if (alterou)
-        {
-            await db.SaveChangesAsync();
-        }
-    }
 }

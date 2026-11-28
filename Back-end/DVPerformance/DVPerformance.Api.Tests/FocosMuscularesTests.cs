@@ -27,7 +27,8 @@ internal static class FocosMuscularesTests
                 exigir(opcoes.Select(o => o.Id).Distinct().Count() == opcoes.Length
                     && opcoes.All(o => !string.IsNullOrWhiteSpace(o.Nome)), "Opções devem ter chaves únicas e rótulos.");
                 exigir(opcoes.All(o => FocosMusculares.Valido(grupo.Nome, o.Id))
-                    && FocosMusculares.Valido(grupo.Nome, "geral"), "Aceitar as opções divulgadas ao cadastro.");
+                    && opcoes.All(o => o.Id != "geral")
+                    && !FocosMusculares.Valido(grupo.Nome, "geral"), "Aceitar somente focos específicos nas opções de cadastro.");
                 exigir(!FocosMusculares.Valido(grupo.Nome, "inexistente")
                     && !FocosMusculares.Valido(grupo.Nome, null)
                     && !FocosMusculares.Valido(grupo.Nome, " "), "Não aceitar valores fora das opções.");
@@ -81,7 +82,7 @@ internal static class FocosMuscularesTests
             {
                 var grupo = grupos.Single(g => g.Id == item.GrupoMuscularId);
                 var foco = FocosMusculares.Inferir(item.GrupoMuscularId, item.Nome);
-                exigir(FocosMusculares.Valido(grupo.Nome, foco), $"Foco incompatível: {grupo.Nome} / {item.Nome}.");
+                exigir(foco == FocosMusculares.Geral || FocosMusculares.Valido(grupo.Nome, foco), $"Foco incompatível: {grupo.Nome} / {item.Nome}.");
                 exigir(foco == FocosMusculares.Inferir(grupo.Nome, item.Nome), "IDs e nomes devem produzir a mesma classificação.");
                 var geralEsperado = item.Nome is "Pullover com Halter" or "Rolo de Punho (Wrist Roller)";
                 exigir((foco == "geral") == geralEsperado, $"Revisar classificação de {item.Nome} ({foco}).");

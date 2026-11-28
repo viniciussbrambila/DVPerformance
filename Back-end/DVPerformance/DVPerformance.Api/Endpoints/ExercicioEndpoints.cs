@@ -206,38 +206,6 @@ public static class ExercicioEndpoints
             return Results.Created($"/exercicios/{novoExercicio.Id}", novoExercicio);
         });
 
-        // POST /exercicios/restaurar-padrao?usuarioId=1 -> Restaura os exercícios pré-cadastrados que o Personal tenha removido, mantendo os criados por ele
-        grupo.MapPost("/restaurar-padrao", async (int? usuarioId, HttpContext httpContext, AppDbContext db) =>
-        {
-            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
-            {
-                return erroPropriedade;
-            }
-
-            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId) ?? usuarioId;
-            if (idResolvido is not > 0)
-            {
-                return Results.BadRequest(new { mensagem = "Informe um usuarioId válido para restaurar os exercícios padrão." });
-            }
-
-            var personalExiste = await db.Usuarios.AnyAsync(u => u.Id == idResolvido.Value && u.Ativo);
-            if (!personalExiste)
-            {
-                return Results.NotFound(new { mensagem = "Conta de Personal não encontrada ou desativada." });
-            }
-
-            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarExerciciosPadraoAsync(db, idResolvido.Value);
-
-            return Results.Ok(new
-            {
-                usuarioId = idResolvido.Value,
-                inseridos,
-                reativados,
-                totalPadrao = CatalogoPadraoService.ExerciciosPadrao.Count,
-                mensagem = "Exercícios pré-cadastrados restaurados com sucesso na conta do Personal."
-            });
-        });
-
         // PUT /exercicios/{id} -> Atualiza um exercício ativo existente na conta do Personal
         grupo.MapPut("/{id:int}", async (int id, Exercicio? dadosAtualizados, HttpContext httpContext, AppDbContext db) =>
         {

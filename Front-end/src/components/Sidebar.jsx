@@ -8,13 +8,10 @@ import {
   ListItemText,
   Box,
   Typography,
-  IconButton,
-  Tooltip,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { Link, useLocation } from "react-router-dom";
 import Marca from "./Marca";
-import DialogoSobreUsuario from "./DialogoSobreUsuario";
 import { DialogoConfirmacao } from "./DialogoConfirmacao";
 import PeopleIcon from "@mui/icons-material/People";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
@@ -23,7 +20,6 @@ import AddTaskIcon from "@mui/icons-material/AddTask";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import LogoutIcon from "@mui/icons-material/Logout";
-import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 
 const NavItemButton = styled(ListItemButton)(({ theme }) => ({
   minHeight: 48,
@@ -59,7 +55,6 @@ const ITENS_NAVEGACAO = [
 
 export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
   const { pathname } = useLocation();
-  const [sobreUsuarioAberto, setSobreUsuarioAberto] = useState(false);
   const [confirmarSaidaAberto, setConfirmarSaidaAberto] = useState(false);
 
   const estaAtivo = (rota) =>
@@ -140,17 +135,6 @@ export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
             >
               {usuarioLogado?.nome || usuarioLogado?.usuario}
             </Typography>
-
-            <Tooltip title="Sobre o usuário">
-              <IconButton
-                size="small"
-                color="primary"
-                aria-label="Sobre o usuário"
-                onClick={() => setSobreUsuarioAberto(true)}
-              >
-                <AccountCircleOutlinedIcon />
-              </IconButton>
-            </Tooltip>
           </Box>
 
           <NavItemButton
@@ -164,12 +148,6 @@ export default function Sidebar({ drawerWidth, onSair, usuarioLogado }) {
           </NavItemButton>
         </Box>
       </Drawer>
-
-      <DialogoSobreUsuario
-        open={sobreUsuarioAberto}
-        onClose={() => setSobreUsuarioAberto(false)}
-        usuarioLogado={usuarioLogado}
-      />
 
       <DialogoConfirmacao
         open={confirmarSaidaAberto}

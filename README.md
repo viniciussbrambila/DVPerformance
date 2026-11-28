@@ -29,9 +29,7 @@ Desenvolvido como projeto de Estágio Supervisionado e Trabalho de Conclusão de
 ## ⚙️ Funcionalidades Implementadas
 
 - [x] **Autenticação, Segurança e Conta do Personal:**
-  - Cadastro e login com senhas protegidas por **PBKDF2-SHA256** e autenticação via token **JWT (HMAC-SHA256)**.
-  - Chave pessoal de recuperação gerada por usuário (armazenada com hash e cifra autenticada AES-GCM), acessível na área **Sobre o usuário** mediante confirmação da senha.
-  - Alteração de senha autenticada e redefinição por chave pessoal com rate limiting.
+  - Cadastro e login com senha em texto simples e autenticação via token **JWT (HMAC-SHA256)**.
 - [x] **Dashboard do Personal:** Visão geral com contagens de alunos cadastrados e planos gerados, além de atalhos de acesso rápido e alternância de tema claro/escuro persistida.
 - [x] **Gestão de Alunos:** Cadastro completo com data de nascimento, peso, altura, experiência, objetivo, frequência semanal, filtros por período, busca e relatório individual de evolução/características.
 - [x] **Catálogo de Exercícios e Máquinas:** Provisionamento automático de catálogo inicial por conta, criação/edição personalizada, definição de foco muscular e nível mínimo exigido.

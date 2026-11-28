@@ -12,6 +12,7 @@ public static class FocosMusculares
 {
     public sealed record OpcaoFoco(string Id, string Nome);
 
+    // Valor interno para itens sem foco reconhecido; não faz parte das opções de cadastro.
     public const string Geral = "geral";
 
     public static readonly string[] NiveisExperiencia = ["Iniciante", "Intermediário", "Avançado"];
@@ -23,85 +24,73 @@ public static class FocosMusculares
             [
                 new("superior", "Superior / movimento inclinado"),
                 new("esternocostal", "Esternocostal / movimento horizontal"),
-                new("inferior", "Inferior / movimento declinado"),
-                new(Geral, "Geral / sem classificação específica")
+                new("inferior", "Inferior / movimento declinado")
             ],
             ["Costas"] =
             [
                 new("puxada_vertical", "Puxada vertical"),
                 new("remada_horizontal", "Remada horizontal"),
-                new("extensao_ombro", "Extensão de ombro / pullover"),
-                new(Geral, "Geral / sem classificação específica")
+                new("extensao_ombro", "Extensão de ombro / pullover")
             ],
             ["Quadríceps"] =
             [
                 new("dominante_joelho", "Agachamento / pressão de pernas"),
                 new("unilateral_joelho", "Unilateral / afundo, passada e búlgaro"),
-                new("extensao_joelho", "Extensão de joelho"),
-                new(Geral, "Geral / sem classificação específica")
+                new("extensao_joelho", "Extensão de joelho")
             ],
             ["Posterior de Coxa"] =
             [
                 new("extensao_quadril", "Extensão de quadril"),
-                new("flexao_joelho", "Flexão de joelho"),
-                new(Geral, "Geral / sem classificação específica")
+                new("flexao_joelho", "Flexão de joelho")
             ],
             ["Glúteos"] =
             [
                 new("extensao_quadril_alongado", "Extensão com maior flexão de quadril"),
-                new("extensao_quadril_encurtado", "Extensão / ponte e coice"),
-                new(Geral, "Geral / sem classificação específica")
+                new("extensao_quadril_encurtado", "Extensão / ponte e coice")
             ],
             ["Ombros"] =
             [
                 new("anterior", "Anterior / desenvolvimento e elevação frontal"),
                 new("lateral", "Lateral / abdução de ombro"),
-                new("posterior", "Posterior / abertura inversa"),
-                new(Geral, "Geral / sem classificação específica")
+                new("posterior", "Posterior / abertura inversa")
             ],
             ["Trapézio"] =
             [
                 new("superior", "Superior / elevação escapular"),
                 new("medio", "Médio / retração escapular"),
-                new("inferior", "Inferior / depressão e elevação em Y"),
-                new(Geral, "Geral / sem classificação específica")
+                new("inferior", "Inferior / depressão e elevação em Y")
             ],
             ["Adutores / Abdutores"] =
             [
                 new("aducao", "Adução do quadril"),
-                new("abducao", "Abdução do quadril"),
-                new(Geral, "Geral / sem classificação específica")
+                new("abducao", "Abdução do quadril")
             ],
             ["Bíceps"] =
             [
                 new("ombro_neutro", "Braço ao lado do tronco"),
                 new("ombro_estendido", "Braço atrás do tronco"),
                 new("ombro_fletido", "Braço à frente / apoiado"),
-                new("pegada_neutra", "Pegada neutra / martelo"),
-                new(Geral, "Geral / sem classificação específica")
+                new("pegada_neutra", "Pegada neutra / martelo")
             ],
             ["Tríceps"] =
             [
                 new("braco_elevado", "Braço elevado / francês e testa"),
                 new("braco_ao_lado", "Braço ao lado / extensão na polia"),
                 new("braco_atras", "Braço atrás / coice"),
-                new("empurrao_composto", "Empurrão composto / paralelas e supino fechado"),
-                new(Geral, "Geral / sem classificação específica")
+                new("empurrao_composto", "Empurrão composto / paralelas e supino fechado")
             ],
             ["Panturrilha"] =
             [
                 new("joelho_estendido", "Joelho estendido"),
                 new("joelho_fletido", "Joelho flexionado / sentado"),
-                new("dorsiflexao", "Dorsiflexão / tibial anterior"),
-                new(Geral, "Geral / sem classificação específica")
+                new("dorsiflexao", "Dorsiflexão / tibial anterior")
             ],
             ["Antebraço"] =
             [
                 new("flexao_punho", "Flexão de punho"),
                 new("extensao_punho", "Extensão de punho"),
                 new("flexao_cotovelo_pronada", "Flexão de cotovelo / pegada pronada"),
-                new("pegada", "Sustentação / pegada"),
-                new(Geral, "Geral / sem classificação específica")
+                new("pegada", "Sustentação / pegada")
             ],
             ["Abdômen"] =
             [
@@ -110,15 +99,13 @@ public static class FocosMusculares
                 new("anti_extensao", "Resistência à extensão / prancha frontal"),
                 new("estabilizacao_lateral", "Estabilização lateral"),
                 new("rotacao", "Rotação do tronco"),
-                new("anti_rotacao", "Resistência à rotação"),
-                new(Geral, "Geral / sem classificação específica")
+                new("anti_rotacao", "Resistência à rotação")
             ],
             ["Lombar"] =
             [
                 new("extensao_tronco", "Extensão do tronco"),
                 new("estabilizacao", "Estabilização do tronco"),
-                new("dobradica_quadril", "Dobradiça do quadril"),
-                new(Geral, "Geral / sem classificação específica")
+                new("dobradica_quadril", "Dobradiça do quadril")
             ]
         };
 

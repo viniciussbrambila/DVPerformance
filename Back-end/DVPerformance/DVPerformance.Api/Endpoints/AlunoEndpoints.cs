@@ -303,7 +303,7 @@ public static class AlunoEndpoints
         return erros;
     }
 
-    // Valida todos os campos do Aluno segundo o Dicionário de Dados e as Regras de Negócio (RNs)
+    // Valida todos os campos do Aluno segundo o Dicionário de Dados e as Regras de Negócio
     private static List<string> ValidarAluno(Aluno? aluno, bool exigirUsuarioId)
     {
         var erros = new List<string>();

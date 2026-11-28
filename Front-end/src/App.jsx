@@ -19,7 +19,6 @@ import Alunos from "./pages/Alunos";
 import Treinos from "./pages/Treinos";
 import Dashboard from "./pages/Dashboard";
 import Cadastro from "./pages/Cadastro";
-import EsqueciSenha from "./pages/EsqueciSenha";
 import Exercicios from "./pages/Exercicios.jsx";
 import Maquinas from "./pages/Maquinas";
 import PlanosExportados from "./pages/PlanosExportados";
@@ -161,17 +160,14 @@ function AppConteudo() {
               navigate("/dashboard", { replace: true });
             }}
             onIrCadastro={() => setTelaAuth("cadastro")}
-            onIrEsqueciSenha={() => setTelaAuth("esqueci")}
           />
-        ) : telaAuth === "cadastro" ? (
+        ) : (
           <Cadastro
             onCadastro={() => {
               setTelaAuth("login");
             }}
             onVoltarLogin={() => setTelaAuth("login")}
           />
-        ) : (
-          <EsqueciSenha onVoltarLogin={() => setTelaAuth("login")} />
         )
       ) : (
         <Box sx={{ display: "flex" }}>

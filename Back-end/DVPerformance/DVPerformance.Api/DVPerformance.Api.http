@@ -12,16 +12,8 @@ Accept: application/json
 GET {{host}}/exercicios?usuarioId=1
 Accept: application/json
 
-### Restaurar Exercícios Pré-Cadastrados Removidos pelo Personal
-POST {{host}}/exercicios/restaurar-padrao?usuarioId=1
-Accept: application/json
-
 ### Listar Máquinas da Conta do Personal (Pré-cadastradas + Personalizadas)
 GET {{host}}/maquinas?usuarioId=1
-Accept: application/json
-
-### Restaurar Máquinas Pré-Cadastradas Removidas pelo Personal
-POST {{host}}/maquinas/restaurar-padrao?usuarioId=1
 Accept: application/json
 
 ### Gerar Treino Automático para um Aluno (informe o ID real do aluno)

@@ -42,9 +42,7 @@ function CardContagem({ icone, titulo, valor }) {
         <Typography variant="body2" color="text.secondary">
           {titulo}
         </Typography>
-        <Typography variant="h4">
-          {valor}
-        </Typography>
+        <Typography variant="h4">{valor}</Typography>
       </Box>
     </Paper>
   );
@@ -83,12 +81,8 @@ export default function Dashboard() {
     : null;
   const resumoSalvo = chaveCache ? lerCache(chaveCache) : null;
 
-  const [totalAlunos, setTotalAlunos] = useState(
-    resumoSalvo?.totalAlunos ?? 0,
-  );
-  const [totalPlanos, setTotalPlanos] = useState(
-    resumoSalvo?.totalPlanos ?? 0,
-  );
+  const [totalAlunos, setTotalAlunos] = useState(resumoSalvo?.totalAlunos ?? 0);
+  const [totalPlanos, setTotalPlanos] = useState(resumoSalvo?.totalPlanos ?? 0);
 
   useEffect(() => {
     const carregarContagens = async () => {

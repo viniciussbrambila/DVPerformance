@@ -175,47 +175,6 @@ public static class MaquinaEndpoints
             return Results.Created($"/maquinas/{novaMaquina.Id}", novaMaquina);
         });
 
-        // POST /maquinas/restaurar-padrao?usuarioId=1 -> Restaura as máquinas pré-cadastradas que o Personal tenha removido, mantendo as criadas por ele
-        grupo.MapPost("/restaurar-padrao", async (int? usuarioId, HttpContext httpContext, AppDbContext db) =>
-        {
-            if (AutorizacaoEndpoints.ValidarMesmoUsuario(httpContext, usuarioId) is IResult erroPropriedade)
-            {
-                return erroPropriedade;
-            }
-
-            var idResolvido = AutorizacaoEndpoints.ResolverUsuarioId(httpContext, usuarioId) ?? usuarioId;
-            if (idResolvido is not > 0)
-            {
-                return Results.BadRequest(new { mensagem = "Informe um usuarioId válido para restaurar as máquinas padrão." });
-            }
-
-            var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == idResolvido.Value && u.Ativo);
-            if (usuario is null)
-            {
-                return Results.NotFound(new { mensagem = "Conta de Personal não encontrada ou desativada." });
-            }
-
-            if (!string.Equals(usuario.Perfil, "admin", StringComparison.OrdinalIgnoreCase))
-            {
-                return Results.Json(new
-                {
-                    mensagem = "Acesso negado.",
-                    erros = new[] { "RN18: Apenas usuários com perfil de Administrador podem manter máquinas no catálogo." }
-                }, statusCode: StatusCodes.Status403Forbidden);
-            }
-
-            var (inseridos, reativados) = await CatalogoPadraoService.RestaurarMaquinasPadraoAsync(db, idResolvido.Value);
-
-            return Results.Ok(new
-            {
-                usuarioId = idResolvido.Value,
-                inseridos,
-                reativados,
-                totalPadrao = CatalogoPadraoService.MaquinasPadrao.Count,
-                mensagem = "Máquinas pré-cadastradas restauradas com sucesso na conta do Personal."
-            });
-        });
-
         // PUT /maquinas/{id} -> Atualiza uma máquina ativa existente na conta do Personal (RF03 / RN18)
         grupo.MapPut("/{id:int}", async (int id, Maquina? dadosAtualizados, HttpContext httpContext, AppDbContext db) =>
         {
